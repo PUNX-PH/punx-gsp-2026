@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "template": "runner",
+  "palette": ["#1b1f3b", "#ff6f59", "#ffd166", "#06d6a0", "#ffffff"],
+  "roles": { "hero": "hero.glb", "obstacle": "obstacle.glb", "collectible": "coin.glb" },
+  "tuning": { "speed": 0, "jumpHeight": 2.2, "obstacleSpacing": 12 }
+}
