@@ -1,0 +1,17 @@
+{
+    "name": "Runner.Runtime",
+    "rootNamespace": "Runner",
+    "references": [
+        "Unity.InputSystem",
+        "glTFast"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
