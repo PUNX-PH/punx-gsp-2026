@@ -1,0 +1,24 @@
+# Unity (project lives in unity/runner-template)
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+*.csproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.pidb
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Build outputs and test results
+/Builds/
+
+# Local tool and agent state
+.superpowers/
+.claude/settings.local.json

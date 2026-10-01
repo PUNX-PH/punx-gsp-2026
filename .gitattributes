@@ -1,0 +1,12 @@
+# Keep LF in the working tree on Windows (core.autocrlf=true would otherwise rewrite
+# the vendored bash scripts to CRLF and break them).
+* text=auto eol=lf
+
+*.glb binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.wasm binary
+*.data binary
+*.br binary
+*.unityweb binary
