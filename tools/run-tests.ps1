@@ -14,7 +14,7 @@ param(
 )
 
 $repo = Split-Path -Parent $PSScriptRoot
-$unity = & powershell -NoProfile -File (Join-Path $PSScriptRoot 'check-env.ps1') -PrintPath
+$unity = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'check-env.ps1') -PrintPath
 if ($LASTEXITCODE -ne 0) { exit 1 }
 
 $project = Join-Path $repo 'unity\runner-template'
