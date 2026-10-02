@@ -1,0 +1,8 @@
+# Which tunings are playable, as decided by the Unity template's Winnability.Check.
+# The web app's validator (web/src/lib/settings.test.ts) and WinnabilityGoldenTests.cs must both reproduce it.
+# Grid: speed 1.00 to 20.00 step 0.05 (outermost), jumpHeight 1.50 to 5.00 step 0.05, obstacleSpacing 4.0 to 40.0 step 0.5
+# (innermost), each value parsed from its decimal text. The fingerprint is the SHA-256 of one character per point, in that
+# order: 1 if the tuning is playable, 0 if not.
+points: 1974723
+accepted: 1279527
+sha256: cb04fd4078d5c9d8e83126a01da183e919cd79d08a1166b6bd02826720955f6d

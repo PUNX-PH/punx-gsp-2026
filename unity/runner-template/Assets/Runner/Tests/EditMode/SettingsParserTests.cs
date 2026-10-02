@@ -87,6 +87,10 @@ namespace Runner.Tests
         }
 
         // Each value is inside its own range, but together they make a game nobody can win.
+        // The web app's validator must decide these two the same way; both are shared files in fixtures/settings.
+        [Test] public void Parse_rejects_a_tuning_exactly_on_the_edge() => AssertRejected("invalid-unwinnable-boundary.json", "jumpHeight");
+        [Test] public void Parse_reads_numbers_as_floats() => AssertAccepted("valid-rounds-to-range-edge.json"); // 20.000000001 is 20 as a float
+
         [Test] public void Parse_rejects_a_jump_that_cannot_clear_an_obstacle() => AssertRejected("invalid-unwinnable-jump.json", "jumpHeight");
         [Test] public void Parse_rejects_spacing_too_short_to_land_and_jump_again() => AssertRejected("invalid-unwinnable-spacing.json", "obstacleSpacing");
     }

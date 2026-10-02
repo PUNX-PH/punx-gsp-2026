@@ -18,11 +18,16 @@ const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const GLB_FILE_NAME = /^[A-Za-z0-9_-]+\.[Gg][Ll][Bb]$/;
 const ROLES = ["hero", "obstacle", "collectible"] as const;
 
-// From RunnerSim.cs and Winnability.cs.
+// From RunnerSim.cs and Winnability.cs. The Unity template reads each number from the settings file as a single-precision
+// float and then does the winnability arithmetic in double precision, which is identical in the Editor and in the
+// WebGL player (in float arithmetic those two disagreed at a few tunings sitting exactly on an edge). So here: round
+// each input and each constant to single precision with Math.fround, and do the arithmetic as JavaScript's doubles.
+// A web validator in plain double precision accepted tunings Unity refuses (speed 4, jumpHeight 2.35).
+const fl = Math.fround;
 const GRAVITY = 30;
 const OBSTACLE_HEIGHT = 1;
-const HIT_WIDTH = 2 * 0.8;
-const MIN_TIMING_WINDOW = 0.2;
+const HIT_WIDTH = 2 * fl(0.8);
+const MIN_TIMING_WINDOW = fl(0.2);
 
 /** Validates settings text. A leading byte-order mark is removed, and the returned text is without it. */
 export function validateSettings(input: string): SettingsResult {
@@ -75,7 +80,7 @@ function validate(s: Record<string, unknown>): string | null {
     checkRange("speed", t.speed, 1, 20) ??
     checkRange("jumpHeight", t.jumpHeight, 1.5, 5) ??
     checkRange("obstacleSpacing", t.obstacleSpacing, 4, 40) ??
-    checkWinnable(t.speed as number, t.jumpHeight as number, t.obstacleSpacing as number)
+    winnabilityError(t.speed as number, t.jumpHeight as number, t.obstacleSpacing as number)
   );
 }
 
@@ -99,14 +104,22 @@ function checkRole(role: string, file: unknown): string | null {
 
 function checkRange(name: string, value: unknown, min: number, max: number): string | null {
   if (typeof value !== "number") return `settings.tuning.${name}: must be a number`;
-  if (value >= min && value <= max) return null;
+  if (fl(value) >= min && fl(value) <= max) return null; // Unity reads the number as a float
   return `settings.tuning.${name}: ${value} is outside ${min} to ${max}`;
 }
 
-// Each value is in range, but together they must make a game that can be won (see Winnability.cs).
-function checkWinnable(speed: number, jumpHeight: number, obstacleSpacing: number): string | null {
+/**
+ * Each value is in range, but together they must make a game that can be won (see Winnability.cs). Null when the
+ * tuning is playable, otherwise the settings error.
+ */
+export function winnabilityError(speedValue: number, jumpHeightValue: number, obstacleSpacingValue: number): string | null {
+  const speed = fl(speedValue);
+  const jumpHeight = fl(jumpHeightValue);
+  const obstacleSpacing = fl(obstacleSpacingValue);
+
   // Seconds one jump spends above the top of an obstacle, against what the hit window and the margin need.
-  const above = 2 * Math.sqrt((2 * Math.max(0, jumpHeight - OBSTACLE_HEIGHT)) / GRAVITY);
+  const excess = Math.max(0, jumpHeight - OBSTACLE_HEIGHT);
+  const above = 2 * Math.sqrt((2 * excess) / GRAVITY);
   const needed = HIT_WIDTH / speed + MIN_TIMING_WINDOW;
   if (above < needed) {
     const minHeight = OBSTACLE_HEIGHT + (GRAVITY * needed * needed) / 8;

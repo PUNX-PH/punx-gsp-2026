@@ -1,7 +1,8 @@
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { rolesNeeded, validateSettings } from "@/lib/settings";
+import { rolesNeeded, validateSettings, winnabilityError } from "@/lib/settings";
 
 // web/src/lib -> repo root is three levels up.
 const FIXTURES = fileURLToPath(new URL("../../../fixtures/settings/", import.meta.url));
@@ -22,6 +23,7 @@ const EXPECTED_ERROR: Record<string, string> = {
   "invalid-speed-0.json": "speed",
   "invalid-speed-21.json": "speed",
   "invalid-unknown-template.json": "template",
+  "invalid-unwinnable-boundary.json": "jumpHeight", // sits exactly on the edge: only single-precision arithmetic refuses it
   "invalid-unwinnable-jump.json": "jumpHeight",
   "invalid-unwinnable-spacing.json": "obstacleSpacing",
 };
@@ -163,5 +165,32 @@ describe("rolesNeeded", () => {
 
   it("accepts an upper-case extension", () => {
     expect(needed(withRoles("Hero.GLB", "obstacle.glb", "coin.glb"))).toEqual(["Hero.GLB", "obstacle.glb", "coin.glb"]);
+  });
+});
+
+// The Unity template decides, in single precision, which of about two million tunings are playable; this validator
+// must decide every one the same way, or it would store a run that the player then refuses. The golden file was made
+// by Unity (WinnabilityGoldenTests.Regenerate_the_golden_file) and WinnabilityGoldenTests.cs checks it from that side.
+describe("winnability agrees with the Unity template on the shared grid", () => {
+  const hundredths = (h: number) => `${Math.floor(h / 100)}.${String(h % 100).padStart(2, "0")}`;
+  const halves = (d: number) => `${Math.floor(d / 2)}${d % 2 === 0 ? ".0" : ".5"}`;
+
+  it("reproduces the fingerprint in fixtures/settings/winnability-grid.txt", () => {
+    const lines = readFileSync(FIXTURES + "winnability-grid.txt", "utf8").split("\n");
+    const golden = (key: string) => lines.find((l) => l.startsWith(key + ": "))!.slice(key.length + 2).trim();
+
+    const bits: string[] = [];
+    let playable = 0;
+    for (let s = 20; s <= 400; s++)
+      for (let j = 30; j <= 100; j++)
+        for (let d = 8; d <= 80; d++) {
+          const ok = winnabilityError(Number(hundredths(s * 5)), Number(hundredths(j * 5)), Number(halves(d))) === null;
+          bits.push(ok ? "1" : "0");
+          if (ok) playable++;
+        }
+
+    expect(bits.length).toBe(Number(golden("points")));
+    expect(playable).toBe(Number(golden("accepted")));
+    expect(createHash("sha256").update(bits.join("")).digest("hex")).toBe(golden("sha256"));
   });
 });
