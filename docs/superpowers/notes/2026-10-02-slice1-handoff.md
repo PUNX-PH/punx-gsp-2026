@@ -85,8 +85,10 @@ The GitHub repo is `PUNX-PH/punx-gsp-2026` (public).
 ## Next steps, in order
 
 1. The user runs the phone check (`slice1-results.md`, last section) and the result goes into that note.
-2. Finish the branch (`finishing-a-development-branch`). The user approved pushing `main` (done) and
-   `slice-1-unity-runner` once Task 6 is committed. GitHub sign-in works through Git Credential Manager.
+2. `slice-1-unity-runner` is pushed to `PUNX-PH/punx-gsp-2026` (`main` is still the setup commit). Still to decide with
+   the user, per `finishing-a-development-branch`: merge to `main`, open a pull request, or keep the branch. Do not
+   merge without being asked. GitHub sign-in works through Git Credential Manager. The ledger workspace
+   `.superpowers/sdd/2026-10-02-slice1-unity-runner-template/` is kept until the phone check is done.
 3. Amend the spec for Vercel hosting (static editor and WebGL builds on Vercel, Blender worker on a separate host,
    `vercel.json` headers for `.unityweb`). **Gate before the player is public:** harden it against untrusted GLBs and
    URLs (a download provider that allows only the role URL and caps its size, a mesh-and-animation-only
