@@ -48,6 +48,29 @@ namespace Runner.Tests
             Assert.Greater(bootstrap.Sim.Z, 0f);
         }
 
+        // Models must render through the one flat shader (no PBR shader graphs, which broke WebGL builds),
+        // tinted with the colour their glTF material declares: hero.glb is #3a86ff.
+        [UnityTest]
+        public IEnumerator Models_use_the_flat_shader_tinted_with_their_own_colour()
+        {
+            host = new GameObject("BootstrapHost");
+            host.SetActive(false);
+            bootstrap = host.AddComponent<RunnerBootstrap>();
+            bootstrap.SettingsUrlOverride = StreamingSettingsUrl("sample");
+            host.SetActive(true);
+            var deadline = Time.realtimeSinceStartup + 20f;
+            while (bootstrap.State == RunnerBootstrap.BootState.Loading && Time.realtimeSinceStartup < deadline) yield return null;
+
+            Assert.AreEqual(RunnerBootstrap.BootState.Ready, bootstrap.State, bootstrap.Error);
+            var material = GameObject.Find("Hero").GetComponentInChildren<Renderer>().sharedMaterial;
+            Assert.AreEqual("Runner/Flat", material.shader.name);
+            var expected = new Color(0x3a / 255f, 0x86 / 255f, 0xff / 255f);
+            var actual = material.GetColor("_BaseColor");
+            Assert.AreEqual(expected.r, actual.r, 0.02f);
+            Assert.AreEqual(expected.g, actual.g, 0.02f);
+            Assert.AreEqual(expected.b, actual.b, 0.02f);
+        }
+
         [UnityTest]
         public IEnumerator Missing_settings_url_fails_visibly()
         {

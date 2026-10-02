@@ -13,9 +13,10 @@ game by wiring steps together on a node canvas. Blender prepares the assets; Uni
 
 ## Status
 
-Nothing is built yet and the stack is not chosen. React and React Flow were assumed when picking the
-Vercel React skills; that is not a decision. Open decisions will live in the design spec
-(`docs/superpowers/specs/`) once it exists.
+The Unity runner template (Slice 1, `unity/runner-template`) is built and runs as a WebGL player. The web side
+(node editor, Vercel hosting, Blender worker) is not started and its stack is not chosen. React and React Flow were
+assumed when picking the Vercel React skills; that is not a decision. Decisions live in the design spec
+(`docs/superpowers/specs/`).
 
 ## Skills (in `.claude/skills/`; origins in `.claude/skills-sources/SOURCES.md`)
 
@@ -35,3 +36,8 @@ Vercel React skills; that is not a decision. Open decisions will live in the des
 
 User uploads (images, FBX, GLB, .blend files) and prompts are untrusted input. Never run scripts that
 come from an uploaded file, and keep Blender and Unity workers sandboxed with no access to secrets.
+
+## Work in progress
+
+Slice 1 (the Unity runner template) is finished except a phone check and the final review. Read
+`docs/superpowers/notes/2026-10-02-slice1-handoff.md` before doing anything else.

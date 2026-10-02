@@ -20,7 +20,7 @@ namespace Runner.View
 
         /// <param name="poolSize">How many obstacles, and how many collectibles, can be on screen at once.</param>
         public RunnerView(Transform root, GameObject heroModel, GameObject obstacleModel, GameObject collectibleModel,
-                          Color background, Color groundColor, int poolSize)
+                          Color background, Color groundColor, Material groundMaterial, int poolSize)
         {
             var cameraObject = new GameObject("Camera") { tag = "MainCamera" };
             cameraObject.transform.SetParent(root, false);
@@ -41,7 +41,9 @@ namespace Runner.View
             Object.Destroy(groundObject.GetComponent<Collider>());
             groundObject.transform.SetParent(root, false);
             groundObject.transform.localScale = new Vector3(8f, 0.2f, 400f);
-            groundObject.GetComponent<Renderer>().material.color = groundColor;
+            var groundRenderer = groundObject.GetComponent<Renderer>();
+            if (groundMaterial != null) groundRenderer.sharedMaterial = groundMaterial;
+            groundRenderer.material.color = groundColor; // .material makes a per-view copy to tint
             ground = groundObject.transform;
 
             hero = Wrap("Hero", heroModel, root);

@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using GLTFast;
+using GLTFast.Materials;
 using UnityEngine;
 using UnityEngine.Networking;
 using Object = UnityEngine.Object;
@@ -14,7 +15,7 @@ namespace Runner.Loading
 
     public static class AssetLoader
     {
-        // Web builds have no threads or timers, so the time limit is checked once per frame.
+        // Web builds have no threads or timers, so the time limit is counted once per frame (see FrameTimeout).
         const float TimeoutSeconds = 30f;
 
         public static async Task<string> FetchText(string url)
@@ -24,10 +25,10 @@ namespace Runner.Loading
                 using (var request = UnityWebRequest.Get(url))
                 {
                     var operation = request.SendWebRequest();
-                    var started = Time.unscaledTime;
+                    var timeout = new FrameTimeout(TimeoutSeconds);
                     while (!operation.isDone)
                     {
-                        if (Time.unscaledTime - started > TimeoutSeconds)
+                        if (timeout.Tick(Time.unscaledDeltaTime))
                         {
                             request.Abort();
                             throw new LoadException("timed out after " + TimeoutSeconds + " s");
@@ -49,17 +50,17 @@ namespace Runner.Loading
         /// that parent owns the glTFast import and disposes it when destroyed, so clone the returned object
         /// (not its parent) to make copies.
         /// </summary>
-        public static async Task<GameObject> LoadModel(string url, Transform parent)
+        public static async Task<GameObject> LoadModel(string url, Transform parent, IMaterialGenerator materialGenerator = null)
         {
-            var import = new GltfImport();
+            var import = new GltfImport(materialGenerator: materialGenerator);
             GameObject owner = null;
             try
             {
                 var load = import.Load(url);
-                var started = Time.unscaledTime;
+                var timeout = new FrameTimeout(TimeoutSeconds);
                 while (!load.IsCompleted)
                 {
-                    if (Time.unscaledTime - started > TimeoutSeconds)
+                    if (timeout.Tick(Time.unscaledDeltaTime))
                         throw new LoadException("timed out after " + TimeoutSeconds + " s");
                     await Task.Yield();
                 }

@@ -1,0 +1,5 @@
+<!-- High managed stripping removes code nothing references. Our own assembly is small and its
+     settings classes are filled by JsonUtility, so keep all of it. -->
+<linker>
+  <assembly fullname="Runner.Runtime" preserve="all"/>
+</linker>

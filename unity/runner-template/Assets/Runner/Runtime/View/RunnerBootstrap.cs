@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using GLTFast.Materials;
 using Runner.Loading;
 using Runner.Settings;
 using Runner.Sim;
@@ -24,6 +25,7 @@ namespace Runner.View
 
         /// <summary>Test hook: use this settings URL instead of the page's settings parameter.</summary>
         public string SettingsUrlOverride;
+
 
         public BootState State { get; private set; } = BootState.Loading;
         public string Error { get; private set; }
@@ -74,13 +76,18 @@ namespace Runner.View
             root.SetParent(transform, false);
             try
             {
-                var hero = await LoadRole(root, settingsUrl, "hero", settings.roles.hero, HeroHeight);
-                var obstacle = await LoadRole(root, settingsUrl, "obstacle", settings.roles.obstacle, RunnerSim.ObstacleHeight);
-                var collectible = await LoadRole(root, settingsUrl, "collectible", settings.roles.collectible, CollectibleHeight);
+                // The shader reaches the player through Always Included Shaders (BuildScript), not through the scene.
+                var flatShader = Shader.Find("Runner/Flat");
+                if (flatShader == null) throw new LoadException("the Runner/Flat shader is missing from this build");
+                var flat = new Material(flatShader);
+                var generator = new FlatMaterialGenerator(flat);
+                var hero = await LoadRole(root, settingsUrl, "hero", settings.roles.hero, HeroHeight, generator);
+                var obstacle = await LoadRole(root, settingsUrl, "obstacle", settings.roles.obstacle, RunnerSim.ObstacleHeight, generator);
+                var collectible = await LoadRole(root, settingsUrl, "collectible", settings.roles.collectible, CollectibleHeight, generator);
 
                 Sim = new RunnerSim(settings.tuning);
                 var poolSize = Mathf.CeilToInt(VisibleDistance / settings.tuning.obstacleSpacing) + 2;
-                view = new RunnerView(root, hero, obstacle, collectible, PaletteColor(settings, 0), PaletteColor(settings, 1), poolSize);
+                view = new RunnerView(root, hero, obstacle, collectible, PaletteColor(settings, 0), PaletteColor(settings, 1), flat, poolSize);
                 hud.PanelColor = PaletteColor(settings, 2);
                 hud.PanelTextColor = PaletteColor(settings, 0);
                 hud.ScoreColor = PaletteColor(settings, 4);
@@ -110,11 +117,11 @@ namespace Runner.View
             return UrlTools.ToAbsolute(pageUrl, url);
         }
 
-        static async Task<GameObject> LoadRole(Transform root, string settingsUrl, string role, string file, float height)
+        static async Task<GameObject> LoadRole(Transform root, string settingsUrl, string role, string file, float height, IMaterialGenerator generator)
         {
             try
             {
-                var content = await AssetLoader.LoadModel(UrlTools.SiblingUrl(settingsUrl, file), root);
+                var content = await AssetLoader.LoadModel(UrlTools.SiblingUrl(settingsUrl, file), root, generator);
                 return Fit(content, height);
             }
             catch (Exception e) when (e is LoadException || e is ArgumentException)
