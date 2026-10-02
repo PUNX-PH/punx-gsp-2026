@@ -22,6 +22,15 @@ const everyRoute = {
   ],
 };
 
+// The Unity player may fetch only from this site (the settings file, the models, its own files): a page link such as
+// /templates/runner-desktop/index.html?settings=https://elsewhere.example/x.json then cannot make it load content from
+// anywhere else. Where two rules set the same header the later one wins, so this stays after everyRoute and repeats
+// its frame-ancestors. blob: and data: are for the player's own use and reach no other site.
+const templatePages = {
+  source: "/templates/:path*",
+  headers: [{ key: "Content-Security-Policy", value: "frame-ancestors 'self'; connect-src 'self' blob: data:" }],
+};
+
 const nextConfig: NextConfig = {
   async headers() {
     return [
@@ -29,6 +38,7 @@ const nextConfig: NextConfig = {
       unityWeb("framework\\.js", "application/javascript"),
       unityWeb("data", "application/octet-stream"),
       everyRoute,
+      templatePages,
     ];
   },
 };

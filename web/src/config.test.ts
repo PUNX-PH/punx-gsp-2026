@@ -26,3 +26,14 @@ describe("next.config headers", () => {
     expect(valueOf(all!, "Referrer-Policy")).toBe("same-origin");
   });
 });
+
+describe("the Unity player may fetch only from this site", () => {
+  it("sends a policy with connect-src 'self' for the template pages, after the all-routes policy so it wins there", async () => {
+    const all = await rules();
+    const templates = all.find((r) => r.source === "/templates/:path*");
+    expect(templates, "a rule for /templates/:path*").toBeDefined();
+    expect(valueOf(templates!, "Content-Security-Policy")).toBe("frame-ancestors 'self'; connect-src 'self' blob: data:");
+    // For a path covered by two rules that set the same header, the later rule wins.
+    expect(all.indexOf(templates!)).toBeGreaterThan(all.findIndex((r) => r.source === "/:path*"));
+  });
+});
