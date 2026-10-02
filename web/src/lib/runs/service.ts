@@ -10,6 +10,9 @@ import { FileExistsError, type FileStore, type Run, RunError, type RunRecords, t
 const MAX_RUNS_PER_PERSON = 20;
 const PENDING_RUN_TTL_MS = 60 * 60 * 1000;
 const SETTINGS_FILE = "settings.json";
+// What a run id looks like (ours are 22 URL-safe characters). Anything else is not a run, and is never passed on: a
+// slash or a leading "__" would make Firestore throw, and the person should just see the uniform 404.
+const RUN_ID = /^(?!__)[A-Za-z0-9_-]{1,64}$/;
 
 export interface RunServiceDeps {
   records: RunRecords;
@@ -24,6 +27,7 @@ export function makeRunService(deps: RunServiceDeps): RunService {
   const notFound = () => new RunError(404, "Not found");
 
   async function ownedRun(user: User, id: string): Promise<Run> {
+    if (!RUN_ID.test(id)) throw notFound();
     const run = await records.get(id);
     if (!run || run.ownerUid !== user.uid) throw notFound();
     return run;
@@ -72,7 +76,7 @@ export function makeRunService(deps: RunServiceDeps): RunService {
     async putFile(user, id, name, bytes) {
       const run = await ownedRun(user, id);
       if (!run.needed.includes(name)) throw new RunError(400, `${name} is not one of this run's files`);
-      if (run.files[name]) throw new RunError(409, `${name} was already uploaded`);
+      if (Object.hasOwn(run.files, name)) throw new RunError(409, `${name} was already uploaded`);
 
       const checked = checkGlb(name, bytes);
       if (!checked.ok) throw new RunError(400, checked.error);
@@ -90,7 +94,7 @@ export function makeRunService(deps: RunServiceDeps): RunService {
 
     async readFile(user, id, name) {
       const run = await ownedRun(user, id);
-      if (!run.files[name]) throw notFound();
+      if (!Object.hasOwn(run.files, name)) throw notFound(); // not run.files[name]: "constructor" is truthy there
       const bytes = await files.get(id, name);
       if (!bytes) throw notFound();
       return { bytes, contentType: contentTypeFor(name) };

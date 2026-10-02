@@ -28,9 +28,9 @@ export class MemoryRunRecords implements RunRecords {
     // Everything from here to the return runs without yielding, so it is atomic like a transaction.
     const run = this.runs.get(id);
     if (!run) throw new RunError(404, "Not found");
-    if (run.files[name]) throw new RunError(409, `${name} was already uploaded`);
+    if (Object.hasOwn(run.files, name)) throw new RunError(409, `${name} was already uploaded`);
     run.files[name] = meta;
-    if (run.needed.every((n) => run.files[n])) run.status = "ready";
+    if (run.needed.every((n) => Object.hasOwn(run.files, n))) run.status = "ready";
     return structuredClone(run);
   }
 

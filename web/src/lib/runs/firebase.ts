@@ -35,11 +35,11 @@ export class FirestoreRunRecords implements RunRecords {
       const snapshot = await transaction.get(reference);
       if (!snapshot.exists) throw new RunError(404, "Not found");
       const run = snapshot.data() as Run;
-      if (run.files[name]) throw new RunError(409, `${name} was already uploaded`);
+      if (Object.hasOwn(run.files, name)) throw new RunError(409, `${name} was already uploaded`);
 
       // The whole map is replaced: file names contain dots, which a "files.<name>" field path would read as nesting.
       const files = { ...run.files, [name]: meta };
-      const status = run.needed.every((needed) => files[needed]) ? "ready" : "pending";
+      const status = run.needed.every((needed) => Object.hasOwn(files, needed)) ? "ready" : "pending";
       transaction.update(reference, { files, status });
       return { ...run, files, status };
     });

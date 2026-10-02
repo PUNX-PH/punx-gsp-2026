@@ -229,3 +229,33 @@ describe("deleteRun", () => {
     expect([...files.files.keys()].filter((k) => k.startsWith(`${id}/`))).toEqual([]);
   });
 });
+
+describe("run ids and file names are never trusted as keys", () => {
+  it.each([["a slash", "a/b"], ["a reserved Firestore id", "__name__"], ["an empty id", ""], ["a path", "../other"], ["a very long id", "x".repeat(200)], ["a space", "run 1"]])(
+    "answers the uniform 404 for an id with %s, without asking the record store",
+    async (_label, badId) => {
+      const asked: string[] = [];
+      const get = records.get.bind(records);
+      records.get = async (id) => {
+        asked.push(id);
+        return get(id);
+      };
+      for (const attempt of [service.readFile(alice, badId, "hero.glb"), service.putFile(alice, badId, "hero.glb", glb()), service.deleteRun(alice, badId)]) {
+        expect(await failure(attempt)).toMatchObject({ status: 404, message: "Not found" });
+      }
+      expect(asked).toEqual([]);
+    },
+  );
+
+  it.each(["constructor", "__proto__", "toString", "hasOwnProperty"])("does not serve %s as if it were a stored file", async (name) => {
+    const id = await readyRun();
+    let looked = 0;
+    const get = files.get.bind(files);
+    files.get = async (runId, fileName) => {
+      looked++;
+      return get(runId, fileName);
+    };
+    expect(await failure(service.readFile(alice, id, name))).toMatchObject({ status: 404, message: "Not found" });
+    expect(looked).toBe(0); // refused before any path was built for the file store
+  });
+});
