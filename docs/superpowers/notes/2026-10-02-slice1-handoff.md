@@ -97,5 +97,5 @@ The GitHub repo is `PUNX-PH/punx-gsp-2026` (public).
    accounts for `@punx.ai` addresses only (Firebase email-link sign-in), all-Firebase storage (Firestore + Cloud
    Storage, which needs the Blaze plan), Describe Game included but in a later slice. The spec is written and
    committed on branch `slice-2-web-foundation`: `docs/superpowers/specs/2026-10-02-web-foundation-design.md`
-   (status: awaiting the user's review). Next: the user reviews the spec, then `writing-plans`, then the user reviews
-   the plan and picks an execution method. Nothing is built or installed for it yet (Node.js is not installed; ask).
+   (approved). The plan is written: `docs/superpowers/plans/2026-10-02-slice2-web-foundation.md` (10 tasks). Next: the user reviews
+   the plan and picks an execution method (native or subagent-driven). Nothing is built or installed for it yet (Node.js is not installed; ask).
