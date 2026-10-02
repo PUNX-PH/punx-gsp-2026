@@ -86,3 +86,55 @@ describe("checkGlb on arbitrary bytes", () => {
     }
   });
 });
+
+import { BIN_CHUNK, JSON_CHUNK, jsonChunk } from "@/lib/testing/glb";
+
+// The Unity player (glTFast) reads every JSON chunk and every uri in them, so the checker must see what it sees.
+describe("checkGlb reads every part of the file, like the player", () => {
+  const outside = "hero.glb: refers to files outside itself";
+  const unsupported = "hero.glb: has parts this app does not accept (one JSON part, then at most one binary part)";
+  const clean = { asset: { version: "2.0" } };
+  const evil = { asset: { version: "2.0" }, buffers: [{ uri: "https://evil.example/x.bin", byteLength: 4 }] };
+
+  const check = (bytes: Uint8Array) => {
+    const result = checkGlb("hero.glb", bytes);
+    return result.ok ? "ok" : result.error;
+  };
+
+  it("refuses a second JSON part, even when the first is clean", () => {
+    expect(check(makeGlb(clean, { extraChunks: [jsonChunk(evil)] }))).toBe(unsupported);
+    expect(check(makeGlb(clean, { bin: new Uint8Array(8), extraChunks: [jsonChunk(evil)] }))).toBe(unsupported);
+  });
+
+  it("refuses a part of a type it does not know, and a second binary part", () => {
+    expect(check(makeGlb(clean, { extraChunks: [{ type: 0x12345678, data: new Uint8Array(8) }] }))).toBe(unsupported);
+    expect(check(makeGlb(clean, { bin: new Uint8Array(8), extraChunks: [{ type: BIN_CHUNK, data: new Uint8Array(8) }] }))).toBe(unsupported);
+  });
+
+  it("refuses bytes left over after the last part, and a binary part that is cut off", () => {
+    expect(check(makeGlb(clean, { trailing: new Uint8Array(3) }))).toBe(unsupported);
+    const cutOff = makeGlb(clean, { bin: new Uint8Array(8) });
+    new DataView(cutOff.buffer).setUint32(cutOff.length - 8 - 8, 1_000_000, true); // the BIN chunk's length field
+    expect(check(cutOff)).toBe(unsupported);
+  });
+
+  it("still accepts one JSON part and one binary part", () => {
+    expect(check(makeGlb(clean, { bin: new Uint8Array(16) }))).toBe("ok");
+    expect(JSON_CHUNK).toBe(0x4e4f534a);
+  });
+
+  it.each([
+    ["an upper-case key", { asset: { version: "2.0" }, buffers: [{ URI: "x.bin" }] }],
+    ["a mixed-case key", { asset: { version: "2.0" }, images: [{ Uri: "x.png" }] }],
+    ["a uri in extras", { asset: { version: "2.0" }, extras: { uri: "https://evil.example" } }],
+    ["a uri deep inside an extension", { asset: { version: "2.0" }, extensions: { X_vendor: { list: [{ nested: { uri: "x" } }] } } }],
+    ["a uri spelled with escapes", '{"asset":{"version":"2.0"},"buffers":[{"\u0075ri":"x.bin"}]}'],
+  ])("refuses %s", (_label, json) => {
+    expect(check(makeGlb(json))).toBe(outside);
+  });
+
+  it("copes with very deeply nested JSON without crashing", () => {
+    const deep = '{"asset":{"version":"2.0"},"extras":' + "[".repeat(5000) + "]".repeat(5000) + "}";
+    expect(["ok", "hero.glb: damaged (the JSON part is missing or not valid)"]).toContain(check(makeGlb(deep)));
+  });
+});
