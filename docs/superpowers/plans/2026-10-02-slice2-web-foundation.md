@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Only a verified `@punx.ai` address (exact domain, lower-cased, one `@`) may sign in; the check runs on `POST /api/session` **and** in `requireUser()` on every request. Refusal text: "Only punx.ai email addresses can sign in".
-- Session cookie `session`: Firebase session cookie, 5 days (`Max-Age=432000`), `HttpOnly; Secure; SameSite=Lax; Path=/`.
+- Session cookie `__Host-session` (the plan first said `session`; the final review asked for the prefix so no other subdomain can set it): Firebase session cookie, 5 days (`Max-Age=432000`), `HttpOnly; Secure; SameSite=Lax; Path=/`, no `Domain`.
 - `POST`, `PUT` and `DELETE` routes require an `Origin` header equal to the site's own origin.
 - Limits: GLB at most 4 MB (4 * 1024 * 1024 bytes), settings at most 16 KB (16,384 bytes), at most 20 runs per person, pending ones included ("You have 20 runs. Delete one first."), a pending run older than one hour is deleted when its owner next lists or creates runs.
 - Run ids: random 128-bit, URL-safe. Storage path `runs/{runId}/{fileName}`; file names come only from validated settings. Firestore collection `runs`. Firestore and Storage rules deny all client access.

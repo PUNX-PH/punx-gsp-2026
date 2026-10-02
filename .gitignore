@@ -22,3 +22,12 @@
 # Local tool and agent state
 .superpowers/
 .claude/settings.local.json
+
+# Secrets: environment files (web/.gitignore keeps web/.env.example) and Firebase service-account keys, which
+# download as <project>-firebase-adminsdk-<id>-<hash>.json
+.env
+.env.*
+!.env.example
+*-firebase-adminsdk-*.json
+serviceAccount*.json
+service-account*.json

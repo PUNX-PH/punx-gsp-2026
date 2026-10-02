@@ -81,7 +81,9 @@ The validator and the GLB checker are pure functions with no network, so they ar
   true **and** the part of the address after the last `@` equals `punx.ai` (lower-cased, exact match; so
   `x@punx.ai.evil.com`, `x@notpunx.ai` and `x@sub.punx.ai` are refused). Anything else gets "Only punx.ai
   email addresses can sign in", and no cookie is set.
-- It then creates a Firebase session cookie (5 days), set `HttpOnly`, `Secure`, `SameSite=Lax`, path `/`.
+- It then creates a Firebase session cookie (5 days) named `__Host-session`, set `HttpOnly`, `Secure`, `SameSite=Lax`,
+  path `/`, with no `Domain`. The `__Host-` prefix makes browsers accept it only under those conditions, which stops
+  any other subdomain of the site's domain from setting a cookie of that name (cookie tossing).
 - `requireUser()` verifies the session cookie with revocation checking and repeats the domain test on every
   request, so removing an address from the allowed domain, or revoking a user in Firebase, takes effect at once.
 - Pages redirect to `/sign-in`; API routes return 401 with a JSON message. A coarse redirect in the app's
@@ -129,11 +131,12 @@ All routes call `requireUser()`; the three that change state also check `Origin`
 4. `DELETE /api/runs/{id}` removes the objects and the record (owner only).
 5. `GET /api/runs` lists the caller's runs.
 
-`checkGlb` accepts a file only if it is 12 bytes or more with magic `glTF`, version 2, a declared length equal to
-the file size, a first chunk of type `JSON` that parses, `asset.version` starting with `2`, and **no external
-references**: no `buffers[].uri` and no `images[].uri` (a self-contained GLB keeps its data in the file). Each
-failure has its own message, for example "hero.glb: not a GLB file (wrong header)" or "hero.glb: refers to
-files outside itself".
+`checkGlb` reads the file the way the Unity player (glTFast) does, which reads every part: it accepts a file only if
+it is 12 bytes or more with magic `glTF`, version 2, a declared length equal to the file size, **exactly one JSON
+part first and at most one binary part after it and nothing else** (no second JSON part, no unknown part, no bytes
+left over), `asset.version` starting with `2`, and **no external references**: no key named `uri` anywhere in the
+JSON, in any letter case (a self-contained GLB keeps its data in the file). Each failure has its own message, for
+example "hero.glb: not a GLB file (wrong header)" or "hero.glb: refers to files outside itself".
 
 ## Serving and Preview
 
@@ -151,7 +154,9 @@ files outside itself".
   `/templates/runner-mobile/index.html` when the device's primary pointer is coarse (a touch screen), and
   `runner-desktop` otherwise, with `?settings=/api/runs/{id}/settings.json`.
 - The app sends `X-Frame-Options: SAMEORIGIN` and a `frame-ancestors 'self'` content-security-policy so only
-  the site can embed its own pages.
+  the site can embed its own pages. The template pages and their files also carry `connect-src 'self' blob: data:`, so
+  the player can fetch only from this site: a link such as `/templates/runner-desktop/index.html?settings=https://elsewhere/x.json`
+  cannot make it load anything from another origin (checked in a browser with a `no-cors` fetch, which the policy refuses).
 - Pages: `/sign-in`, `/` (your runs, with Preview and Delete), `/runs/new` (pick the settings file and the
   models; shows each file's result), `/runs/{id}/preview`. The interface is plain and functional; it is
   replaced by the editor in slice 3.
