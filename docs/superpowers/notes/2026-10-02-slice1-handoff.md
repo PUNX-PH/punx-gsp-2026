@@ -93,6 +93,9 @@ The GitHub repo is `PUNX-PH/punx-gsp-2026` (public).
    `vercel.json` headers for `.unityweb`). **Gate before the player is public:** harden it against untrusted GLBs and
    URLs (a download provider that allows only the role URL and caps its size, a mesh-and-animation-only
    instantiation mask, a same-origin rule for `settings`); this needs a decision on where run folders live.
-4. Plan the next slice. The user asked whether the web should come first, since that is where prompts and assets go;
-   the recommendation was to put the node editor (prompt and asset nodes that write `settings.json` and the files,
-   then open the WebGL player) ahead of the Blender Prepare Asset step. Confirm with the user.
+4. **Next slice: web foundation (slice 2).** Decided with the user (2026-10-02): web first, hosted on Vercel, real
+   accounts for `@punx.ai` addresses only (Firebase email-link sign-in), all-Firebase storage (Firestore + Cloud
+   Storage, which needs the Blaze plan), Describe Game included but in a later slice. The spec is written and
+   committed on branch `slice-2-web-foundation`: `docs/superpowers/specs/2026-10-02-web-foundation-design.md`
+   (status: awaiting the user's review). Next: the user reviews the spec, then `writing-plans`, then the user reviews
+   the plan and picks an execution method. Nothing is built or installed for it yet (Node.js is not installed; ask).

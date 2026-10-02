@@ -14,9 +14,9 @@ game by wiring steps together on a node canvas. Blender prepares the assets; Uni
 ## Status
 
 The Unity runner template (Slice 1, `unity/runner-template`) is built and runs as a WebGL player. The web side
-(node editor, Vercel hosting, Blender worker) is not started and its stack is not chosen. React and React Flow were
-assumed when picking the Vercel React skills; that is not a decision. Decisions live in the design spec
-(`docs/superpowers/specs/`).
+is being designed: slice 2 (web foundation: Next.js on Vercel, `@punx.ai`-only Firebase sign-in, Firestore and
+Cloud Storage) has a spec awaiting review, `docs/superpowers/specs/2026-10-02-web-foundation-design.md`. Nothing
+for it is built yet. Decisions live in the design specs (`docs/superpowers/specs/`).
 
 ## Skills (in `.claude/skills/`; origins in `.claude/skills-sources/SOURCES.md`)
 
@@ -39,5 +39,5 @@ come from an uploaded file, and keep Blender and Unity workers sandboxed with no
 
 ## Work in progress
 
-Slice 1 (the Unity runner template) is finished except a phone check and the final review. Read
+Slice 1 (the Unity runner template) is finished except the phone check. Read
 `docs/superpowers/notes/2026-10-02-slice1-handoff.md` before doing anything else.
