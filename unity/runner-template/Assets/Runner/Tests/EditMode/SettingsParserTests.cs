@@ -80,10 +80,14 @@ namespace Runner.Tests
         }
 
         [Test]
-        public void Parse_accepts_range_limits()
+        public void Parse_accepts_the_playable_extremes()
         {
-            AssertAccepted("valid-range-min.json");
+            AssertAccepted("valid-playable-low.json");
             AssertAccepted("valid-range-max.json");
         }
+
+        // Each value is inside its own range, but together they make a game nobody can win.
+        [Test] public void Parse_rejects_a_jump_that_cannot_clear_an_obstacle() => AssertRejected("invalid-unwinnable-jump.json", "jumpHeight");
+        [Test] public void Parse_rejects_spacing_too_short_to_land_and_jump_again() => AssertRejected("invalid-unwinnable-spacing.json", "obstacleSpacing");
     }
 }

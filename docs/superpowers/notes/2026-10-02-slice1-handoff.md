@@ -19,8 +19,10 @@ The GitHub repo is `PUNX-PH/punx-gsp-2026` (public).
 
 - Repo: `C:\dev\GameStudioPlatform` (outside OneDrive on purpose). Branch `slice-1-unity-runner`.
 - Plan Tasks 1 to 5 are complete. Task 6 is done except the **phone check**, which needs the user (steps in
-  `slice1-results.md`). Tests: EditMode 44, PlayMode 4
+  `slice1-results.md`). Tests: EditMode 61, PlayMode 4
   (`powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-tests.ps1 -Platform EditMode|PlayMode`).
+- The final whole-branch review is done and its Important findings are fixed (see "Fixed after the final review" in
+  `slice1-results.md`). Its Minor findings and the untrusted-input hardening are listed there as follow-ups.
 - Both WebGL builds are about 7.7 MB against a 15 MB budget and pass every browser check that can be done
   without a phone: colours, console, jump, game over, restart, and five failure messages.
 - The ledger is `.superpowers/sdd/2026-10-02-slice1-unity-runner-template/progress.md` (git-ignored, so it
@@ -83,11 +85,12 @@ The GitHub repo is `PUNX-PH/punx-gsp-2026` (public).
 ## Next steps, in order
 
 1. The user runs the phone check (`slice1-results.md`, last section) and the result goes into that note.
-2. Final whole-branch review with a fresh reviewer (Review Focus section of the plan), a single fix pass, and
-   finish the branch. The user approved pushing `main` (done) and `slice-1-unity-runner` once Task 6 is committed.
-   GitHub sign-in works through Git Credential Manager.
+2. Finish the branch (`finishing-a-development-branch`). The user approved pushing `main` (done) and
+   `slice-1-unity-runner` once Task 6 is committed. GitHub sign-in works through Git Credential Manager.
 3. Amend the spec for Vercel hosting (static editor and WebGL builds on Vercel, Blender worker on a separate host,
-   `vercel.json` headers for `.unityweb`).
+   `vercel.json` headers for `.unityweb`). **Gate before the player is public:** harden it against untrusted GLBs and
+   URLs (a download provider that allows only the role URL and caps its size, a mesh-and-animation-only
+   instantiation mask, a same-origin rule for `settings`); this needs a decision on where run folders live.
 4. Plan the next slice. The user asked whether the web should come first, since that is where prompts and assets go;
    the recommendation was to put the node editor (prompt and asset nodes that write `settings.json` and the files,
    then open the WebGL player) ahead of the Blender Prepare Asset step. Confirm with the user.

@@ -172,8 +172,9 @@ namespace Runner.Tests
         }
 
         [Test]
-        public void Extreme_valid_tuning_never_produces_NaN()
+        public void Extreme_tuning_never_produces_NaN()
         {
+            // The corner of the ranges, which Winnability rejects as unplayable: the sim itself must still stay finite.
             var sim = new RunnerSim(new Tuning { speed = 20f, jumpHeight = 1.5f, obstacleSpacing = 4f });
             for (var i = 0; i < 1200; i++)
             {

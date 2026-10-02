@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Runner.Sim;
 using UnityEngine;
 
 namespace Runner.Settings
@@ -60,7 +61,8 @@ namespace Runner.Settings
             if (s.tuning == null) return "settings.tuning: missing";
             return CheckRange("speed", s.tuning.speed, 1f, 20f)
                    ?? CheckRange("jumpHeight", s.tuning.jumpHeight, 1.5f, 5f)
-                   ?? CheckRange("obstacleSpacing", s.tuning.obstacleSpacing, 4f, 40f);
+                   ?? CheckRange("obstacleSpacing", s.tuning.obstacleSpacing, 4f, 40f)
+                   ?? Winnability.Check(s.tuning); // the three values together, once each is in range
         }
 
         static string CheckRole(string role, string file)

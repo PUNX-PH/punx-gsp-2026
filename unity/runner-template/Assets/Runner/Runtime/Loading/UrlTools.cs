@@ -34,9 +34,11 @@ namespace Runner.Loading
         /// </summary>
         public static string ToAbsolute(string pageUrl, string urlOrRelative)
         {
-            if (Uri.TryCreate(urlOrRelative, UriKind.Absolute, out var absolute)) return absolute.AbsoluteUri;
-            if (!Uri.TryCreate(pageUrl, UriKind.Absolute, out var page)) return urlOrRelative;
-            return new Uri(page, urlOrRelative).AbsoluteUri;
+            // Resolve against the page first: where Path.DirectorySeparatorChar is '/' (WebGL), Uri.TryCreate reads a
+            // root-relative "/runs/a/settings.json" as the absolute file URI file:///runs/a/settings.json.
+            if (Uri.TryCreate(pageUrl, UriKind.Absolute, out var page))
+                return Uri.TryCreate(page, urlOrRelative, out var resolved) ? resolved.AbsoluteUri : urlOrRelative;
+            return Uri.TryCreate(urlOrRelative, UriKind.Absolute, out var absolute) ? absolute.AbsoluteUri : urlOrRelative;
         }
 
         /// <summary>A file in the same folder as settingsUrl; its query and fragment are dropped.</summary>

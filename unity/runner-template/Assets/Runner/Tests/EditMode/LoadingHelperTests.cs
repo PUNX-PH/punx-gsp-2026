@@ -44,6 +44,16 @@ namespace Runner.Tests
         }
 
         [Test]
+        public void ToAbsolute_resolves_a_root_relative_url_against_the_page()
+        {
+            // Where Path.DirectorySeparatorChar is '/' (the WebGL player), Uri.TryCreate("/runs/...", Absolute) succeeds
+            // as file:///runs/..., so a root-relative URL has to be resolved against the page first. Windows (where
+            // these tests run) cannot show that failure; this pins the result.
+            Assert.AreEqual("https://h/runs/a/settings.json",
+                UrlTools.ToAbsolute("https://h/p/index.html?settings=x", "/runs/a/settings.json"));
+        }
+
+        [Test]
         public void ToAbsolute_leaves_relative_url_alone_without_a_page_url()
         {
             Assert.AreEqual("runs/a/settings.json", UrlTools.ToAbsolute("", "runs/a/settings.json"));
@@ -70,6 +80,29 @@ namespace Runner.Tests
             Assert.AreEqual(-0.25f, offset.x, 1e-5f);
             Assert.AreEqual(0f, offset.y, 1e-5f);
             Assert.AreEqual(-0.75f, offset.z, 1e-5f);
+        }
+
+        [Test]
+        public void ModelFit_caps_the_footprint_of_a_thin_model()
+        {
+            // A 1 m wide, 0.1 m thick disc fitted to 0.5 m tall would otherwise be 5 m wide.
+            var (scale, offset) = ModelFit.Compute(new Bounds(new Vector3(0f, 0.05f, 0f), new Vector3(1f, 0.1f, 1f)), 0.5f, 1.6f);
+            Assert.AreEqual(1.6f, scale, 1e-5f);
+            Assert.AreEqual(0f, offset.y, 1e-5f);
+        }
+
+        [Test]
+        public void ModelFit_caps_the_footprint_of_a_long_model()
+        {
+            var (scale, _) = ModelFit.Compute(new Bounds(new Vector3(0f, 0.5f, 0f), new Vector3(0.5f, 1f, 4f)), 1f, 1.6f);
+            Assert.AreEqual(0.4f, scale, 1e-5f);
+        }
+
+        [Test]
+        public void ModelFit_footprint_cap_leaves_a_model_that_fits_alone()
+        {
+            var (scale, _) = ModelFit.Compute(new Bounds(new Vector3(0f, 1f, 0f), new Vector3(1f, 2f, 1f)), 1f, 1.6f);
+            Assert.AreEqual(0.5f, scale, 1e-5f);
         }
 
         [Test]

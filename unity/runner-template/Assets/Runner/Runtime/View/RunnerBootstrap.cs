@@ -138,7 +138,8 @@ namespace Runner.View
 
             var bounds = renderers[0].bounds;
             for (var i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
-            var (scale, offset) = ModelFit.Compute(bounds, height);
+            // Never wider or longer than the hit window: a bigger model would look like it hits things it does not touch.
+            var (scale, offset) = ModelFit.Compute(bounds, height, 2f * RunnerSim.HitHalfWidth);
             content.transform.localScale = Vector3.one * scale;
             content.transform.localPosition = offset;
             content.SetActive(false);

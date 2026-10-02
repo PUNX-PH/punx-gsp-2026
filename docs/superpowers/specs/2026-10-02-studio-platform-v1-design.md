@@ -78,6 +78,13 @@ The **game settings file** is the contract between the Runner and the templates.
 }
 ```
 
+The template and the Runner must validate settings the same way (shared fixtures in `fixtures/settings`). Each
+`tuning` value has a range (`speed` 1 to 20, `jumpHeight` 1.5 to 5, `obstacleSpacing` 4 to 40), and the three together
+must be playable: the player always gets a take-off window of at least 0.2 s, and obstacles are at least one whole
+jump plus 0.2 s apart (`Winnability.cs` has the arithmetic). A slow game needs a high jump, and a fast game with a
+high jump needs widely spaced obstacles; the template's error message names the value to change. This was added
+before any settings file existed, so it does not break the additive-only rule in practice.
+
 ### Graph and nodes
 
 A graph is a directed acyclic graph saved as one JSON file. Each wire carries one of five data types:
