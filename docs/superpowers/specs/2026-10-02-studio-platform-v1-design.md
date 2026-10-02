@@ -1,6 +1,7 @@
 # Game Studio Platform: v1 design
 
-Date: 2026-10-02. Status: awaiting review. Path: architectural (new project).
+Date: 2026-10-02. Status: awaiting review. Path: architectural (new project). Amended 2026-10-02 for the web
+foundation (`2026-10-02-web-foundation-design.md`): accounts and cloud hosting are now in scope.
 
 ## Purpose
 
@@ -9,7 +10,8 @@ prompt, reference images and optional 3D assets, wires steps together on a node 
 browser preview of the resulting game. Blender prepares the assets; Unity runs the game.
 
 Audience: the studio's own team first. Opening it to outside creators is a later goal, and this design
-must not block it, but nothing for it (accounts, quotas, billing, cloud) is built in v1.
+must not block it. v1 has accounts for `@punx.ai` addresses only and is hosted on Vercel; open sign-up,
+quotas and billing are not built in v1.
 
 **Done for v1:** a creator wires a graph of about six nodes and plays a browser preview of a runner game
 that uses their own 3D model and a palette taken from their reference image. Target: under one minute
@@ -22,7 +24,8 @@ flat art. Everything below is the smallest thing that meets "done for v1".
 
 ## Out of scope for v1
 
-- Accounts, multiple users, quotas, billing, cloud hosting.
+- Open sign-up, quotas and billing. (Accounts for `@punx.ai` addresses and Vercel hosting are in scope: see
+  the web foundation spec.)
 - AI 3D generation. Assets come from uploads, or from low-poly shapes the Blender step can make.
 - `.blend` uploads (they can embed scripts).
 - Native mobile builds (APK/IPA), ads and analytics SDKs.
@@ -58,7 +61,7 @@ Editor (browser) --graph JSON--> Runner --> node executors --> run folder (setti
 | Unit | Does | Interface | Depends on |
 |---|---|---|---|
 | Editor | Canvas for building and running graphs; shows progress, errors, preview | Reads and writes graph JSON over HTTP; receives run progress over server-sent events | Runner API |
-| Graph store | Saves graphs, uploads and run results on local disk, with SQLite for metadata | Functions: save/load graph, store upload, read/write run folder | Disk |
+| Graph store | Saves graphs, uploads and run results: files in Cloud Storage, records in Firestore, owned by a signed-in user | Functions: save/load graph, store upload, read/write run folder | Firestore, Cloud Storage |
 | Runner | Validates a graph, runs nodes in dependency order, caches results, reports progress | `run(graph) -> run id`; emits events `node-started`, `node-done`, `node-failed`, `run-done` | Graph store, node executors |
 | Node executors | One per node type; pure function of inputs and parameters | `execute(inputs, params) -> outputs` | Blender worker, AI executor |
 | Blender worker | Runs one headless Blender job from a script and returns a GLB | `prepareAsset(file, params) -> glb` | Blender install |
@@ -142,7 +145,9 @@ Uploads and prompts are untrusted input.
   uploaded file and an empty working folder, with no secrets in its environment.
 - The AI step has no tools. Its output is parsed and validated against the settings schema, and rejected
   if it does not match.
-- Run folders are addressed by random ids. v1 binds to the local machine or studio network only.
+- Run folders are addressed by random ids and readable only by their owner. Only verified `@punx.ai` email
+  addresses can sign in (Firebase email-link sign-in, checked on the server on every request); see the web
+  foundation spec.
 
 ### Error handling
 
@@ -163,8 +168,9 @@ that fails validation stops the run before the Preview opens.
 
 ## Proposed stack
 
-TypeScript throughout. React with React Flow for the editor. A small Node server for the API, runner and
-static files. SQLite plus local folders for storage. Blender via its command line. Unity (current LTS)
+TypeScript throughout. Next.js (React, with React Flow for the editor) on Vercel serves the editor, the API,
+the runner and the static Unity builds. Firebase provides sign-in (Authentication), records (Firestore) and
+files (Cloud Storage). Blender via its command line, on a separate host. Unity (current LTS)
 with the glTFast package. These choices are open to change during planning if a slice shows a problem.
 
 ## Build order
@@ -173,15 +179,19 @@ Each slice gets its own plan and review.
 
 1. **Unity runner template** that loads a hand-written `settings.json` and a GLB in a WebGL build. This
    proves the riskiest part: runtime loading, build size and mobile performance.
-2. **Blender Prepare Asset** as a command-line script with fixtures.
-3. **Runner** with the settings schema and cache, driven by graph JSON files.
-4. **Editor** on top of the runner.
-5. **Describe Game** (AI) and Palette from Image.
+2. **Web foundation** (`2026-10-02-web-foundation-design.md`): the Next.js app on Vercel with `@punx.ai`
+   sign-in, Firebase storage, run upload and a Preview of a hand-made run. Settles hosting, sign-in and
+   serving the Unity builds.
+3. **Editor and runner** with the non-AI nodes (Reference Image, Asset Upload, Palette from Image, Game
+   Template, Preview), the settings schema, caching and per-node errors.
+4. **Prompt and Describe Game** (AI), with schema validation of the model's output and rate limits.
+5. **Blender Prepare Asset** as a command-line script with fixtures, then as an optional node.
 6. Later, if wanted: a second template, export of a ready-to-build Unity project for local mobile builds,
-   then accounts and publishing for outside creators.
+   then open sign-up, quotas and publishing for outside creators.
 
 ## Prerequisites (this machine, checked 2026-10-02)
 
 Not found in standard locations: Node.js, Python, Blender, Unity Hub and Unity Editor. Before slice 1 the
-studio needs Unity (current LTS, with the WebGL module) to build the template, and before slice 2
-Blender. Node.js is needed from slice 3. Nothing is installed without asking.
+studio needs Unity (current LTS, with the WebGL module) to build the template. Slice 2 needs Node.js LTS, a
+Firebase project on the Blaze plan and a Vercel project; Blender is needed from slice 5. Unity is installed
+(6000.3.25f1, 2026-10-02). Nothing is installed without asking.
