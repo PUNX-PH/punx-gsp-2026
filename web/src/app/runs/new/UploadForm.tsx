@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { checkGlb } from "@/lib/glb";
 import { rolesNeeded, validateSettings } from "@/lib/settings";
 import { planUploads } from "@/lib/uploadPlan";
 
@@ -36,6 +37,16 @@ export function UploadForm() {
     const plan = planUploads(rolesNeeded(checked.settings), models, MAX_GLB_BYTES);
     if (!plan.ok) return setError(plan.error);
 
+    // Each file is read once and given the same GLB check the server runs, so a bad file is reported now, before a
+    // run is created and left half-finished.
+    const files: { name: string; buffer: ArrayBuffer }[] = [];
+    for (const { name, file } of plan.uploads) {
+      const buffer = await file.arrayBuffer();
+      const glb = checkGlb(name, new Uint8Array(buffer));
+      if (!glb.ok) return setError(glb.error);
+      files.push({ name, buffer });
+    }
+
     setBusy(true);
     try {
       const created = await fetch("/api/runs", { method: "POST", body: text });
@@ -44,13 +55,13 @@ export function UploadForm() {
       if (!created.ok || !createdBody.id) return setError(createdBody.error ?? "Something went wrong on our side");
 
       const id = createdBody.id;
-      setResults(plan.uploads.map((u) => ({ name: u.name, state: "uploading" as const })));
+      setResults(files.map((f) => ({ name: f.name, state: "uploading" as const })));
       const outcomes = await Promise.all(
-        plan.uploads.map(async ({ name, file }) => {
+        files.map(async ({ name, buffer }) => {
           try {
             const response = await fetch(`/api/runs/${encodeURIComponent(id)}/files/${encodeURIComponent(name)}`, {
               method: "PUT",
-              body: await file.arrayBuffer(),
+              body: buffer,
             });
             if (response.status === 401) {
               router.replace("/sign-in");

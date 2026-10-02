@@ -7,7 +7,9 @@ export function planUploads(needed: string[], chosen: File[], maxBytes = Infinit
   const uploads: { name: string; file: File }[] = [];
   const missing: string[] = [];
   for (const name of needed) {
-    const file = chosen.find((candidate) => candidate.name === name);
+    // Windows and macOS do not tell hero.glb from Hero.glb, so a file matches whatever its case, an exact match
+    // winning. It is uploaded under the settings' name, which is the one the player will ask for.
+    const file = chosen.find((candidate) => candidate.name === name) ?? chosen.find((candidate) => candidate.name.toLowerCase() === name.toLowerCase());
     if (file) uploads.push({ name, file });
     else missing.push(name);
   }

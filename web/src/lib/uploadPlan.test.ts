@@ -17,8 +17,21 @@ describe("planUploads", () => {
     });
   });
 
-  it("is case-sensitive, like the settings file names", () => {
-    expect(planUploads(["Hero.GLB"], [file("hero.glb")])).toEqual({ ok: false, error: "Choose Hero.GLB" });
+  it("matches a chosen file whatever its letter case (Windows and macOS do not tell hero.glb from Hero.glb)", () => {
+    const plan = planUploads(["Hero.GLB"], [file("hero.glb")]);
+    expect(plan.ok).toBe(true);
+    // The upload goes under the name the settings use, with the chosen file's contents.
+    if (plan.ok) expect(plan.uploads.map((u) => [u.name, u.file.name])).toEqual([["Hero.GLB", "hero.glb"]]);
+  });
+
+  it("prefers the file whose name matches exactly when several differ only by case", () => {
+    const plan = planUploads(["hero.glb"], [file("HERO.GLB"), file("hero.glb")]);
+    if (plan.ok) expect(plan.uploads[0].file.name).toBe("hero.glb");
+    else throw new Error(plan.error);
+  });
+
+  it("still reports a name that no chosen file matches, even ignoring case", () => {
+    expect(planUploads(["hero.glb"], [file("coin.glb")])).toEqual({ ok: false, error: "Choose hero.glb" });
   });
 
   it("needs only one file when one name serves every role", () => {
