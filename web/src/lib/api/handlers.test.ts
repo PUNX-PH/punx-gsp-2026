@@ -247,3 +247,41 @@ describe("an unexpected failure", () => {
     expect(text).not.toContain("SECRETBYTES");
   });
 });
+
+describe("a failure of the identity service (not a refused session)", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("is a logged 500, never a 401 that sends people to sign in again", async () => {
+    const { api, auth } = setup();
+    auth.failure = Object.assign(new Error("Firebase says: the private_key is bad"), { code: "app/invalid-credential" });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = await api.listRuns(request("GET", "/api/runs"));
+    expect(response.status).toBe(500);
+    expect(await readJson(response)).toEqual({ error: "Something went wrong on our side" });
+
+    const text = JSON.stringify(logged.mock.calls);
+    expect(text).toContain("app/invalid-credential");
+    expect(text).not.toContain("private_key");
+  });
+
+  it("logs the kind of failure and never the message when the run service throws", async () => {
+    const { auth } = setup();
+    const broken: RunService = {
+      createRun: async () => undefined as never,
+      putFile: async () => {
+        throw new Error("boom with SECRET-IN-THE-MESSAGE");
+      },
+      readFile: async () => undefined as never,
+      listRuns: async () => [],
+      deleteRun: async () => undefined,
+    };
+    const api = makeApi({ auth, runs: broken, domain: "punx.ai" });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await api.putFile(request("PUT", "/api/runs/run7/files/hero.glb", { body: new Uint8Array(4) }), "run7", "hero.glb");
+    const text = JSON.stringify(logged.mock.calls);
+    expect(text).toContain("run7");
+    expect(text).not.toContain("SECRET-IN-THE-MESSAGE");
+  });
+});

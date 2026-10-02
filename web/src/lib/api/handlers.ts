@@ -2,6 +2,7 @@
 // are tested without a server. Every handler goes through one guard: a change must come from the site's own origin,
 // the caller must have a valid session, and any failure becomes a short message in plain words.
 import { sameOrigin } from "@/lib/access";
+import { describeFailure } from "@/lib/auth/errors";
 import type { AuthPort, User } from "@/lib/auth/ports";
 import { readSessionCookie, requireUser } from "@/lib/auth/session";
 import { readBodyCapped, TooLargeError } from "@/lib/body";
@@ -32,15 +33,16 @@ export function makeApi({ auth, runs, domain }: ApiDeps) {
   ): Promise<Response> {
     if (options.changes && !sameOrigin(req)) return json(403, { error: "Request not allowed" });
 
-    const user = await requireUser(auth, readSessionCookie(req), domain);
-    if (!user) return json(401, { error: "Your session has expired. Sign in again." });
-
     try {
+      // A refused session is null (a 401). A failure of the identity service throws, and is a logged 500 below.
+      const user = await requireUser(auth, readSessionCookie(req), domain);
+      if (!user) return json(401, { error: "Your session has expired. Sign in again." });
       return await work(user);
     } catch (error) {
       if (error instanceof RunError) return json(error.status, { error: error.message });
-      // The run id and the failure, never the request body: an upload's bytes must not reach the logs.
-      console.error("run API failed", { handler, runId: options.runId, error: error instanceof Error ? error.message : "unknown" });
+      // The run id and the kind of failure, never the request body or the error's message: an upload's bytes and a
+      // key quoted in a message must not reach the logs.
+      console.error("run API failed", { handler, runId: options.runId, failure: describeFailure(error) });
       return json(500, { error: "Something went wrong on our side" });
     }
   }

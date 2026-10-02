@@ -1,11 +1,15 @@
-// An in-memory AuthPort for tests, behaving like Firebase where it matters: unknown tokens throw, a session cookie
-// stops working once its user's tokens are revoked, and creating a cookie can be made to fail (a sign-in that is
-// not recent).
+// An in-memory AuthPort for tests, behaving like Firebase where it matters: an unknown token is refused
+// (AuthRejectedError), a session cookie stops working once its user's tokens are revoked, creating a cookie can be
+// made to fail (a sign-in that is not recent, or an outage), and the whole service can be made to fail.
+import { AuthRejectedError } from "@/lib/auth/errors";
 import type { AuthPort, Identity } from "@/lib/auth/ports";
 
 export class MemoryAuth implements AuthPort {
   readonly revokedUids = new Set<string>();
-  failCreateSessionCookie = false;
+  /** When set, every call throws this (an outage, a bad key): a failure, not a refusal. */
+  failure: Error | null = null;
+  /** When set, createSessionCookie throws this (AuthRejectedError for a sign-in that is not recent). */
+  createSessionCookieError: Error | null = null;
   lastMaxAgeMs: number | undefined;
 
   private readonly idTokens = new Map<string, Identity>();
@@ -19,13 +23,15 @@ export class MemoryAuth implements AuthPort {
   }
 
   async verifyIdToken(idToken: string): Promise<Identity> {
+    if (this.failure) throw this.failure;
     const identity = this.idTokens.get(idToken);
-    if (!identity) throw new Error("invalid ID token");
+    if (!identity) throw new AuthRejectedError();
     return identity;
   }
 
   async createSessionCookie(idToken: string, maxAgeMs: number): Promise<string> {
-    if (this.failCreateSessionCookie) throw new Error("sign-in is not recent");
+    if (this.failure) throw this.failure;
+    if (this.createSessionCookieError) throw this.createSessionCookieError;
     const identity = await this.verifyIdToken(idToken);
     this.lastMaxAgeMs = maxAgeMs;
     const cookie = `session-cookie-${++this.counter}`;
@@ -34,12 +40,14 @@ export class MemoryAuth implements AuthPort {
   }
 
   async verifySessionCookie(cookie: string): Promise<Identity> {
+    if (this.failure) throw this.failure;
     const identity = this.cookies.get(cookie);
-    if (!identity || this.revokedUids.has(identity.uid)) throw new Error("invalid session cookie");
+    if (!identity || this.revokedUids.has(identity.uid)) throw new AuthRejectedError();
     return identity;
   }
 
   async revokeRefreshTokens(uid: string): Promise<void> {
+    if (this.failure) throw this.failure;
     this.revokedUids.add(uid);
   }
 

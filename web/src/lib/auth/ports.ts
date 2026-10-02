@@ -1,5 +1,8 @@
 // What the app needs from an identity service. The Firebase Admin adapter implements it for real
 // (firebaseAdmin.ts); tests use the in-memory MemoryAuth.
+//
+// Every method throws AuthRejectedError (auth/errors.ts) when the service REFUSES a credential, and lets any other
+// error through when the call FAILS: callers treat the first as "signed out" and the second as a fault to report.
 
 export interface Identity {
   uid: string;

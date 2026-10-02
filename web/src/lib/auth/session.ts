@@ -2,6 +2,7 @@
 // The domain rule (a verified address at exactly the allowed domain) is applied when the session starts and again
 // on every request, so a change in who is allowed, or a revoked user, takes effect at once.
 import { isAllowedEmail } from "@/lib/access";
+import { AuthRejectedError } from "@/lib/auth/errors";
 import type { AuthPort, User } from "@/lib/auth/ports";
 
 export const SESSION_COOKIE = "session";
@@ -17,8 +18,9 @@ export async function startSession(auth: AuthPort, idToken: string, domain: stri
   let identity;
   try {
     identity = await auth.verifyIdToken(idToken);
-  } catch {
-    return SIGN_IN_AGAIN;
+  } catch (error) {
+    if (error instanceof AuthRejectedError) return SIGN_IN_AGAIN;
+    throw error; // a failure of the identity service is not the person's sign-in problem
   }
 
   if (!identity.emailVerified || !isAllowedEmail(identity.email, domain)) {
@@ -27,31 +29,37 @@ export async function startSession(auth: AuthPort, idToken: string, domain: stri
 
   try {
     return { ok: true, cookie: await auth.createSessionCookie(idToken, SESSION_MAX_AGE_MS), maxAgeMs: SESSION_MAX_AGE_MS };
-  } catch {
-    return SIGN_IN_AGAIN; // the sign-in was not recent enough to start a session
+  } catch (error) {
+    if (error instanceof AuthRejectedError) return SIGN_IN_AGAIN; // the sign-in was not recent enough
+    throw error;
   }
 }
 
-/** The signed-in person, or null when there is no valid session. Callers turn null into a 401 or a redirect. */
+/**
+ * The signed-in person, or null when there is no valid session; callers turn null into a 401 or a redirect. A failure
+ * of the identity service is not "no session": it is thrown, so it is reported instead of looking like a sign-out.
+ */
 export async function requireUser(auth: AuthPort, cookie: string | undefined, domain: string): Promise<User | null> {
   if (!cookie) return null;
   try {
     const identity = await auth.verifySessionCookie(cookie);
     if (!identity.emailVerified || !identity.email || !isAllowedEmail(identity.email, domain)) return null;
     return { uid: identity.uid, email: identity.email };
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof AuthRejectedError) return null;
+    throw error;
   }
 }
 
-/** Signs the person out everywhere. Quiet when the cookie is missing or already invalid. */
+/** Signs the person out everywhere. Quiet when the cookie is missing or already refused; a service failure is thrown. */
 export async function endSession(auth: AuthPort, cookie: string | undefined): Promise<void> {
   if (!cookie) return;
   try {
     const identity = await auth.verifySessionCookie(cookie);
     await auth.revokeRefreshTokens(identity.uid);
-  } catch {
-    // Nothing to end.
+  } catch (error) {
+    if (error instanceof AuthRejectedError) return; // nothing to end
+    throw error;
   }
 }
 

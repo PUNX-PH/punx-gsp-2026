@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { AuthRejectedError } from "@/lib/auth/errors";
 import { MemoryAuth } from "@/lib/auth/memory";
 import {
   clearedSessionCookieHeader,
@@ -49,7 +50,7 @@ describe("startSession", () => {
   it("answers 401 when the sign-in is too old to start a session", async () => {
     const auth = new MemoryAuth();
     auth.addIdToken("good", punx);
-    auth.failCreateSessionCookie = true;
+    auth.createSessionCookieError = new AuthRejectedError();
     expect(await startSession(auth, "good", DOMAIN)).toEqual({ ok: false, status: 401, error: "Sign in again." });
   });
 });
@@ -123,5 +124,39 @@ describe("the session cookie", () => {
     const header = sessionCookieHeader("a b;c", 1000);
     const value = header.split(";")[0].slice("session=".length);
     expect(readSessionCookie(new Request("https://x.example/", { headers: { cookie: `session=${value}` } }))).toBe("a b;c");
+  });
+});
+
+describe("when the identity service itself fails (not when it refuses a credential)", () => {
+  const outage = () => new Error("Firebase is down");
+
+  it("startSession passes the failure on instead of calling it a sign-in problem", async () => {
+    const auth = new MemoryAuth();
+    auth.addIdToken("good", punx);
+    auth.failure = outage();
+    await expect(startSession(auth, "good", DOMAIN)).rejects.toThrow("Firebase is down");
+  });
+
+  it("startSession passes on a failure while creating the cookie, too", async () => {
+    const auth = new MemoryAuth();
+    auth.addIdToken("good", punx);
+    auth.createSessionCookieError = outage();
+    await expect(startSession(auth, "good", DOMAIN)).rejects.toThrow("Firebase is down");
+  });
+
+  it("requireUser does not treat a failure as being signed out", async () => {
+    const auth = new MemoryAuth();
+    const cookie = auth.addSessionCookie("c1", punx);
+    auth.failure = outage();
+    await expect(requireUser(auth, cookie, DOMAIN)).rejects.toThrow("Firebase is down");
+  });
+
+  it("endSession passes a failure on, and stays quiet about a refused credential", async () => {
+    const auth = new MemoryAuth();
+    const cookie = auth.addSessionCookie("c1", punx);
+    auth.failure = outage();
+    await expect(endSession(auth, cookie)).rejects.toThrow("Firebase is down");
+    auth.failure = null;
+    await expect(endSession(auth, "unknown-cookie")).resolves.toBeUndefined();
   });
 });
