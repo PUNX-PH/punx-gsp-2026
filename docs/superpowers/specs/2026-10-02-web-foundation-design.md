@@ -184,9 +184,9 @@ wrong on our side" and are logged with the run id, never with file contents.
 
 - **Test-first, pure code.** The settings validator is run against every file in `fixtures/settings` and must
   agree with the Unity template on all of them (accept and reject), including the winnability messages. The
-  domain rule has a table of addresses, including the lookalikes above. `checkGlb` has fixtures: a valid GLB,
-  empty, wrong magic, wrong version, wrong declared length, invalid JSON, and one with an external `uri`.
-  The GLB fixtures live in `fixtures/glb/` and are made by extending `tools/make-sample.ps1`.
+  domain rule has a table of addresses, including the lookalikes above. `checkGlb` is tested on slice 1's real
+  sample GLB and on GLBs built in memory by a test helper: empty, wrong magic, wrong version, wrong declared
+  length, invalid JSON, and one with an external `uri`.
 - **Test-first, with fakes.** `requireUser()`, the run API and the file route run against an in-memory run
   store: signed out, wrong domain, unverified email, someone else's run, over the cap, oversize body, name not
   in `needed`, and the pending to ready transition.
@@ -225,7 +225,6 @@ wrong on our side" and are logged with the run id, never with file contents.
 ```
 web/                     the Next.js app (src/, public/templates/, vercel.json or next.config headers)
 fixtures/settings/       shared with the Unity template (already there)
-fixtures/glb/            GLB fixtures for checkGlb
 firebase.json, firestore.rules, storage.rules      deny-all rules, deployed with the Firebase CLI
 tools/publish-template.ps1                       copies Builds/runner-* to web/public/templates/
 ```
