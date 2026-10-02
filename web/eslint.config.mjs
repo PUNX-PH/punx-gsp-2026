@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated Unity builds and the spike files are static assets, not source.
+    "public/**",
   ]),
 ]);
 
