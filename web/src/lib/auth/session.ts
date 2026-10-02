@@ -5,7 +5,9 @@ import { isAllowedEmail } from "@/lib/access";
 import { AuthRejectedError } from "@/lib/auth/errors";
 import type { AuthPort, User } from "@/lib/auth/ports";
 
-export const SESSION_COOKIE = "session";
+// The __Host- prefix makes the browser accept the cookie only if it is Secure, has Path=/ and has no Domain, and stops
+// any other subdomain of the site's domain (say, another app under punx.ai) from setting a cookie of this name.
+export const SESSION_COOKIE = "__Host-session";
 export const SESSION_MAX_AGE_MS = 5 * 24 * 60 * 60 * 1000;
 
 export type StartResult =

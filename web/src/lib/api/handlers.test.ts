@@ -32,7 +32,7 @@ interface Options {
 
 function request(method: string, path: string, { cookie = "alice-cookie", origin = ORIGIN, body }: Options = {}) {
   const headers: Record<string, string> = {};
-  if (cookie) headers.cookie = `session=${cookie}`;
+  if (cookie) headers.cookie = `__Host-session=${cookie}`;
   if (origin) headers.origin = origin;
   return new Request(ORIGIN + path, { method, headers, body: body as BodyInit | undefined });
 }
