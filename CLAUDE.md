@@ -40,5 +40,5 @@ come from an uploaded file, and keep Blender and Unity workers sandboxed with no
 
 ## Work in progress
 
-Slice 1 (the Unity runner template) is finished except the phone check. Read
+Slice 1 (the Unity runner template) is finished except the phone check; slice 2 (the web app) is built and reviewed but blocked on the user's Vercel and Firebase setup. Read `docs/superpowers/notes/slice2-handoff.md` first, then
 `docs/superpowers/notes/2026-10-02-slice1-handoff.md` before doing anything else.
