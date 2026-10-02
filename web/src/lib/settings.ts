@@ -1,0 +1,139 @@
+// Validation of a game's settings.json, written to agree with the Unity template: the checks, their order, the ranges
+// and the message words are ported from SettingsParser.cs and Winnability.cs, and the shared files in
+// fixtures/settings/ are accepted and rejected the same way by both. This validator may be stricter than Unity on a
+// wrongly typed value, never looser. The 16 KB size limit is the caller's job.
+
+export interface GameSettings {
+  schemaVersion: number;
+  template: string;
+  palette: string[];
+  roles: { hero: string; obstacle: string; collectible: string };
+  tuning: { speed: number; jumpHeight: number; obstacleSpacing: number };
+}
+
+export type SettingsResult = { ok: true; settings: GameSettings; text: string } | { ok: false; error: string };
+
+const SUPPORTED_VERSION = 1;
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+const GLB_FILE_NAME = /^[A-Za-z0-9_-]+\.[Gg][Ll][Bb]$/;
+const ROLES = ["hero", "obstacle", "collectible"] as const;
+
+// From RunnerSim.cs and Winnability.cs.
+const GRAVITY = 30;
+const OBSTACLE_HEIGHT = 1;
+const HIT_WIDTH = 2 * 0.8;
+const MIN_TIMING_WINDOW = 0.2;
+
+/** Validates settings text. A leading byte-order mark is removed, and the returned text is without it. */
+export function validateSettings(input: string): SettingsResult {
+  const text = input.charCodeAt(0) === 0xfeff ? input.slice(1) : input;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (e) {
+    return fail(`settings: not valid JSON (${e instanceof Error ? e.message : "unreadable"})`);
+  }
+  if (!isObject(parsed)) return fail("settings: not valid JSON (expected an object)");
+
+  const error = validate(parsed);
+  return error === null ? { ok: true, settings: parsed as unknown as GameSettings, text } : fail(error);
+}
+
+/** The distinct file names the roles point at, in the order hero, obstacle, collectible. */
+export function rolesNeeded(s: GameSettings): string[] {
+  return [...new Set(ROLES.map((role) => s.roles[role]))];
+}
+
+function fail(error: string): SettingsResult {
+  return { ok: false, error };
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function validate(s: Record<string, unknown>): string | null {
+  const version = typeof s.schemaVersion === "number" ? s.schemaVersion : 0;
+  if (version !== SUPPORTED_VERSION)
+    return `settings.schemaVersion: ${version} is not supported (expected ${SUPPORTED_VERSION})`;
+  const template = typeof s.template === "string" ? s.template : "";
+  if (template !== "runner") return `settings.template: "${template}" is not supported (expected "runner")`;
+
+  const paletteError = checkPalette(s.palette);
+  if (paletteError) return paletteError;
+
+  if (!isObject(s.roles)) return "settings.roles: missing";
+  for (const role of ROLES) {
+    const roleError = checkRole(role, s.roles[role]);
+    if (roleError) return roleError;
+  }
+
+  if (!isObject(s.tuning)) return "settings.tuning: missing";
+  const t = s.tuning;
+  return (
+    checkRange("speed", t.speed, 1, 20) ??
+    checkRange("jumpHeight", t.jumpHeight, 1.5, 5) ??
+    checkRange("obstacleSpacing", t.obstacleSpacing, 4, 40) ??
+    checkWinnable(t.speed as number, t.jumpHeight as number, t.obstacleSpacing as number)
+  );
+}
+
+function checkPalette(palette: unknown): string | null {
+  const count = Array.isArray(palette) ? palette.length : 0;
+  if (!Array.isArray(palette) || count !== 5) return `settings.palette: expected 5 colors like #rrggbb, found ${count}`;
+  for (let i = 0; i < palette.length; i++) {
+    const color = palette[i];
+    if (typeof color !== "string" || !HEX_COLOR.test(color))
+      return `settings.palette[${i}]: "${typeof color === "string" ? color : ""}" is not a #rrggbb color`;
+  }
+  return null;
+}
+
+function checkRole(role: string, file: unknown): string | null {
+  if (typeof file !== "string" || file === "") return `settings.roles.${role}: missing`;
+  if (!GLB_FILE_NAME.test(file))
+    return `settings.roles.${role}: "${file}" must be a plain file name like ${role}.glb (letters, digits, - and _ only)`;
+  return null;
+}
+
+function checkRange(name: string, value: unknown, min: number, max: number): string | null {
+  if (typeof value !== "number") return `settings.tuning.${name}: must be a number`;
+  if (value >= min && value <= max) return null;
+  return `settings.tuning.${name}: ${value} is outside ${min} to ${max}`;
+}
+
+// Each value is in range, but together they must make a game that can be won (see Winnability.cs).
+function checkWinnable(speed: number, jumpHeight: number, obstacleSpacing: number): string | null {
+  // Seconds one jump spends above the top of an obstacle, against what the hit window and the margin need.
+  const above = 2 * Math.sqrt((2 * Math.max(0, jumpHeight - OBSTACLE_HEIGHT)) / GRAVITY);
+  const needed = HIT_WIDTH / speed + MIN_TIMING_WINDOW;
+  if (above < needed) {
+    const minHeight = OBSTACLE_HEIGHT + (GRAVITY * needed * needed) / 8;
+    return (
+      `settings.tuning.jumpHeight: ${f(jumpHeight)} m is too low to jump an obstacle at ${f(speed)} m/s ` +
+      `with a ${f(MIN_TIMING_WINDOW * 1000)} ms timing margin; use at least ${f(roundUp(minHeight))} m or a higher speed`
+    );
+  }
+
+  // One jump per obstacle: the hero must be back on the ground, with the margin to spare, before the next take-off.
+  const airTime = 2 * Math.sqrt((2 * jumpHeight) / GRAVITY);
+  const minSpacing = speed * (airTime + MIN_TIMING_WINDOW);
+  if (obstacleSpacing < minSpacing) {
+    return (
+      `settings.tuning.obstacleSpacing: ${f(obstacleSpacing)} m is too short at ${f(speed)} m/s, the hero needs ` +
+      `room to land and jump again; use at least ${f(roundUp(minSpacing))} m or a lower speed`
+    );
+  }
+  return null;
+}
+
+// Rounded up to 0.1 so that the value in the message passes the check itself.
+function roundUp(value: number): number {
+  return Math.ceil(value * 10) / 10;
+}
+
+// Up to two decimals, no trailing zeros: the same as C#'s "0.##".
+function f(value: number): string {
+  return String(Number(value.toFixed(2)));
+}
