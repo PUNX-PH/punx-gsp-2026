@@ -52,3 +52,10 @@ describe("sameOrigin", () => {
     expect(sameOrigin(post("https://studio.punx.ai/api/runs", origin))).toBe(false);
   });
 });
+
+describe("isAllowedEmail with no configured domain", () => {
+  it("refuses everyone, so a missing setting locks the site instead of opening it", () => {
+    expect(isAllowedEmail("a@", "")).toBe(false);
+    expect(isAllowedEmail("a@punx.ai", "")).toBe(false);
+  });
+});

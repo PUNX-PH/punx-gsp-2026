@@ -5,7 +5,8 @@
  * Lookalikes fail: x@punx.ai.evil.com, x@notpunx.ai, x@sub.punx.ai, a second @, spaces, a trailing dot.
  */
 export function isAllowedEmail(email: string | null | undefined, domain: string): boolean {
-  if (typeof email !== "string" || /\s/.test(email)) return false;
+  // An unset domain refuses everyone: a missing setting must lock the site, not open it.
+  if (domain === "" || typeof email !== "string" || /\s/.test(email)) return false;
   const parts = email.toLowerCase().split("@");
   return parts.length === 2 && parts[0] !== "" && parts[1] === domain.toLowerCase();
 }

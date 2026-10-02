@@ -1,0 +1,10 @@
+rules_version = '2';
+
+// Deny all client access. Only the server (the Firebase Admin SDK, which bypasses these rules) reads or writes.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
