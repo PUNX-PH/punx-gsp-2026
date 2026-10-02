@@ -97,5 +97,12 @@ The GitHub repo is `PUNX-PH/punx-gsp-2026` (public).
    accounts for `@punx.ai` addresses only (Firebase email-link sign-in), all-Firebase storage (Firestore + Cloud
    Storage, which needs the Blaze plan), Describe Game included but in a later slice. The spec is written and
    committed on branch `slice-2-web-foundation`: `docs/superpowers/specs/2026-10-02-web-foundation-design.md`
-   (approved). The plan is written: `docs/superpowers/plans/2026-10-02-slice2-web-foundation.md` (10 tasks). Next: the user reviews
-   the plan and picks an execution method (native or subagent-driven). Nothing is built or installed for it yet (Node.js is not installed; ask).
+   (approved). The plan is `docs/superpowers/plans/2026-10-02-slice2-web-foundation.md` (10 tasks), executed inline
+   (the user chose native). **State:** Node.js 24 LTS is installed (with the user's yes). Tasks 1, 3, 4, 5, 7 and 8 are
+   complete; the code for Tasks 2 (Unity builds and Brotli headers), 6 (sign-in) and 9 (pages) is written and committed,
+   with 135 tests passing and lint and build clean, but their deployed checks wait for the user: a Vercel project (root
+   directory `web`, Production Branch `slice-2-web-foundation`), the Firebase project (Blaze, email-link sign-in, `us-east1`),
+   and the environment variables listed in `web/.env.example`. Then Task 6 Step 6, Task 2 Step 5, Task 9 Step 7 and
+   Task 10, and the final review (aim the reviewer at the auth and upload code). The ledger is
+   `.superpowers/sdd/2026-10-02-slice2-web-foundation/progress.md` (git-ignored). The slice 3 editor reference is
+   `docs/superpowers/notes/slice3-editor-reference.md`. Ask before any push.

@@ -15,9 +15,9 @@ game by wiring steps together on a node canvas. Blender prepares the assets; Uni
 
 The Unity runner template (Slice 1, `unity/runner-template`) is built and runs as a WebGL player. The web side
 is being designed: slice 2 (web foundation: Next.js on Vercel, `@punx.ai`-only Firebase sign-in, Firestore and
-Cloud Storage) has an approved spec and a written plan awaiting review: `docs/superpowers/specs/2026-10-02-web-foundation-design.md`,
-`docs/superpowers/plans/2026-10-02-slice2-web-foundation.md`. Nothing
-for it is built yet. Decisions live in the design specs (`docs/superpowers/specs/`).
+Cloud Storage) is being built (inline, from the plan): `docs/superpowers/specs/2026-10-02-web-foundation-design.md`,
+`docs/superpowers/plans/2026-10-02-slice2-web-foundation.md`. Tasks 1, 3, 4, 5, 7 and 8 are done and the code for 2, 6 and 9 is written; what is left needs the user (Vercel project, Firebase project, the deployed checks). Nothing
+else is built. Decisions live in the design specs (`docs/superpowers/specs/`).
 
 ## Skills (in `.claude/skills/`; origins in `.claude/skills-sources/SOURCES.md`)
 
