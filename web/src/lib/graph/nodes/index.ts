@@ -2,6 +2,7 @@
 import { model } from "@/lib/graph/nodes/model";
 import { gameTemplate } from "@/lib/graph/nodes/gameTemplate";
 import { paletteFromImage } from "@/lib/graph/nodes/paletteFromImage";
+import { preview } from "@/lib/graph/nodes/preview";
 import { referenceImage } from "@/lib/graph/nodes/referenceImage";
 import type { Executor } from "@/lib/graph/types";
 
@@ -10,4 +11,5 @@ export const EXECUTORS: Record<string, Executor> = {
   model,
   "palette-from-image": paletteFromImage,
   "game-template": gameTemplate,
+  preview,
 };
