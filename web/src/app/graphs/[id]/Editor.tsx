@@ -2,34 +2,39 @@
 
 // The node canvas. It holds one reducer (the graph, the run view, the selection) and hands React Flow a picture of it;
 // everything React Flow reports (a drag, a delete, a wire) goes back through the pure units in lib/graph and lib/canvas,
-// so the rules are tested without a browser and this file only connects them.
+// so the rules are tested without a browser and this file only connects them: saving, uploading, Play, the game view.
 import {
   Background,
   type Connection,
   Controls,
   type Edge,
+  type EdgeChange,
   type FinalConnectionState,
   type NodeChange,
-  type EdgeChange,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { AddMenu } from "@/app/graphs/[id]/AddMenu";
 import { cx } from "@/app/graphs/[id]/cx";
 import styles from "@/app/graphs/[id]/editor.module.css";
+import { GameFrame, GamePanel } from "@/app/graphs/[id]/GamePanel";
+import { usePrefs } from "@/app/graphs/[id]/prefsStore";
 import { SettingsPanel } from "@/app/graphs/[id]/SettingsPanel";
 import { type EditorActions, EditorActionsContext, StepCard, type StepNode } from "@/app/graphs/[id]/StepCard";
 import { Toolbar } from "@/app/graphs/[id]/Toolbar";
 import { WireEdge, type WireEdgeType } from "@/app/graphs/[id]/WireEdge";
 import { type Choice, addChoices } from "@/lib/canvas/addMenu";
+import { type Autosave, type SaveState, createAutosave } from "@/lib/canvas/autosave";
+import { SESSION_EXPIRED, playGraph, saveGraph, uploadFile } from "@/lib/canvas/client";
 import { editorReducer, initialEditorState } from "@/lib/canvas/editorState";
 import { connectionToEdge, graphFromEdgeChanges, graphFromNodeChanges, toFlow } from "@/lib/canvas/flow";
-import type { Theme } from "@/lib/canvas/prefs";
+import { clampRect } from "@/lib/canvas/prefs";
+import { isOutOfDate, revealSchedule } from "@/lib/canvas/runView";
 import { stepNumbers } from "@/lib/canvas/stepNumbers";
-import { type Edit, addEdge, addNode, editTuning, removeEdge, removeNode } from "@/lib/graph/edits";
+import { type Edit, addEdge, addNode, editAsset, editTuning, removeEdge, removeNode } from "@/lib/graph/edits";
 import { starterGraph } from "@/lib/graph/starter";
 import type { Assets, Graph, GraphEdge, PortRef } from "@/lib/graph/types";
 import { wiringProblem } from "@/lib/graph/wiring";
@@ -45,7 +50,29 @@ export interface EditorProps {
 const NODE_TYPES = { step: StepCard };
 const EDGE_TYPES = { wire: WireEdge };
 const NO_PENDING: ReadonlySet<string> = new Set();
+const AUTOSAVE_MS = 800;
+const REVEAL_MS = 150;
 const TOAST_MS = 4000;
+
+// ---- things the browser tells us about ----
+
+const subscribeCoarse = (onChange: () => void) => {
+  const query = window.matchMedia("(pointer: coarse)");
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+};
+const subscribeResize = (onChange: () => void) => {
+  window.addEventListener("resize", onChange);
+  return () => window.removeEventListener("resize", onChange);
+};
+
+function prefersReducedMotion(): boolean {
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
+}
 
 export function Editor(props: EditorProps) {
   return (
@@ -57,19 +84,38 @@ export function Editor(props: EditorProps) {
 
 function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorProps) {
   const [state, dispatch] = useReducer(editorReducer, { graph: initialGraph, assets: initialAssets, lastRunId: initialRunId }, initialEditorState);
-  const [theme, setTheme] = useState<Theme>("dark");
+  const latest = useRef(state);
+  useEffect(() => {
+    latest.current = state;
+  });
+
+  const [prefs, changePrefs] = usePrefs();
+  const [save, setSave] = useState<SaveState>({ status: "idle" });
   const [menu, setMenu] = useState<{ from?: PortRef; anchor?: { x: number; y: number } } | null>(null);
   const [toastAt, setToastAt] = useState<{ x: number; y: number } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<{ nodeId: string; message: string } | null>(null);
+  const [expired, setExpired] = useState(false);
+  const [pending, setPending] = useState<ReadonlySet<string>>(NO_PENDING);
+  const [sideTab, setSideTab] = useState<"settings" | "game">("settings");
+  const [sideOpen, setSideOpen] = useState(true);
   // In a controlled flow React Flow hides a node until it is told the node's measured size, so the sizes it reports are
   // kept here and handed back with the nodes.
   const [measured, setMeasured] = useState<Record<string, { width: number; height: number }>>({});
-  const { flowToScreenPosition, screenToFlowPosition } = useReactFlow();
+
+  const coarsePointer = useSyncExternalStore<boolean | null>(subscribeCoarse, () => window.matchMedia("(pointer: coarse)").matches, () => null);
+  const viewportWidth = useSyncExternalStore(subscribeResize, () => window.innerWidth, () => 1280);
+  const viewportHeight = useSyncExternalStore(subscribeResize, () => window.innerHeight, () => 800);
+
+  const autosave = useRef<Autosave | null>(null);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const { flowToScreenPosition, screenToFlowPosition, fitView } = useReactFlow();
 
   const { graph } = state;
   const numbers = useMemo(() => stepNumbers(graph), [graph]);
   const flow = useMemo(
-    () => toFlow({ graph, assets: state.assets, run: state.run, numbers, graphId: id, pending: NO_PENDING, selection: state.selection }),
-    [graph, state.assets, state.run, numbers, id, state.selection],
+    () => toFlow({ graph, assets: state.assets, run: state.run, numbers, graphId: id, pending, selection: state.selection }),
+    [graph, state.assets, state.run, numbers, id, pending, state.selection],
   );
   const nodes = useMemo(() => flow.nodes.map((n) => (measured[n.id] ? { ...n, measured: measured[n.id] } : n)) as StepNode[], [flow.nodes, measured]);
   const edges = flow.edges as WireEdgeType[];
@@ -80,11 +126,46 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
     dispatch({ type: "toast", message });
   }, []);
 
+  // ---- saving ----
+
+  useEffect(() => {
+    const created = createAutosave({ save: (g) => saveGraph(id, g), delayMs: AUTOSAVE_MS });
+    autosave.current = created;
+    const stop = created.subscribe(setSave);
+    return () => {
+      stop();
+      created.dispose();
+      autosave.current = null;
+    };
+  }, [id]);
+
+  const firstGraph = useRef(initialGraph);
+  useEffect(() => {
+    if (graph !== firstGraph.current) autosave.current?.edit(graph);
+  }, [graph]);
+
+  useEffect(() => {
+    if (save.status !== "dirty" && save.status !== "saving") return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [save.status]);
+
   useEffect(() => {
     if (!state.toast) return;
     const timer = setTimeout(() => dispatch({ type: "toast", message: null }), TOAST_MS);
     return () => clearTimeout(timer);
   }, [state.toast]);
+
+  useEffect(
+    () => () => {
+      for (const timer of timers.current) clearTimeout(timer);
+    },
+    [],
+  );
 
   // ---- what React Flow reports ----
 
@@ -96,7 +177,10 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
 
       const result = graphFromNodeChanges(graph, changes);
       if (result.graph !== graph) apply({ graph: result.graph, touched: result.touched });
-      if (result.selected !== undefined) dispatch({ type: "select", selection: result.selected === null ? { kind: "none" } : { kind: "node", id: result.selected } });
+      if (result.selected !== undefined) {
+        dispatch({ type: "select", selection: result.selected === null ? { kind: "none" } : { kind: "node", id: result.selected } });
+        if (result.selected !== null) setSideTab("settings");
+      }
     },
     [graph, apply],
   );
@@ -172,10 +256,98 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
       }
       apply({ graph: next, touched });
       dispatch({ type: "select", selection: { kind: "node", id: added.id } });
+      setSideTab("settings");
       setMenu(null);
     },
     [menu, graph, apply, say, screenToFlowPosition],
   );
+
+  // ---- files ----
+
+  const chooseFile = useCallback(
+    async (nodeId: string, file: File) => {
+      setUploadError(null);
+      setUploading(true);
+      const result = await uploadFile(id, file);
+      setUploading(false);
+      if (!result.ok) {
+        if (result.expired) setExpired(true);
+        return setUploadError({ nodeId, message: result.message });
+      }
+      const current = latest.current;
+      dispatch({ type: "assets", assets: { ...current.assets, [result.sha256]: result.info } });
+      apply(editAsset(current.graph, nodeId, result.sha256));
+    },
+    [id, apply],
+  );
+
+  // ---- the game view ----
+
+  const showGame = useCallback(() => {
+    setSideTab("game");
+    setSideOpen(true);
+  }, []);
+
+  // ---- Play ----
+
+  const play = useCallback(async () => {
+    if (latest.current.playing) return;
+    dispatch({ type: "play-started" });
+
+    // What is played is what is saved: wait for the save, and stop if it failed.
+    const saved = (await autosave.current?.flush()) ?? true;
+    if (!saved) {
+      dispatch({ type: "play-failed" });
+      return say("The graph could not be saved, so it was not played. Fix the save problem first.");
+    }
+
+    setPending(new Set(stepNumbers(latest.current.graph).keys()));
+    const outcome = await playGraph(id);
+    if (outcome.kind === "expired" || outcome.kind === "failed") {
+      setPending(NO_PENDING);
+      dispatch({ type: "play-failed" });
+      if (outcome.kind === "expired") setExpired(true);
+      else say(outcome.message);
+      return;
+    }
+
+    dispatch({ type: "play-finished", response: outcome });
+    if (outcome.kind === "invalid") return setPending(NO_PENDING);
+
+    // One step's result at a time, in the order they ran, so the order can be seen.
+    setPending(new Set(outcome.order));
+    for (const { node, atMs } of revealSchedule(outcome.order, REVEAL_MS, prefersReducedMotion())) {
+      timers.current.push(
+        setTimeout(() => {
+          setPending((current) => {
+            if (!current.has(node)) return current;
+            const next = new Set(current);
+            next.delete(node);
+            return next;
+          });
+        }, atMs),
+      );
+    }
+    if (outcome.state === "done") showGame();
+  }, [id, say, showGame]);
+
+  // ---- problems after a Play ----
+
+  const failedIds = state.run.order.filter((nodeId) => state.run.outcomes[nodeId]?.state === "failed");
+  const problemCount = state.run.problems.length + failedIds.length;
+  const firstProblem = state.run.problems[0];
+  const firstProblemStep = state.run.problems.find((p) => p.node !== null)?.node ?? failedIds[0] ?? null;
+
+  const showProblem = useCallback(
+    (nodeId: string) => {
+      dispatch({ type: "select", selection: { kind: "node", id: nodeId } });
+      setSideTab("settings");
+      void fitView({ nodes: [{ id: nodeId }], duration: 300, maxZoom: 1, padding: 1 });
+    },
+    [fitView],
+  );
+
+  // ---- what the cards can ask for ----
 
   const actions = useMemo<EditorActions>(
     () => ({
@@ -186,35 +358,58 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
       },
       onRemoveNode: (nodeId) => apply(removeNode(graph, nodeId)),
       onRemoveEdge: (edge) => apply(removeEdge(graph, edge)),
-      onOpenGame() {
-        // The game view is added with Play (Task 15).
-      },
+      onOpenGame: showGame,
     }),
-    [graph, apply, openMenu, flowToScreenPosition],
+    [graph, apply, openMenu, flowToScreenPosition, showGame],
   );
+
+  // ---- drawing it ----
 
   const selectedId = state.selection.kind === "node" ? state.selection.id : null;
   const selectedNode = selectedId ? graph.nodes.find((n) => n.id === selectedId) ?? null : null;
   const selectedData = selectedId ? nodes.find((n) => n.id === selectedId)?.data ?? null : null;
+  const sessionExpired = expired || (save.status === "error" && save.message === SESSION_EXPIRED);
+  const docked = prefs.gameView === "docked";
+  const viewport = { width: viewportWidth, height: viewportHeight };
+  const frame = <GameFrame runId={state.run.runId} outOfDate={isOutOfDate(state.run, graph)} coarsePointer={coarsePointer} />;
 
   return (
     <EditorActionsContext.Provider value={actions}>
-      <div className={cx(styles.editor, styles.shell)} data-theme={theme}>
+      <div className={cx(styles.editor, styles.shell)} data-theme={prefs.theme}>
         <Toolbar
           name={name}
-          save={{ status: "idle" }}
-          theme={theme}
-          canPlay={false}
+          save={save}
+          theme={prefs.theme}
+          canPlay={graph.nodes.length > 0}
           playing={state.playing}
-          onPlay={() => {}}
+          onPlay={play}
           onAddStep={() => openMenu()}
-          onTheme={setTheme}
-          onRetry={() => {}}
+          onTheme={(theme) => changePrefs({ theme })}
+          onRetry={() => autosave.current?.retry()}
         />
 
-        {state.hintOpen && graph.nodes.length > 0 && (
-          <p className={styles.hintBar}>1. Choose a picture on the first step. 2. Press Play.</p>
+        {sessionExpired && (
+          <p className={styles.banner} role="alert">
+            {SESSION_EXPIRED} Changes that are not saved will be lost. <a href="/sign-in">Sign in</a>
+          </p>
         )}
+
+        {!state.playing && problemCount > 0 && (
+          <p className={styles.banner} role="status">
+            {problemCount} {problemCount === 1 ? "problem" : "problems"}
+            {firstProblem && firstProblem.node === null ? `: ${firstProblem.message}` : ""}
+            {firstProblemStep && (
+              <>
+                {" "}
+                <button type="button" className={styles.linkButton} onClick={() => showProblem(firstProblemStep)}>
+                  Show the first
+                </button>
+              </>
+            )}
+          </p>
+        )}
+
+        {state.hintOpen && graph.nodes.length > 0 && <p className={styles.hintBar}>1. Choose a picture on the first step. 2. Press Play.</p>}
 
         <div className={styles.main}>
           <div className={styles.canvasArea}>
@@ -229,7 +424,7 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
               onConnectEnd={onConnectEnd}
               isValidConnection={isValidConnection}
               deleteKeyCode={["Delete", "Backspace"]}
-              colorMode={theme}
+              colorMode={prefs.theme}
               fitView
               fitViewOptions={{ padding: 0.25, maxZoom: 1 }}
               minZoom={0.3}
@@ -247,23 +442,70 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
                 </button>
               </div>
             )}
+
+            {!sideOpen && (
+              <button type="button" className={cx(styles.secondary, styles.showPanel)} onClick={() => setSideOpen(true)}>
+                Show panel
+              </button>
+            )}
           </div>
 
-          <aside className={styles.side} aria-label="Settings">
-            <SettingsPanel
-              node={selectedNode}
-              data={selectedData}
-              assets={state.assets}
-              graphId={id}
-              uploading={false}
-              error={null}
-              onChooseFile={() => {
-                // Uploading is added with saving (Task 15).
-              }}
-              onTune={(nodeId, tuning) => apply(editTuning(graph, nodeId, tuning))}
-            />
-          </aside>
+          {sideOpen && (
+            <aside className={styles.side} aria-label="Side panel">
+              <div role="tablist" className={styles.tabs}>
+                <button type="button" role="tab" aria-selected={!docked || sideTab === "settings"} onClick={() => setSideTab("settings")}>
+                  Settings
+                </button>
+                {docked && (
+                  <button type="button" role="tab" aria-selected={sideTab === "game"} onClick={() => setSideTab("game")}>
+                    Game
+                  </button>
+                )}
+                <button type="button" className={styles.collapse} aria-label="Hide panel" onClick={() => setSideOpen(false)}>
+                  Hide
+                </button>
+              </div>
+              {docked && sideTab === "game" ? (
+                <GamePanel
+                  mode="docked"
+                  rect={prefs.floating}
+                  viewport={viewport}
+                  frame={frame}
+                  onMode={(gameView) => {
+                    changePrefs({ gameView });
+                    if (gameView === "docked") showGame();
+                  }}
+                  onRect={(floating) => changePrefs({ floating })}
+                />
+              ) : (
+                <SettingsPanel
+                  node={selectedNode}
+                  data={selectedData}
+                  assets={state.assets}
+                  graphId={id}
+                  uploading={uploading}
+                  error={uploadError && uploadError.nodeId === selectedId ? uploadError.message : null}
+                  onChooseFile={chooseFile}
+                  onTune={(nodeId, tuning) => apply(editTuning(graph, nodeId, tuning))}
+                />
+              )}
+            </aside>
+          )}
         </div>
+
+        {!docked && (
+          <GamePanel
+            mode={prefs.gameView}
+            rect={clampRect(prefs.floating, viewport)}
+            viewport={viewport}
+            frame={frame}
+            onMode={(gameView) => {
+              changePrefs({ gameView });
+              if (gameView === "docked") showGame();
+            }}
+            onRect={(floating) => changePrefs({ floating })}
+          />
+        )}
 
         {menu && <AddMenu choices={addChoices(graph, menu.from)} anchor={menu.anchor} onPick={pickChoice} onClose={() => setMenu(null)} />}
 
@@ -276,4 +518,3 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
     </EditorActionsContext.Provider>
   );
 }
-

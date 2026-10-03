@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
 import { getGraphService } from "@/lib/graph/firebase";
 import { GraphError } from "@/lib/graph/types";
-import { GraphPlain } from "./GraphPlain";
+import { Editor } from "./Editor";
 
 export default async function GraphPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -17,5 +17,5 @@ export default async function GraphPage({ params }: { params: Promise<{ id: stri
       throw error;
     });
 
-  return <GraphPlain id={record.id} name={record.name} initialGraph={record.graph} initialAssets={record.assets} initialRunId={record.lastRunId} />;
+  return <Editor id={record.id} name={record.name} initialGraph={record.graph} initialAssets={record.assets} initialRunId={record.lastRunId} />;
 }

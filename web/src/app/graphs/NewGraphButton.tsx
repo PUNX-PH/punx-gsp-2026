@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import styles from "@/app/graphs/[id]/editor.module.css";
 
 async function message(response: Response, fallback: string): Promise<string> {
   const body = (await response.json().catch(() => ({}))) as { error?: string };
@@ -31,10 +32,10 @@ export function NewGraphButton() {
 
   return (
     <p>
-      <button onClick={create} disabled={busy}>
+      <button type="button" className={styles.play} onClick={create} disabled={busy}>
         New from starter
       </button>
-      {error && <span className="error"> {error}</span>}
+      {error && <span className={styles.errorText}> {error}</span>}
     </p>
   );
 }
@@ -45,16 +46,22 @@ export function DeleteGraphButton({ id }: { id: string }) {
 
   async function remove() {
     if (!window.confirm("Delete this graph, its files and its game?")) return;
-    const response = await fetch(`/api/graphs/${encodeURIComponent(id)}`, { method: "DELETE" });
-    if (response.status === 401) return router.replace("/sign-in");
-    if (!response.ok) return setError(await message(response, "Could not delete this graph."));
-    router.refresh();
+    try {
+      const response = await fetch(`/api/graphs/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (response.status === 401) return router.replace("/sign-in");
+      if (!response.ok) return setError(await message(response, "Could not delete this graph."));
+      router.refresh();
+    } catch {
+      setError("The request did not finish. Check your connection and try again.");
+    }
   }
 
   return (
     <>
-      <button onClick={remove}>Delete</button>
-      {error && <span className="error"> {error}</span>}
+      <button type="button" className={styles.secondary} onClick={remove}>
+        Delete
+      </button>
+      {error && <span className={styles.errorText}> {error}</span>}
     </>
   );
 }

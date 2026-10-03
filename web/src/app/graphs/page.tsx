@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import styles from "@/app/graphs/[id]/editor.module.css";
 import { currentUser } from "@/lib/auth/server";
 import { getGraphService } from "@/lib/graph/firebase";
 import { DeleteGraphButton, NewGraphButton } from "./NewGraphButton";
+import { ThemedShell } from "./ThemedShell";
 
 export default async function GraphsPage() {
   const user = await currentUser();
@@ -11,29 +13,35 @@ export default async function GraphsPage() {
   const graphs = await getGraphService().listGraphs(user);
 
   return (
-    <main className="page">
-      <h1>Your graphs</h1>
-      <p className="note">A plain page for building and playing a graph. The node canvas replaces it.</p>
+    <ThemedShell>
+      <main className={styles.listPage}>
+        <h1 className={styles.listTitle}>Your graphs</h1>
+        <p className={styles.hint}>A graph is a game: the steps that make it, wired together. Open one to build and play it.</p>
 
-      <NewGraphButton />
+        <NewGraphButton />
 
-      {graphs.length === 0 ? (
-        <p>You have no graphs yet. Start from the starter graph.</p>
-      ) : (
-        <ul>
-          {graphs.map((graph) => (
-            <li key={graph.id}>
-              <Link href={`/graphs/${encodeURIComponent(graph.id)}`}>{graph.name}</Link>{" "}
-              <span className="note">{new Date(graph.updatedAt).toISOString().slice(0, 16).replace("T", " ")} UTC</span>{" "}
-              <DeleteGraphButton id={graph.id} />
-            </li>
-          ))}
-        </ul>
-      )}
+        {graphs.length === 0 ? (
+          <p className={styles.hint}>You have no graphs yet. Start from the starter graph.</p>
+        ) : (
+          <ul className={styles.listRows}>
+            {graphs.map((graph) => (
+              <li key={graph.id} className={styles.listRow}>
+                <Link href={`/graphs/${encodeURIComponent(graph.id)}`} className={styles.listName}>
+                  {graph.name}
+                </Link>
+                <span className={styles.listMeta}>{new Date(graph.updatedAt).toISOString().slice(0, 16).replace("T", " ")} UTC</span>
+                <DeleteGraphButton id={graph.id} />
+              </li>
+            ))}
+          </ul>
+        )}
 
-      <p>
-        <Link href="/">Back to your runs</Link>
-      </p>
-    </main>
+        <p>
+          <Link href="/" className={styles.listBack}>
+            Back to your runs
+          </Link>
+        </p>
+      </main>
+    </ThemedShell>
   );
 }

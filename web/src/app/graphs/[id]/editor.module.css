@@ -776,3 +776,119 @@
 .canvasArea :global(.react-flow__background-pattern) { fill: var(--dots); }
 .canvasArea :global(.react-flow__controls-button svg) { fill: currentColor; }
 .canvasArea :global(.react-flow__attribution) { color: var(--muted); }
+
+/* ---- banners, the side panel's tabs ---- */
+
+.banner {
+  margin: 0;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--warn);
+  background: var(--surface);
+  color: var(--warn);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.banner a { color: inherit; text-decoration: underline; }
+
+.tabs {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.tabs button {
+  padding: 9px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.tabs button[aria-selected="true"] {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tabs button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.tabs .collapse { margin-left: auto; font-size: 12px; }
+
+.showPanel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 6;
+}
+
+/* ---- the list of graphs ---- */
+
+.listShell {
+  min-height: 100vh;
+  background: var(--canvas);
+}
+
+.listPage {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 40px 16px;
+}
+
+.listTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.listRows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.listRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.listName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.listName:hover { text-decoration: underline; }
+.listName:focus-visible,
+.listBack:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+.listMeta {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.listBack {
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: underline;
+}
