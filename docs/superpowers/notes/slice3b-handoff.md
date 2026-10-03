@@ -19,7 +19,7 @@ server changes.
   slice 2, 3a, then this.
 - **Plan tasks 1 to 15 are complete** in the ledger (`.superpowers/sdd/2026-10-04-slice3b-node-canvas/progress.md`,
   git-ignored). Task 16 (deployed acceptance and wrap-up) has not started and needs the user's setup.
-- **Tests:** web 638 passing (`cd web && npm test`), lint, typecheck and `npm run build` clean. The gate is test, lint,
+- **Tests:** web 675 passing (`cd web && npm test`), lint, typecheck and `npm run build` clean. The gate is test, lint,
   build.
 - **The final whole-branch review is done** (a fresh opus reviewer, aimed at `Editor.tsx` and its React Flow use): no
   Critical findings; eight Important, all fixed (selection switching, results of a removed step coming back on a reused
@@ -104,23 +104,34 @@ A temporary page under `web/src/app/` is a quick way to see the editor in the br
 before committing (a stale `.next/types` makes `tsc` complain). The browser pane often runs hidden, which stops rendering
 frames: React Flow nodes then stay `visibility: hidden`, so judge the canvas only when `document.hidden` is false.
 
-## Deferred minors from the final review
+## Deferred minors from the final review: fixed (2026-10-04)
 
-None blocks anything; the ledger has the details.
+All twelve were taken on after the final review, test-first where there is logic (web 675 passing; lint, typecheck and build
+clean). What changed, and what was deliberately left:
 
-1. A selected wire turns grey (React Flow's own `.selected` rule outranks ours).
-2. The upload error line repeats the raw file name: a very long one does not wrap and right-to-left marks are not
-   isolated; no RTL test.
-3. Reveal timers are not cleared when a new Play starts; the same toast twice does not restart its timer.
-4. `connectOnClick` is on, so a stray click on a handle starts a click-to-connect that skips the refusal message.
-5. "Back to canvas" always docks the game; the floating window writes localStorage on every pointer move; the in-memory
-   preference value hides changes made in another tab.
-6. The "not used" card's text (62% opacity) is about 3.3:1.
-7. After a reload the Preview card has no "Open game" (the Game tab still shows the game).
-8. The Add menu and the toast are not kept inside the window; the measured-size map is never pruned.
-9. Every edit replaces the whole graph, so an upload finishing during a drag can drop the drag's last move.
-10. Look deviations from the spec: the wire × shows on a selected wire only (not on hover); "Add step" places the step
-    near the middle of the canvas; no `color-scheme` for the chosen theme.
-11. Play after a retryable save error refuses instead of retrying the save.
-12. Accessibility details: the order-number `aria-label`; the tablist contains the Hide button; Delete and Backspace
-    delete the selected step while the Add menu is open.
+1. **Selected wire grey:** a CSS rule outranks React Flow's `.selected` one (`tokens.test.ts` holds it; seen in a browser
+   with and without the rule).
+2. **Upload error line:** direction marks are stripped from file names and from server sentences (`client.ts`), a name is
+   capped at 60 characters (never half of one), and the line wraps and is bidi-isolated.
+3. **Timers and toasts:** a new Play clears the old reveal timers; `toastSeq` makes the same toast twice restart its time.
+4. **`connectOnClick` is off**: wires are dragged. This also removes click-to-connect on touch screens (dragging still works).
+5. **Game view:** "Back to canvas" returns to the view the game was in (`viewToReturnTo`); the floating window stores its
+   place once, on release; the preference store (`lib/canvas/prefsStore.ts`, now tested) re-reads storage on another tab's change.
+6. **"Not used" card:** no longer dimmed as a whole (its status text is 4.7:1 before any dimming, so no opacity could pass);
+   the icon, thumbnail and swatches are dimmed, the border is dashed, the text is full strength.
+7. **Preview card after a reload** shows "Open game" while the run is unchanged by anything this page ran.
+8. **Add menu and toast** are kept inside the window (`fitPoint`, `useFitInViewport`); measured sizes of removed steps are pruned.
+9. **Upload racing a drag:** the edit is now worked out inside the reducer (`{ type: "edit" }`) from the graph as it is then.
+   Other edits come from React Flow callbacks that already read the current render's graph.
+10. **Look deviations:** `color-scheme` follows the theme; the wire × shows when the wire is selected, its label is hovered, or
+    focus is in it (not when only the curve is hovered). **Not changed on purpose:** "Add step" still places the step near the
+    middle of the visible canvas, because beside the last step it could land off screen.
+11. **Play after a retryable save error** tries the save once more (`flush`); a failure during the flush is not repeated.
+12. **Accessibility:** the order number is real (visually hidden) text; Hide is outside the tab list (`SideTabs.tsx`); Delete and
+    Backspace do nothing to the selected step while the Add menu is open.
+
+Seen working in a real browser (the pane hidden: viewport emulation, a `requestAnimationFrame` and `ResizeObserver` stand-in, and
+a throwaway page, since deleted): the selected wire's color, the × appearing, the tab list and badge markup, `color-scheme`, the
+menu and toast pulled inside a 1280 x 800 window from its corner, Float to Full and Back, one storage write per drag, Delete with the
+menu open and closed, the not-used card. **Only unit-tested, not seen:** the toast restart, the reveal timers, the upload race,
+`connectOnClick`, the hover ×, the cross-tab preference refresh.
