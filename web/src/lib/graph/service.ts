@@ -1,0 +1,198 @@
+// The graph service: the rules about graphs and their files, over two ports (records and files) so that it is tested
+// with in-memory fakes. Everything about who may see a graph is decided here: a graph that is not yours, does not
+// exist, or has no such file all look the same ("Not found"). A graph is saved as a whole after it parses; a half-built
+// graph can always be saved (what stops a run is checked at Play).
+import type { User } from "@/lib/auth/ports";
+import { checkGlb } from "@/lib/glb";
+import { readImage, sniffKind } from "@/lib/graph/image";
+import { NODE_SPECS, WIRE_WORDS } from "@/lib/graph/registry";
+import { parseGraph } from "@/lib/graph/schema";
+import { starterGraph } from "@/lib/graph/starter";
+import type { GraphFiles, GraphRecords } from "@/lib/graph/store/ports";
+import { type AssetInfo, type Graph, GraphError, type GraphRecord } from "@/lib/graph/types";
+import { randomId, sha256Hex } from "@/lib/runs/service";
+import { RunError, type RunService } from "@/lib/runs/types";
+
+const MAX_GRAPHS_PER_PERSON = 10;
+const MAX_ASSETS_PER_GRAPH = 20;
+const UNREFERENCED_GRACE_MS = 5 * 60 * 1000;
+const MAX_NAME = 80;
+const MAX_FILE_NAME = 100;
+const DEFAULT_NAME = "Untitled game";
+// What a graph id looks like (ours are 22 URL-safe characters); anything else is not a graph and is never passed on.
+const GRAPH_ID = /^(?!__)[A-Za-z0-9_-]{1,64}$/;
+// The kind of file each file-taking node accepts.
+const FILE_KIND: Record<string, AssetInfo["kind"]> = { "reference-image": "image", model: "model" };
+
+export interface GraphService {
+  createGraph(user: User, input: { name?: string; starter?: boolean }): Promise<GraphRecord>;
+  listGraphs(user: User): Promise<GraphRecord[]>;
+  getGraph(user: User, id: string): Promise<GraphRecord>;
+  saveGraph(user: User, id: string, input: { name?: string; graph: unknown }): Promise<GraphRecord>;
+  deleteGraph(user: User, id: string): Promise<void>;
+  addAsset(user: User, id: string, name: string, bytes: Uint8Array): Promise<{ sha256: string } & AssetInfo>;
+  readAsset(user: User, id: string, sha256: string): Promise<{ bytes: Uint8Array; contentType: string }>;
+}
+
+export interface GraphServiceDeps {
+  records: GraphRecords;
+  files: GraphFiles;
+  runs: RunService;
+  now: () => number;
+  newId?: () => string;
+}
+
+const withoutControls = (text: string) => text.replace(/\p{Cc}/gu, "");
+
+function cleanName(name: string | undefined): string {
+  const cleaned = withoutControls(name ?? "").trim().slice(0, MAX_NAME).trim();
+  return cleaned === "" ? DEFAULT_NAME : cleaned;
+}
+
+// A file name is for people to read and is never used in a path; this keeps it short and free of oddities anyway.
+function cleanFileName(name: string): string {
+  const cleaned = withoutControls(name).replace(/[/\\]/g, "_").trim().slice(0, MAX_FILE_NAME).trim();
+  return cleaned === "" ? "file" : cleaned;
+}
+
+export function makeGraphService(deps: GraphServiceDeps): GraphService {
+  const { records, files, runs, now } = deps;
+  const newId = deps.newId ?? randomId;
+  const notFound = () => new GraphError(404, "Not found");
+
+  async function ownedGraph(user: User, id: string): Promise<GraphRecord> {
+    if (!GRAPH_ID.test(id)) throw notFound();
+    const record = await records.get(id);
+    if (!record || record.ownerUid !== user.uid) throw notFound();
+    return record;
+  }
+
+  const referencedFiles = (graph: Graph) =>
+    new Set(graph.nodes.flatMap((n) => (typeof n.params.asset === "string" ? [n.params.asset] : [])));
+
+  // Files nothing refers to, uploaded more than five minutes ago. (A file is uploaded before the graph that uses it is
+  // saved, so a fresh one is never stale.)
+  const staleFiles = (record: GraphRecord) => {
+    const used = referencedFiles(record.graph);
+    return Object.entries(record.assets)
+      .filter(([sha, info]) => !used.has(sha) && now() - info.uploadedAt > UNREFERENCED_GRACE_MS)
+      .map(([sha]) => sha);
+  };
+
+  async function removeFiles(record: GraphRecord, shas: string[]): Promise<GraphRecord> {
+    if (shas.length === 0) return record;
+    const updated = await records.update(record.id, { removeAssets: shas, updatedAt: now() });
+    for (const sha of shas) await files.delete(record.id, sha);
+    return updated;
+  }
+
+  return {
+    async createGraph(user, input) {
+      const existing = await records.listByOwner(user.uid);
+      if (existing.length >= MAX_GRAPHS_PER_PERSON) throw new GraphError(409, `You have ${MAX_GRAPHS_PER_PERSON} graphs. Delete one first.`);
+
+      const record: GraphRecord = {
+        id: newId(),
+        ownerUid: user.uid,
+        ownerEmail: user.email,
+        name: cleanName(input.name),
+        createdAt: now(),
+        updatedAt: now(),
+        graph: input.starter ? starterGraph() : { schemaVersion: 1, nodes: [], edges: [] },
+        assets: {},
+        lastRunId: null,
+      };
+      await records.create(record);
+      return record;
+    },
+
+    async listGraphs(user) {
+      return (await records.listByOwner(user.uid)).sort((a, b) => b.updatedAt - a.updatedAt);
+    },
+
+    getGraph: ownedGraph,
+
+    async saveGraph(user, id, input) {
+      const record = await ownedGraph(user, id);
+      const parsed = parseGraph(input.graph);
+      if (!parsed.ok) throw new GraphError(400, parsed.error);
+
+      for (const node of parsed.graph.nodes) {
+        const sha = node.params.asset;
+        if (typeof sha !== "string") continue;
+        const label = NODE_SPECS[node.type].label;
+        if (!Object.hasOwn(record.assets, sha)) throw new GraphError(400, `${label}: that file was not uploaded to this graph.`);
+        const wanted = FILE_KIND[node.type];
+        if (record.assets[sha].kind !== wanted) {
+          throw new GraphError(400, `${label}: the file you chose is not a ${wanted === "image" ? WIRE_WORDS.image : "3D model"}.`);
+        }
+      }
+
+      const stale = staleFiles({ ...record, graph: parsed.graph });
+      const updated = await records.update(id, {
+        name: input.name === undefined ? undefined : cleanName(input.name),
+        graph: parsed.graph,
+        removeAssets: stale,
+        updatedAt: now(),
+      });
+      for (const sha of stale) await files.delete(id, sha);
+      return updated;
+    },
+
+    async deleteGraph(user, id) {
+      const record = await ownedGraph(user, id);
+      if (record.lastRunId) {
+        try {
+          await runs.deleteRun(user, record.lastRunId);
+        } catch (error) {
+          if (!(error instanceof RunError && error.status === 404)) throw error; // someone may have deleted it already
+        }
+      }
+      await files.deleteGraph(id);
+      await records.delete(id);
+    },
+
+    async addAsset(user, id, name, bytes) {
+      let record = await ownedGraph(user, id);
+      const shown = cleanFileName(name);
+
+      // What the file is comes from its bytes, never from its name or the type the browser claimed.
+      const kind = sniffKind(bytes);
+      let info: Omit<AssetInfo, "uploadedAt">;
+      if (kind === "png" || kind === "jpeg") {
+        const image = await readImage(bytes);
+        if (!image.ok) throw new GraphError(400, `${shown}: ${image.error}`);
+        info = { name: shown, size: bytes.length, kind: "image", contentType: kind === "png" ? "image/png" : "image/jpeg", width: image.width, height: image.height };
+      } else if (kind === "glb") {
+        const checked = checkGlb(shown, bytes);
+        if (!checked.ok) throw new GraphError(400, checked.error);
+        info = { name: shown, size: bytes.length, kind: "model", contentType: "model/gltf-binary" };
+      } else {
+        throw new GraphError(400, `${shown}: not a PNG, JPEG or GLB file`);
+      }
+
+      const sha256 = await sha256Hex(bytes);
+      if (Object.hasOwn(record.assets, sha256)) return { sha256, ...record.assets[sha256] };
+
+      if (Object.keys(record.assets).length >= MAX_ASSETS_PER_GRAPH) record = await removeFiles(record, staleFiles(record));
+
+      // The file goes in first, so that a record never points at nothing; if the record is refused the file is removed.
+      await files.put(id, sha256, bytes, info.contentType);
+      try {
+        const updated = await records.addAsset(id, sha256, { ...info, uploadedAt: now() }, MAX_ASSETS_PER_GRAPH);
+        return { sha256, ...updated.assets[sha256] };
+      } catch (error) {
+        await files.delete(id, sha256);
+        throw error;
+      }
+    },
+
+    async readAsset(user, id, sha256) {
+      const record = await ownedGraph(user, id);
+      if (!Object.hasOwn(record.assets, sha256)) throw notFound(); // not record.assets[sha256]: "constructor" is truthy there
+      const bytes = await files.get(id, sha256);
+      if (!bytes) throw notFound();
+      return { bytes, contentType: record.assets[sha256].contentType };
+    },
+  };
+}

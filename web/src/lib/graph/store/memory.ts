@@ -6,11 +6,18 @@ import type { GraphFiles, GraphRecords } from "@/lib/graph/store/ports";
 const yieldToOthers = () => Promise.resolve();
 const notFound = () => new GraphError(404, "Not found");
 
+// Firestore throws for an id that is empty, contains a slash, is "." or "..", or starts with "__" (which the app keeps
+// out of its own ids). The fake does the same, so that a test notices a service that lets such an id through.
+function documentId(id: string): string {
+  if (id === "" || id === "." || id === ".." || id.includes("/") || id.startsWith("__")) throw new Error(`invalid document id`);
+  return id;
+}
+
 export class MemoryGraphRecords implements GraphRecords {
   readonly graphs = new Map<string, GraphRecord>();
 
   private existing(id: string): GraphRecord {
-    const record = this.graphs.get(id);
+    const record = this.graphs.get(documentId(id));
     if (!record) throw notFound();
     return record;
   }
@@ -22,7 +29,7 @@ export class MemoryGraphRecords implements GraphRecords {
 
   async get(id: string): Promise<GraphRecord | null> {
     await yieldToOthers();
-    const record = this.graphs.get(id);
+    const record = this.graphs.get(documentId(id));
     return record ? structuredClone(record) : null;
   }
 
@@ -59,7 +66,7 @@ export class MemoryGraphRecords implements GraphRecords {
 
   async delete(id: string): Promise<void> {
     await yieldToOthers();
-    this.graphs.delete(id);
+    this.graphs.delete(documentId(id));
   }
 }
 

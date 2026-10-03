@@ -120,12 +120,12 @@ function contentTypeFor(name: string): string {
   return "application/octet-stream";
 }
 
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
+export async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", bytes as BufferSource);
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 // 128 random bits, URL-safe.
-function randomId(): string {
+export function randomId(): string {
   return Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
 }
