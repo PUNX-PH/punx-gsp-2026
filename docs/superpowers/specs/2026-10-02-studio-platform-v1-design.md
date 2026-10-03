@@ -98,7 +98,7 @@ mismatched types.
 |---|---|---|---|
 | Prompt | typed text | `text` | built-in |
 | Reference Image | uploaded PNG/JPG | `image` | built-in |
-| Asset Upload | uploaded GLB/FBX/OBJ | `model` (raw) | built-in |
+| Asset Upload (named 3D Model; GLB only until slice 5) | uploaded GLB/FBX/OBJ | `model` (raw) | built-in |
 | Palette from Image | `image` | `palette` | built-in |
 | Describe Game | `text`, `image`s | `settings` (draft: template, palette, tuning) | AI executor |
 | Prepare Asset | raw `model`, optional `palette` | `model` (GLB) | Blender worker |
@@ -107,8 +107,9 @@ mismatched types.
 
 ### Runner behavior
 
-- Runs nodes in dependency order. Independent branches may run in parallel.
-- **Cache key** = hash of (node type, node version, parameters, hashes of inputs). A node with an
+- Runs nodes in dependency order. Independent branches may run in parallel (slice 3a runs nodes one at a time; a graph
+  is checked on save and again on Play, and a run is one request that returns every node's state).
+- **Cache key** (deferred: built in the first slice that has a slow node; see the slice 3a spec) = hash of (node type, node version, parameters, hashes of inputs). A node with an
   unchanged key reuses its stored output, so changing a palette color does not redo the Blender step.
 - A failed node reports its error on that node. Nodes that depend on it are skipped. Other branches finish.
 - Progress is sent to the editor as server-sent events.
@@ -182,8 +183,11 @@ Each slice gets its own plan and review.
 2. **Web foundation** (`2026-10-02-web-foundation-design.md`): the Next.js app on Vercel with `@punx.ai`
    sign-in, Firebase storage, run upload and a Preview of a hand-made run. Settles hosting, sign-in and
    serving the Unity builds.
-3. **Editor and runner** with the non-AI nodes (Reference Image, Asset Upload, Palette from Image, Game
-   Template, Preview), the settings schema, caching and per-node errors.
+3. **Editor and runner** with the non-AI nodes (Reference Image, 3D Model, Palette from Image, Game
+   Template, Preview), the settings schema and per-node errors, split in two (`2026-10-03-graph-engine-design.md`):
+   **3a the graph engine** (graph format, typed wires, node executors, runner, saved graphs, uploads, API, a plain
+   page) and **3b the node canvas** on top of it (its own spec). Caching moves to the first slice that has a slow
+   node (4 or 5).
 4. **Prompt and Describe Game** (AI), with schema validation of the model's output and rate limits.
 5. **Blender Prepare Asset** as a command-line script with fixtures, then as an optional node.
 6. Later, if wanted: a second template, export of a ready-to-build Unity project for local mobile builds,

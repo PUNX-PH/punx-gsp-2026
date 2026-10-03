@@ -17,7 +17,9 @@ The Unity runner template (Slice 1, `unity/runner-template`) is built and runs a
 is being designed: slice 2 (web foundation: Next.js on Vercel, `@punx.ai`-only Firebase sign-in, Firestore and
 Cloud Storage) is being built (inline, from the plan): `docs/superpowers/specs/2026-10-02-web-foundation-design.md`,
 `docs/superpowers/plans/2026-10-02-slice2-web-foundation.md`. Tasks 1, 3, 4, 5, 7 and 8 are done and the code for 2, 6 and 9 is written; what is left needs the user (Vercel project, Firebase project, the deployed checks). Nothing
-else is built. Decisions live in the design specs (`docs/superpowers/specs/`).
+else is built. Slice 3 (the node editor) is split into 3a, the graph engine (spec written, awaiting review:
+`docs/superpowers/specs/2026-10-03-graph-engine-design.md`), and 3b, the canvas (not yet designed). Decisions live in the
+design specs (`docs/superpowers/specs/`).
 
 ## Skills (in `.claude/skills/`; origins in `.claude/skills-sources/SOURCES.md`)
 
