@@ -688,3 +688,91 @@
   font-size: 12px;
   font-weight: 500;
 }
+
+/* ---- the editor's layout ---- */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--canvas);
+}
+
+.main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.canvasArea {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.side {
+  flex: none;
+  width: 320px;
+  overflow-y: auto;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.hintBar {
+  margin: 0;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 12.5px;
+}
+
+.emptyStart {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.emptyStart p { margin: 0; }
+.emptyStart button { pointer-events: auto; }
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  z-index: 50;
+  max-width: 360px;
+  margin: 0;
+  padding: 8px 12px;
+  transform: translateX(-50%);
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+/* React Flow's own surfaces take their colors from the same tokens. */
+.canvasArea :global(.react-flow) {
+  --xy-background-color: var(--canvas);
+  --xy-controls-button-background-color: var(--surface);
+  --xy-controls-button-background-color-hover: var(--surface-raised);
+  --xy-controls-button-color: var(--text);
+  --xy-controls-button-border-color: var(--line);
+  --xy-attribution-background-color: transparent;
+  background: var(--canvas);
+}
+
+.canvasArea :global(.react-flow__background-pattern) { fill: var(--dots); }
+.canvasArea :global(.react-flow__controls-button svg) { fill: currentColor; }
+.canvasArea :global(.react-flow__attribution) { color: var(--muted); }
