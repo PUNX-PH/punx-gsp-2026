@@ -29,7 +29,10 @@ export interface GamePanelProps {
   viewport: { width: number; height: number };
   frame: ReactNode;
   onMode: (mode: GameView) => void;
-  onRect: (rect: Rect) => void;
+  /** The window was moved or resized. `final` is true once the pointer is let go: only then is it worth storing. */
+  onRect: (rect: Rect, final: boolean) => void;
+  /** Where "Back to canvas" goes from full screen: the view the game was in before. */
+  backTo?: Exclude<GameView, "full">;
 }
 
 const MODES: { id: GameView; label: string }[] = [
@@ -38,7 +41,7 @@ const MODES: { id: GameView; label: string }[] = [
   { id: "full", label: "Full" },
 ];
 
-export function GamePanel({ mode, rect, viewport, frame, onMode, onRect }: GamePanelProps) {
+export function GamePanel({ mode, rect, viewport, frame, onMode, onRect, backTo = "docked" }: GamePanelProps) {
   const modeButtons = (
     <div className={styles.segmented} role="group" aria-label="Game view">
       {MODES.map((option) => (
@@ -62,12 +65,13 @@ export function GamePanel({ mode, rect, viewport, frame, onMode, onRect }: GameP
       current = step(current, e.clientX - lastX, e.clientY - lastY);
       lastX = e.clientX;
       lastY = e.clientY;
-      onRect(current);
+      onRect(current, false);
     };
     const stop = () => {
       element.removeEventListener("pointermove", move);
       element.removeEventListener("pointerup", stop);
       element.removeEventListener("pointercancel", stop);
+      onRect(current, true);
     };
     element.addEventListener("pointermove", move);
     element.addEventListener("pointerup", stop);
@@ -78,7 +82,7 @@ export function GamePanel({ mode, rect, viewport, frame, onMode, onRect }: GameP
     return (
       <div className={styles.fullOverlay} role="dialog" aria-label="Game">
         <header className={styles.fullBar}>
-          <button type="button" className={styles.secondary} onClick={() => onMode("docked")}>
+          <button type="button" className={styles.secondary} onClick={() => onMode(backTo)}>
             ← Back to canvas
           </button>
           {modeButtons}

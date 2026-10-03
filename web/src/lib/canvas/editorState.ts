@@ -1,6 +1,7 @@
 // The editor's state and the one reducer that changes it. Everything that happens on the canvas becomes an action here,
 // so the rules (what an edit makes stale, what a selection survives, when the hint closes) are tested without a browser.
 import { type PlayResponse, type RunView, applyPlay, emptyRunView, markStale, pruneRun } from "@/lib/canvas/runView";
+import type { Edit } from "@/lib/graph/edits";
 import type { Assets, Graph, GraphEdge } from "@/lib/graph/types";
 
 export type Selection = { kind: "none" } | { kind: "node"; id: string } | { kind: "edge"; edge: GraphEdge };
@@ -14,12 +15,17 @@ export interface EditorState {
   /** The "choose a picture, then press Play" hint, shown until the first successful run. */
   hintOpen: boolean;
   toast: string | null;
+  /** Changes with every toast shown, so the same message twice is still a new toast (and gets its own time on screen). */
+  toastSeq: number;
   /** Steps touched by edits made while a run was on its way: the run does not know about them, so they are stale when it arrives. */
   touchedDuringPlay: string[];
 }
 
 export type EditorAction =
   | { type: "edited"; graph: Graph; touched: string[] }
+  /** An edit worked out from the graph as it is when this is handled, not from the one a handler last saw (an upload that
+   *  finishes during a drag must not undo the drag). */
+  | { type: "edit"; make: (graph: Graph) => Edit }
   | { type: "assets"; assets: Assets }
   | { type: "select"; selection: Selection }
   /** React Flow reports a deselect for the old selection after the select of the new one: it clears only its own kind. */
@@ -38,6 +44,7 @@ export function initialEditorState(record: { graph: Graph; assets: Assets; lastR
     playing: false,
     hintOpen: record.lastRunId === null,
     toast: null,
+    toastSeq: 0,
     touchedDuringPlay: [],
   };
 }
@@ -51,20 +58,27 @@ function survivingSelection(selection: Selection, graph: Graph): Selection {
   return selection;
 }
 
+function applyEdit(state: EditorState, graph: Graph, touched: string[]): EditorState {
+  let run = pruneRun(markStale(state.run, graph, touched), graph);
+  // A step or wire added or removed may fix a problem that belongs to the graph as a whole (no Preview, two Previews).
+  const structural = graph.nodes.length !== state.graph.nodes.length || graph.edges.length !== state.graph.edges.length;
+  if (structural && run.problems.some((p) => p.node === null)) run = { ...run, problems: run.problems.filter((p) => p.node !== null) };
+  return {
+    ...state,
+    graph,
+    run,
+    selection: survivingSelection(state.selection, graph),
+    touchedDuringPlay: state.playing ? [...state.touchedDuringPlay, ...touched] : state.touchedDuringPlay,
+  };
+}
+
 export function editorReducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
-    case "edited": {
-      let run = pruneRun(markStale(state.run, action.graph, action.touched), action.graph);
-      // A step or wire added or removed may fix a problem that belongs to the graph as a whole (no Preview, two Previews).
-      const structural = action.graph.nodes.length !== state.graph.nodes.length || action.graph.edges.length !== state.graph.edges.length;
-      if (structural && run.problems.some((p) => p.node === null)) run = { ...run, problems: run.problems.filter((p) => p.node !== null) };
-      return {
-        ...state,
-        graph: action.graph,
-        run,
-        selection: survivingSelection(state.selection, action.graph),
-        touchedDuringPlay: state.playing ? [...state.touchedDuringPlay, ...action.touched] : state.touchedDuringPlay,
-      };
+    case "edited":
+      return applyEdit(state, action.graph, action.touched);
+    case "edit": {
+      const edit = action.make(state.graph);
+      return applyEdit(state, edit.graph, edit.touched);
     }
     case "assets":
       return { ...state, assets: action.assets };
@@ -86,6 +100,6 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case "play-failed":
       return { ...state, playing: false };
     case "toast":
-      return { ...state, toast: action.message };
+      return { ...state, toast: action.message, toastSeq: state.toastSeq + 1 };
   }
 }

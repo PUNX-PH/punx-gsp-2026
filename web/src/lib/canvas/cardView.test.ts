@@ -143,6 +143,17 @@ describe("a step's result", () => {
     expect(step("n4", { run }).result).toEqual({ kind: "none" });
   });
 
+  it("shows the game link for a game made earlier, before anything has run on this page (after a reload)", () => {
+    expect(step("n4", { run: emptyRunView("run1") }).result).toEqual({ kind: "open-game" });
+  });
+
+  it("does not offer a game link for a Preview that failed or was skipped in the last run", () => {
+    const failed = { ...playedRun(), outcomes: { ...outcomes, n4: { state: "failed", error: "x" } } as Record<string, NodeOutcome> };
+    const skipped = { ...playedRun(), outcomes: { ...outcomes, n4: { state: "skipped", because: "y" } } as Record<string, NodeOutcome> };
+    expect(step("n4", { run: failed }).result).toEqual({ kind: "none" });
+    expect(step("n4", { run: skipped }).result).toEqual({ kind: "none" });
+  });
+
   it("holds a result back while its step is still waiting to be revealed", () => {
     expect(step("n2", { run: playedRun(), pending: ["n2"] }).result).toEqual({ kind: "none" });
   });

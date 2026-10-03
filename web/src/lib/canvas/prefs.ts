@@ -80,3 +80,23 @@ export function resizeRect(rect: Rect, dw: number, dh: number, viewport: { width
     height: clamp(rect.height + dh, MIN_HEIGHT, viewport.height - rect.y),
   };
 }
+
+const EDGE_MARGIN = 8;
+
+/** Where a box of this size should start to stay inside the viewport, as close to `point` as it can; its top left wins when it is too big. */
+export function fitPoint(
+  point: { x: number; y: number },
+  size: { width: number; height: number },
+  viewport: { width: number; height: number },
+  margin = EDGE_MARGIN,
+): { x: number; y: number } {
+  return {
+    x: Math.max(margin, Math.min(point.x, viewport.width - size.width - margin)),
+    y: Math.max(margin, Math.min(point.y, viewport.height - size.height - margin)),
+  };
+}
+
+/** The view "Back to canvas" returns to: whichever one the game was in when it went full screen. */
+export function viewToReturnTo(returnTo: Exclude<GameView, "full">, current: GameView, picked: GameView): Exclude<GameView, "full"> {
+  return picked === "full" && current !== "full" ? current : returnTo;
+}

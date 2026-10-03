@@ -4,6 +4,7 @@
 // A step that cannot be added is listed but greyed, with the reason.
 import { useEffect, useRef } from "react";
 import styles from "@/app/graphs/[id]/editor.module.css";
+import { useFitInViewport } from "@/app/graphs/[id]/useFitInViewport";
 import type { Choice } from "@/lib/canvas/addMenu";
 
 export interface AddMenuProps {
@@ -20,6 +21,7 @@ export function AddMenu({ choices, onPick, onClose, anchor }: AddMenuProps) {
   useEffect(() => {
     close.current = onClose;
   });
+  useFitInViewport(menu, true, `${anchor?.x}:${anchor?.y}:${choices.length}`); // a menu opened near an edge is moved back inside the window
 
   // Opens with the first choice focused (so the keyboard works at once), closes on Escape wherever the focus is, and hands
   // the focus back to whatever opened it.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampRect, DEFAULT_PREFS, loadPrefs, moveRect, PREFS_KEY, type Prefs, resizeRect, savePrefs } from "@/lib/canvas/prefs";
+import { clampRect, DEFAULT_PREFS, fitPoint, loadPrefs, moveRect, PREFS_KEY, type Prefs, resizeRect, savePrefs, viewToReturnTo } from "@/lib/canvas/prefs";
 
 const VIEWPORT = { width: 1200, height: 800 };
 
@@ -81,5 +81,38 @@ describe("window geometry", () => {
     expect(resizeRect(rect, 60, 40, VIEWPORT)).toEqual({ x: 100, y: 100, width: 360, height: 240 });
     expect(resizeRect(rect, -500, -500, VIEWPORT)).toEqual({ x: 100, y: 100, width: 240, height: 160 });
     expect(resizeRect(rect, 5000, 5000, VIEWPORT)).toEqual({ x: 100, y: 100, width: 1100, height: 700 });
+  });
+});
+
+describe("fitPoint (the Add menu and the toast stay inside the window)", () => {
+  const SIZE = { width: 280, height: 300 };
+
+  it("leaves a place alone when the box fits there", () => {
+    expect(fitPoint({ x: 100, y: 100 }, SIZE, VIEWPORT)).toEqual({ x: 100, y: 100 });
+  });
+
+  it("moves a box that would run off the right or bottom edge back in, leaving a margin", () => {
+    expect(fitPoint({ x: 1100, y: 700 }, SIZE, VIEWPORT)).toEqual({ x: 912, y: 492 });
+  });
+
+  it("moves a box that would start off the top or left edge back in", () => {
+    expect(fitPoint({ x: -50, y: -5 }, SIZE, VIEWPORT)).toEqual({ x: 8, y: 8 });
+  });
+
+  it("keeps the top left visible when the box is bigger than the window", () => {
+    expect(fitPoint({ x: 300, y: 300 }, { width: 5000, height: 5000 }, VIEWPORT)).toEqual({ x: 8, y: 8 });
+  });
+});
+
+describe("viewToReturnTo (Back to canvas goes back to where the game was)", () => {
+  it("remembers the view the game was in when it goes full screen", () => {
+    expect(viewToReturnTo("docked", "floating", "full")).toBe("floating");
+    expect(viewToReturnTo("floating", "docked", "full")).toBe("docked");
+  });
+
+  it("keeps what it remembered while the game stays full screen or the view changes some other way", () => {
+    expect(viewToReturnTo("floating", "full", "full")).toBe("floating");
+    expect(viewToReturnTo("floating", "full", "docked")).toBe("floating");
+    expect(viewToReturnTo("docked", "floating", "docked")).toBe("docked");
   });
 });

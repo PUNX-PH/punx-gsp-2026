@@ -137,3 +137,10 @@ export function candidateEdge(start: HandleEnd, end: HandleEnd): GraphEdge {
   const second = { node: end.node, port: end.port };
   return start.type === "source" ? { from: first, to: second } : { from: second, to: first };
 }
+
+/** The sizes React Flow measured, without those of steps that are no longer in the graph (the same object when none is). */
+export function pruneSizes<T>(sizes: Record<string, T>, nodes: { id: string }[]): Record<string, T> {
+  const present = new Set(nodes.map((n) => n.id));
+  const kept = Object.entries(sizes).filter(([id]) => present.has(id));
+  return kept.length === Object.keys(sizes).length ? sizes : Object.fromEntries(kept);
+}

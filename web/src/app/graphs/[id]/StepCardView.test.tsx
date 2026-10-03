@@ -52,8 +52,14 @@ describe("StepCardView", () => {
   });
 
   it("shows the running-order number only on a step that leads to the Preview", () => {
-    expect(render(data("n2"))).toContain('aria-label="Step 2"');
-    expect(render(data("n5"))).not.toContain('aria-label="Step ');
+    expect(render(data("n2"))).toContain(`class="${styles.badge}"`);
+    expect(render(data("n5"))).not.toContain(styles.badge);
+  });
+
+  it("gives a screen reader the number as text (a label on a plain span is not reliably announced), and the eye the number alone", () => {
+    const html = render(data("n2"));
+    expect(html).toContain(`<span aria-hidden="true">2</span><span class="${styles.visuallyHidden}">Step 2</span>`);
+    expect(html).not.toContain('aria-label="Step ');
   });
 
   it("says each status in words", () => {

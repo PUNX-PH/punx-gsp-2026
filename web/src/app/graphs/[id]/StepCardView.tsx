@@ -86,8 +86,9 @@ export function StepCardView({ data, selected, onAddFrom, onRemove, onOpenGame, 
   return (
     <div className={cx(styles.card, selected && styles.selected)} data-status={data.status} role="group" aria-label={data.label}>
       {data.number !== null && (
-        <span className={styles.badge} aria-label={`Step ${data.number}`}>
-          {data.number}
+        <span className={styles.badge}>
+          <span aria-hidden="true">{data.number}</span>
+          <span className={styles.visuallyHidden}>{`Step ${data.number}`}</span>
         </span>
       )}
 

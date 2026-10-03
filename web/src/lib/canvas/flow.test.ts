@@ -1,6 +1,6 @@
 import type { EdgeChange, NodeChange } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
-import { candidateEdge, connectionToEdge, edgeId, graphFromEdgeChanges, graphFromNodeChanges, toFlow } from "@/lib/canvas/flow";
+import { candidateEdge, connectionToEdge, edgeId, graphFromEdgeChanges, graphFromNodeChanges, pruneSizes, toFlow } from "@/lib/canvas/flow";
 import { emptyRunView } from "@/lib/canvas/runView";
 import { stepNumbers } from "@/lib/canvas/stepNumbers";
 import type { Selection } from "@/lib/canvas/editorState";
@@ -131,5 +131,18 @@ describe("candidateEdge", () => {
     const a = { node: "n2", port: "image", type: "target" as const };
     const b = { node: "n3", port: "palette", type: "target" as const };
     expect(candidateEdge(a, b)).toEqual(wire("n3", "palette", "n2", "image"));
+  });
+});
+
+describe("pruneSizes (the measured sizes of steps that are gone are forgotten)", () => {
+  const sizes = { n1: { width: 232, height: 200 }, n2: { width: 232, height: 180 }, gone: { width: 232, height: 90 } };
+
+  it("drops the size of a step that is no longer in the graph", () => {
+    expect(pruneSizes(sizes, starterGraph().nodes)).toEqual({ n1: sizes.n1, n2: sizes.n2 });
+  });
+
+  it("hands back the same object when every size is of a step that is still there, so nothing re-renders", () => {
+    const kept = { n1: sizes.n1, n2: sizes.n2 };
+    expect(pruneSizes(kept, starterGraph().nodes)).toBe(kept);
   });
 });

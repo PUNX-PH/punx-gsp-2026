@@ -11,7 +11,8 @@ export interface Autosave {
   subscribe(listener: (state: SaveState) => void): () => void;
   /** Records the newest graph and (re)starts the quiet-moment timer. */
   edit(graph: Graph): void;
-  /** Saves anything pending now and waits until nothing is on its way. True when everything is saved, false after a failure. */
+  /** Saves anything pending now and waits until nothing is on its way. True when everything is saved, false after a failure
+   *  (a retryable one is tried once more first). */
   flush(): Promise<boolean>;
   /** Tries the newest graph again after a failure. */
   retry(): void;
@@ -96,12 +97,20 @@ export function createAutosave({ save, delayMs, timers }: AutosaveOptions): Auto
     },
     async flush() {
       clearTimer();
+      // A failure that was already there, and that trying again could clear (the network, a server fault), gets one more try.
+      // One that happens during this flush is the answer: it is not repeated.
+      let mayRetry = state.status === "error" && state.retryable;
       for (;;) {
         if (inFlight) {
           await inFlight;
           continue;
         }
-        if (state.status === "error") return false;
+        if (state.status === "error") {
+          if (!mayRetry) return false;
+          mayRetry = false;
+          await startSave();
+          continue;
+        }
         if (state.status === "dirty") {
           await startSave();
           continue;

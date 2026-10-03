@@ -26,16 +26,14 @@ export function WireEdge({ id, source, target, sourceHandleId, targetHandleId, s
           style={{ position: "absolute", transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`, pointerEvents: "all" }}
         >
           {data?.word}
-          {selected && (
-            <button
-              type="button"
-              className={styles.pillRemove}
-              aria-label={`Remove this ${data?.word ?? ""} wire`}
-              onClick={() => actions.onRemoveEdge({ from: { node: source, port: sourceHandleId ?? "" }, to: { node: target, port: targetHandleId ?? "" } })}
-            >
-              <CrossIcon />
-            </button>
-          )}
+          <button
+            type="button"
+            className={cx(styles.pillRemove, selected && styles.pillRemoveShown)}
+            aria-label={`Remove this ${data?.word ?? ""} wire`}
+            onClick={() => actions.onRemoveEdge({ from: { node: source, port: sourceHandleId ?? "" }, to: { node: target, port: targetHandleId ?? "" } })}
+          >
+            <CrossIcon />
+          </button>
         </div>
       </EdgeLabelRenderer>
     </>

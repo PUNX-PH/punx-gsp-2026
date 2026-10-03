@@ -23,16 +23,18 @@ import styles from "@/app/graphs/[id]/editor.module.css";
 import { GameFrame, GamePanel } from "@/app/graphs/[id]/GamePanel";
 import { usePrefs } from "@/app/graphs/[id]/prefsStore";
 import { SettingsPanel } from "@/app/graphs/[id]/SettingsPanel";
+import { SideTabs } from "@/app/graphs/[id]/SideTabs";
 import { type EditorActions, EditorActionsContext, StepCard, type StepNode } from "@/app/graphs/[id]/StepCard";
+import { Toast } from "@/app/graphs/[id]/Toast";
 import { Toolbar } from "@/app/graphs/[id]/Toolbar";
 import { WireEdge, type WireEdgeType } from "@/app/graphs/[id]/WireEdge";
 import { type Choice, addChoices } from "@/lib/canvas/addMenu";
 import { type Autosave, type SaveState, createAutosave } from "@/lib/canvas/autosave";
 import { SESSION_EXPIRED, playGraph, saveGraph, uploadFile } from "@/lib/canvas/client";
 import { editorReducer, initialEditorState } from "@/lib/canvas/editorState";
-import { candidateEdge, connectionToEdge, graphFromEdgeChanges, graphFromNodeChanges, toFlow } from "@/lib/canvas/flow";
+import { candidateEdge, connectionToEdge, graphFromEdgeChanges, graphFromNodeChanges, pruneSizes, toFlow } from "@/lib/canvas/flow";
 import { fileProblem } from "@/lib/canvas/files";
-import { clampRect } from "@/lib/canvas/prefs";
+import { type GameView, clampRect, viewToReturnTo } from "@/lib/canvas/prefs";
 import { isOutOfDate, revealSchedule } from "@/lib/canvas/runView";
 import { stepNumbers } from "@/lib/canvas/stepNumbers";
 import { type Edit, addEdge, addNode, editAsset, editTuning, removeEdge, removeNode } from "@/lib/graph/edits";
@@ -100,6 +102,8 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
   const [pending, setPending] = useState<ReadonlySet<string>>(NO_PENDING);
   const [sideTab, setSideTab] = useState<"settings" | "game">("settings");
   const [sideOpen, setSideOpen] = useState(true);
+  // Where "Back to canvas" goes from full screen: the view the game was in before it went full screen.
+  const [returnTo, setReturnTo] = useState<Exclude<GameView, "full">>("docked");
   // In a controlled flow React Flow hides a node until it is told the node's measured size, so the sizes it reports are
   // kept here and handed back with the nodes.
   const [measured, setMeasured] = useState<Record<string, { width: number; height: number }>>({});
@@ -164,7 +168,7 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
     if (!state.toast) return;
     const timer = setTimeout(() => dispatch({ type: "toast", message: null }), TOAST_MS);
     return () => clearTimeout(timer);
-  }, [state.toast]);
+  }, [state.toast, state.toastSeq]); // the same message shown again starts its time again
 
   useEffect(
     () => () => {
@@ -179,7 +183,7 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
     (changes: NodeChange<StepNode>[]) => {
       const sizes: Record<string, { width: number; height: number }> = {};
       for (const change of changes) if (change.type === "dimensions" && change.dimensions) sizes[change.id] = change.dimensions;
-      if (Object.keys(sizes).length > 0) setMeasured((current) => ({ ...current, ...sizes }));
+      if (Object.keys(sizes).length > 0) setMeasured((current) => pruneSizes({ ...current, ...sizes }, graph.nodes));
 
       const result = graphFromNodeChanges(graph, changes);
       if (result.graph !== graph) apply({ graph: result.graph, touched: result.touched });
@@ -289,9 +293,11 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
       const wrongKind = step ? fileProblem(step.type, result.info.kind) : "That step is no longer in the graph.";
       if (wrongKind) return setUploadError({ nodeId, message: wrongKind }); // never put a file a step cannot use into the graph
       dispatch({ type: "assets", assets: { ...current.assets, [result.sha256]: result.info } });
-      apply(editAsset(current.graph, nodeId, result.sha256));
+      // Worked out from the graph as it is when the reducer handles it, not from `current`, which may be a render behind: a
+      // step moved a moment ago must stay where it was moved.
+      dispatch({ type: "edit", make: (graph) => (graph.nodes.some((n) => n.id === nodeId) ? editAsset(graph, nodeId, result.sha256) : { graph, touched: [] }) });
     },
-    [id, apply],
+    [id],
   );
 
   // ---- the game view ----
@@ -301,10 +307,22 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
     setSideOpen(true);
   }, []);
 
+  const chooseGameView = useCallback(
+    (gameView: GameView) => {
+      setReturnTo((before) => viewToReturnTo(before, prefs.gameView, gameView));
+      changePrefs({ gameView });
+      if (gameView === "docked") showGame();
+    },
+    [prefs.gameView, changePrefs, showGame],
+  );
+
   // ---- Play ----
 
   const play = useCallback(async () => {
     if (latest.current.playing) return;
+    // Results still waiting to be revealed from the last Play must not reveal steps of this one early.
+    for (const timer of timers.current) clearTimeout(timer);
+    timers.current = [];
     dispatch({ type: "play-started" });
 
     // What is played is what is saved: wait for the save, and stop if it failed.
@@ -437,7 +455,8 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
               onConnect={onConnect}
               onConnectEnd={onConnectEnd}
               isValidConnection={isValidConnection}
-              deleteKeyCode={["Delete", "Backspace"]}
+              deleteKeyCode={menu ? null : ["Delete", "Backspace"]} // not while the Add menu is open: the key is for the menu, not the selected step
+              connectOnClick={false} // a wire is dragged: a stray click on a handle would start one that skips the refusal message
               colorMode={prefs.theme}
               fitView
               fitViewOptions={{ padding: 0.25, maxZoom: 1 }}
@@ -466,30 +485,15 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
 
           {sideOpen && (
             <aside className={styles.side} aria-label="Side panel">
-              <div role="tablist" className={styles.tabs}>
-                <button type="button" role="tab" aria-selected={!docked || sideTab === "settings"} onClick={() => setSideTab("settings")}>
-                  Settings
-                </button>
-                {docked && (
-                  <button type="button" role="tab" aria-selected={sideTab === "game"} onClick={() => setSideTab("game")}>
-                    Game
-                  </button>
-                )}
-                <button type="button" className={styles.collapse} aria-label="Hide panel" onClick={() => setSideOpen(false)}>
-                  Hide
-                </button>
-              </div>
+              <SideTabs docked={docked} tab={sideTab} onTab={setSideTab} onHide={() => setSideOpen(false)} />
               {docked && sideTab === "game" ? (
                 <GamePanel
                   mode="docked"
                   rect={prefs.floating}
                   viewport={viewport}
                   frame={frame}
-                  onMode={(gameView) => {
-                    changePrefs({ gameView });
-                    if (gameView === "docked") showGame();
-                  }}
-                  onRect={(floating) => changePrefs({ floating })}
+                  onMode={chooseGameView}
+                  onRect={(floating, final) => changePrefs({ floating }, { persist: final })}
                 />
               ) : (
                 <SettingsPanel
@@ -513,21 +517,15 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
             rect={clampRect(prefs.floating, viewport)}
             viewport={viewport}
             frame={frame}
-            onMode={(gameView) => {
-              changePrefs({ gameView });
-              if (gameView === "docked") showGame();
-            }}
-            onRect={(floating) => changePrefs({ floating })}
+            onMode={chooseGameView}
+            onRect={(floating, final) => changePrefs({ floating }, { persist: final })}
+            backTo={returnTo}
           />
         )}
 
         {menu && <AddMenu choices={addChoices(graph, menu.from)} anchor={menu.anchor} onPick={pickChoice} onClose={() => setMenu(null)} />}
 
-        {state.toast && (
-          <p role="alert" className={styles.toast} style={toastAt ? { left: toastAt.x + 12, top: toastAt.y + 12, bottom: "auto", transform: "none" } : undefined}>
-            {state.toast}
-          </p>
-        )}
+        {state.toast && <Toast message={state.toast} at={toastAt} seq={state.toastSeq} />}
       </div>
     </EditorActionsContext.Provider>
   );

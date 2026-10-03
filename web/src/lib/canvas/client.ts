@@ -16,7 +16,17 @@ async function bodyOf(response: Response): Promise<Record<string, unknown>> {
   return typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
 }
 
-const sentence = (body: Record<string, unknown>) => (typeof body.error === "string" ? body.error : SERVER_FAULT);
+// Characters that change the direction text is drawn in. In a file name they could reorder the rest of a sentence it sits in.
+const DIRECTION_MARKS = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
+const MAX_NAME_CHARS = 60;
+
+/** A file name as it may appear inside a sentence: no direction marks, and short enough (by characters, never half of one). */
+function plainName(name: string): string {
+  const chars = Array.from(name.replace(DIRECTION_MARKS, ""));
+  return chars.length > MAX_NAME_CHARS ? `${chars.slice(0, MAX_NAME_CHARS - 1).join("")}…` : chars.join("");
+}
+
+const sentence = (body: Record<string, unknown>) => (typeof body.error === "string" ? body.error.replace(DIRECTION_MARKS, "") : SERVER_FAULT);
 
 /** Saves the whole graph. A refusal (400, 413) is the server's own sentence and is not worth retrying; a fault or a network failure is. */
 export async function saveGraph(id: string, graph: Graph): Promise<SaveResult> {
@@ -36,7 +46,7 @@ export type UploadResult =
 
 /** Uploads a picture or a model to the graph. A file over 4 MB is refused here, before anything is sent. */
 export async function uploadFile(id: string, file: File): Promise<UploadResult> {
-  if (file.size > MAX_FILE_BYTES) return { ok: false, message: `${file.name}: larger than 4 MB`, expired: false };
+  if (file.size > MAX_FILE_BYTES) return { ok: false, message: `${plainName(file.name)}: larger than 4 MB`, expired: false };
   try {
     const response = await fetch(`${graphUrl(id)}/assets?name=${encodeURIComponent(file.name)}`, { method: "POST", body: file });
     if (response.status === 401) return { ok: false, message: SESSION_EXPIRED, expired: true };

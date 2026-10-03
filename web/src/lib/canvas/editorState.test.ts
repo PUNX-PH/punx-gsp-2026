@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { editorReducer, type EditorState, initialEditorState } from "@/lib/canvas/editorState";
 import type { NodeOutcome } from "@/lib/graph/runner";
-import { addEdge, addNode, editTuning, moveNode, removeEdge, removeNode } from "@/lib/graph/edits";
+import { addEdge, addNode, editAsset, editTuning, moveNode, removeEdge, removeNode } from "@/lib/graph/edits";
 import { starterGraph } from "@/lib/graph/starter";
 
 const record = (lastRunId: string | null = null) => ({ graph: starterGraph(), assets: {}, lastRunId });
@@ -188,5 +188,35 @@ describe("editorReducer: edits made while a run is on its way (review fix)", () 
     state = editorReducer(state, { type: "play-started" });
     state = editorReducer(state, { type: "play-finished", response: ranDone });
     expect(state.run.stale).toEqual([]);
+  });
+});
+
+describe("editorReducer: deferred minors", () => {
+  it("applies an edit to the graph as it is when the action is handled, so a move made a moment earlier is kept", () => {
+    const afterMove = (() => {
+      const moved = moveNode(starterGraph(), "n1", { x: 99, y: 99 });
+      return editorReducer(initialEditorState(record()), { type: "edited", graph: moved.graph, touched: moved.touched });
+    })();
+    // An upload that finishes prepares its edit later, from whatever graph the page last drew: here the one before the move.
+    const next = editorReducer(afterMove, { type: "edit", make: (graph) => editAsset(graph, "n1", "a".repeat(64)) });
+    const first = next.graph.nodes.find((n) => n.id === "n1")!;
+    expect(first.position).toEqual({ x: 99, y: 99 });
+    expect(first.params.asset).toBe("a".repeat(64));
+  });
+
+  it("treats an edit made that way like any other: it marks what it touched stale, and counts during Play", () => {
+    const next = editorReducer(played(), { type: "edit", make: (graph) => editAsset(graph, "n1", "a".repeat(64)) });
+    expect(next.run.stale.sort()).toEqual(["n1", "n2", "n3", "n4"]);
+
+    const playing = editorReducer(initialEditorState(record()), { type: "play-started" });
+    const during = editorReducer(playing, { type: "edit", make: (graph) => editAsset(graph, "n1", "a".repeat(64)) });
+    expect(during.touchedDuringPlay).toEqual(["n1"]);
+  });
+
+  it("makes the same message twice two toasts, so the second one gets its own full time on screen", () => {
+    const first = editorReducer(initialEditorState(record()), { type: "toast", message: "That wire does not fit." });
+    const second = editorReducer(first, { type: "toast", message: "That wire does not fit." });
+    expect(second.toast).toBe(first.toast);
+    expect(second.toastSeq).not.toBe(first.toastSeq);
   });
 });

@@ -184,7 +184,7 @@ describe("autosave.flush", () => {
     const failing = setup();
     failing.autosave.edit(graphWith(1));
     const flushed = failing.autosave.flush();
-    failing.answers[0].resolve({ ok: false, message: "x", retryable: true });
+    failing.answers[0].resolve({ ok: false, message: "x", retryable: false }); // (a retryable one is tried again: see below)
     expect(await flushed).toBe(false);
     expect(await failing.autosave.flush()).toBe(false);
   });
@@ -247,5 +247,54 @@ describe("autosave.dispose with flush (review fix)", () => {
     plain.autosave.dispose();
     plain.clock.advance(DELAY * 10);
     expect(plain.calls).toHaveLength(0);
+  });
+});
+
+describe("autosave.flush after a failure (deferred minor)", () => {
+  it("tries a retryable failure once more, so Play does not refuse over a blip it could have cleared", async () => {
+    const { autosave, clock, calls, answers } = setup();
+    autosave.edit(graphWith(1));
+    clock.advance(DELAY);
+    answers[0].resolve({ ok: false, message: "Couldn't reach the server.", retryable: true });
+    await tick();
+
+    const flushed = autosave.flush();
+    expect(calls).toEqual([graphWith(1), graphWith(1)]);
+    answers[1].resolve({ ok: true });
+    expect(await flushed).toBe(true);
+    expect(autosave.state()).toEqual({ status: "saved" });
+  });
+
+  it("is false when that second try fails too, and does not keep trying", async () => {
+    const { autosave, clock, calls, answers } = setup();
+    autosave.edit(graphWith(1));
+    clock.advance(DELAY);
+    answers[0].resolve({ ok: false, message: "Couldn't reach the server.", retryable: true });
+    await tick();
+
+    const flushed = autosave.flush();
+    answers[1].resolve({ ok: false, message: "Couldn't reach the server.", retryable: true });
+    expect(await flushed).toBe(false);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("does not repeat a save that fails during the flush itself: that is the failure, not an old one", async () => {
+    const { autosave, calls, answers } = setup();
+    autosave.edit(graphWith(1));
+    const flushed = autosave.flush();
+    answers[0].resolve({ ok: false, message: "Couldn't reach the server.", retryable: true });
+    expect(await flushed).toBe(false);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("does not retry a failure that retrying cannot fix", async () => {
+    const { autosave, clock, calls, answers } = setup();
+    autosave.edit(graphWith(1));
+    clock.advance(DELAY);
+    answers[0].resolve({ ok: false, message: "The graph is larger than 64 KB", retryable: false });
+    await tick();
+
+    expect(await autosave.flush()).toBe(false);
+    expect(calls).toHaveLength(1);
   });
 });

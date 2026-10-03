@@ -74,6 +74,10 @@ function chosenFile(node: GraphNode, assets: Assets, graphId: string): ResultVie
 
 function fromRun(node: GraphNode, run: RunView): ResultView {
   const outcome = run.outcomes[node.id];
+  // A game made earlier is still there to open after a reload, before anything has run on this page (and when an edit
+  // made the Preview's result stale: the game view then says it is out of date). A Preview that failed or was skipped in
+  // the last run offers nothing.
+  if (node.type === "preview" && outcome === undefined && run.runId) return { kind: "open-game" };
   if (outcome?.state !== "done") return { kind: "none" };
   if (node.type === "palette-from-image" && Array.isArray(outcome.result)) return { kind: "palette", colors: outcome.result as string[] };
   if (node.type === "game-template") {

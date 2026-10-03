@@ -58,6 +58,29 @@ describe("uploadFile", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("leaves direction-changing marks in a file name out of the sentence, so they cannot reorder the rest of it", async () => {
+    const fetch = answer(201, {});
+    const tricky = new File([new Uint8Array(4 * 1024 * 1024 + 1)], "a\u202Eb\u2066c\u200Fd\u061Ce.png", { type: "image/png" });
+    const result = await uploadFile("g1", tricky);
+    expect(result).toEqual({ ok: false, message: "abcde.png: larger than 4 MB", expired: false });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("shortens a very long file name in the sentence without cutting a character in half", async () => {
+    const long = new File([new Uint8Array(4 * 1024 * 1024 + 1)], `${"😀".repeat(100)}.png`, { type: "image/png" });
+    const result = await uploadFile("g1", long);
+    expect(result.ok).toBe(false);
+    const message = result.ok ? "" : result.message;
+    expect(message).toBe(`${"😀".repeat(59)}…: larger than 4 MB`);
+    expect(message.isWellFormed()).toBe(true);
+  });
+
+  it("also leaves those marks out of a sentence the server sends back", async () => {
+    answer(400, { error: "The file \u202Efdp.png is not a picture." });
+    const result = await uploadFile("g1", picture());
+    expect(result).toEqual({ ok: false, message: "The file fdp.png is not a picture.", expired: false });
+  });
+
   it("sends the file as the body with its name in the query, and returns the new file", async () => {
     const fetch = answer(201, { sha256: "a".repeat(64), name: "photo.png", size: 10, kind: "image", width: 30, height: 20 });
     const file = picture();
