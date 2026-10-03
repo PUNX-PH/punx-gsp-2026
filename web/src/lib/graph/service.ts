@@ -4,12 +4,23 @@
 // graph can always be saved (what stops a run is checked at Play).
 import type { User } from "@/lib/auth/ports";
 import { checkGlb } from "@/lib/glb";
+import { checkGraph } from "@/lib/graph/checks";
 import { readImage, sniffKind } from "@/lib/graph/image";
+import { EXECUTORS } from "@/lib/graph/nodes";
 import { NODE_SPECS, WIRE_WORDS } from "@/lib/graph/registry";
+import { type RunResult, runGraph } from "@/lib/graph/runner";
 import { parseGraph } from "@/lib/graph/schema";
 import { starterGraph } from "@/lib/graph/starter";
 import type { GraphFiles, GraphRecords } from "@/lib/graph/store/ports";
-import { type AssetInfo, type Graph, GraphError, type GraphRecord } from "@/lib/graph/types";
+import {
+  type AssetInfo,
+  type Executor,
+  type ExecutorContext,
+  type Graph,
+  GraphError,
+  type GraphRecord,
+  type Problem,
+} from "@/lib/graph/types";
 import { randomId, sha256Hex } from "@/lib/runs/service";
 import { RunError, type RunService } from "@/lib/runs/types";
 
@@ -24,6 +35,9 @@ const GRAPH_ID = /^(?!__)[A-Za-z0-9_-]{1,64}$/;
 // The kind of file each file-taking node accepts.
 const FILE_KIND: Record<string, AssetInfo["kind"]> = { "reference-image": "image", model: "model" };
 
+/** Play either says what stops the graph from running, or runs it (which can still fail on a node). */
+export type PlayResult = { kind: "invalid"; problems: Problem[] } | { kind: "ran"; result: RunResult; runId?: string };
+
 export interface GraphService {
   createGraph(user: User, input: { name?: string; starter?: boolean }): Promise<GraphRecord>;
   listGraphs(user: User): Promise<GraphRecord[]>;
@@ -32,6 +46,8 @@ export interface GraphService {
   deleteGraph(user: User, id: string): Promise<void>;
   addAsset(user: User, id: string, name: string, bytes: Uint8Array): Promise<{ sha256: string } & AssetInfo>;
   readAsset(user: User, id: string, sha256: string): Promise<{ bytes: Uint8Array; contentType: string }>;
+  /** Checks the SAVED graph, runs it, and keeps the graph's one run. */
+  play(user: User, id: string): Promise<PlayResult>;
 }
 
 export interface GraphServiceDeps {
@@ -40,6 +56,7 @@ export interface GraphServiceDeps {
   runs: RunService;
   now: () => number;
   newId?: () => string;
+  executors?: Record<string, Executor>;
 }
 
 const withoutControls = (text: string) => text.replace(/\p{Cc}/gu, "");
@@ -193,6 +210,30 @@ export function makeGraphService(deps: GraphServiceDeps): GraphService {
       const bytes = await files.get(id, sha256);
       if (!bytes) throw notFound();
       return { bytes, contentType: record.assets[sha256].contentType };
+    },
+
+    async play(user, id) {
+      const record = await ownedGraph(user, id);
+      const parsed = parseGraph(record.graph);
+      if (!parsed.ok) throw new Error("a stored graph no longer parses"); // saved graphs always parse: our fault, a logged 500
+      const problems = checkGraph(parsed.graph, record.assets);
+      if (problems.length > 0) return { kind: "invalid", problems };
+
+      // The Preview replaces the graph's earlier run; the holder tells us afterwards whether the run changed.
+      let lastRun = record.lastRunId;
+      const ctx: ExecutorContext = {
+        user,
+        assets: record.assets,
+        readAsset: async (sha256) => (Object.hasOwn(record.assets, sha256) ? files.get(id, sha256) : null),
+        runs,
+        lastRun: { get: () => lastRun, set: (runId) => void (lastRun = runId) },
+      };
+      const result = await runGraph(parsed.graph, { executors: deps.executors ?? EXECUTORS, ctx });
+      if (lastRun !== record.lastRunId) await records.setLastRunId(id, lastRun);
+
+      const finalNode = parsed.graph.nodes.find((n) => NODE_SPECS[n.type].final)!;
+      const runId = (result.nodes[finalNode.id].result as { runId?: string } | undefined)?.runId;
+      return { kind: "ran", result, runId };
     },
   };
 }
