@@ -1,0 +1,342 @@
+/* The node canvas. One theme at a time, chosen by data-theme on .editor; every color below is a token. Dark is the
+   default (an ink-slate canvas, a coral accent used for Play, the order numbers and focus); light is the option. The wire
+   colors are drawn from one set per theme so a wire, its handles and its pill always agree. */
+
+.editor {
+  --canvas: #1a1d26;
+  --dots: #2c3142;
+  --surface: #232733;
+  --surface-raised: #2b3040;
+  --line: #3a4056;
+  --text: #eceef5;
+  --muted: #a0a7bc;
+  --accent: #ff6d5a;
+  --on-accent: #1a1d26;
+  --ring: #ff8a7a;
+  --ok: #4ade80;
+  --bad: #ff7b7b;
+  --warn: #fbbf24;
+  --idle: #8a91a8;
+  --wire-image: #f5a524;
+  --wire-model: #5b9bff;
+  --wire-palette: #a58bff;
+  --wire-settings: #34d399;
+  --card-shadow: none;
+  color: var(--text);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.editor[data-theme="light"] {
+  --canvas: #f2f3f8;
+  --dots: #cfd4e1;
+  --surface: #ffffff;
+  --surface-raised: #f6f7fb;
+  --line: #d4d9e6;
+  --text: #1b2030;
+  --muted: #566079;
+  --accent: #d93f27;
+  --on-accent: #ffffff;
+  --ring: #d93f27;
+  --ok: #15803d;
+  --bad: #c62828;
+  --warn: #a16207;
+  --idle: #6b7390;
+  --wire-image: #b9740a;
+  --wire-model: #2563eb;
+  --wire-palette: #7c3aed;
+  --wire-settings: #059669;
+  --card-shadow: 0 1px 2px rgba(25, 32, 60, 0.1);
+}
+
+/* ---- wire colors: the same class on a handle, a wire and a pill ---- */
+
+.wire_image { --wire: var(--wire-image); }
+.wire_model { --wire: var(--wire-model); }
+.wire_palette { --wire: var(--wire-palette); }
+.wire_settings { --wire: var(--wire-settings); }
+
+/* ---- a step's card ---- */
+
+.card {
+  position: relative;
+  width: 232px;
+  padding: 10px 12px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--card-shadow);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.selected {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.card[data-status="failed"] { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); }
+.card[data-status="attention"] { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
+.card[data-status="not-used"] { border-style: dashed; opacity: 0.62; }
+
+/* The running order, drawn on the card: the one accented thing on it. */
+.badge {
+  position: absolute;
+  top: -9px;
+  left: -9px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--surface-raised);
+  color: var(--muted);
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.remove,
+.plus {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.remove {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+
+.remove:hover,
+.plus:hover { color: var(--text); border-color: var(--muted); }
+
+.remove:focus-visible,
+.plus:focus-visible,
+.openGame:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.help {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+/* Several inputs: one labelled row each, with the handle on the row. */
+.ports {
+  margin: 8px -12px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.portRow {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 12px;
+  font-size: 11.5px;
+}
+
+.portLabel { color: var(--text); }
+.optional { color: var(--muted); font-size: 11px; }
+
+/* ---- results ---- */
+
+.result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 8px;
+}
+
+.thumb {
+  flex: none;
+  width: 44px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  object-fit: cover;
+  background: var(--surface-raised);
+}
+
+.fileInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 11.5px;
+}
+
+.fileName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileMeta { color: var(--muted); font-size: 11px; }
+
+.swatches {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.swatch {
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(128, 134, 156, 0.55);
+  border-radius: 4px;
+}
+
+.chip {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 11.5px;
+}
+
+.openGame { cursor: pointer; }
+.openGame:hover { border-color: var(--muted); }
+
+/* ---- status ---- */
+
+.status {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.status svg { flex: none; margin-top: 1px; width: 14px; height: 14px; }
+.status[data-tone="done"] { color: var(--ok); }
+.status[data-tone="failed"] { color: var(--bad); }
+.status[data-tone="attention"] { color: var(--warn); }
+.status[data-tone="running"],
+.status[data-tone="skipped"],
+.status[data-tone="not-used"] { color: var(--idle); }
+
+.spinner { animation: spin 0.9s linear infinite; transform-origin: 50% 50%; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+}
+
+/* ---- handles and the "+" on an open output ---- */
+
+.card .handle {
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--wire);
+}
+
+/* While a wire is dragged: handles that accept it glow, the rest dim. */
+.card .handle:global(.connectingto):global(.valid) {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--wire) 38%, transparent);
+}
+
+.card .handle:global(.connectingto):not(:global(.valid)) { opacity: 0.25; }
+
+.plus {
+  position: absolute;
+  top: 50%;
+  right: -34px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+
+/* ---- wires ---- */
+
+.edgePath {
+  fill: none;
+  stroke: var(--wire);
+  stroke-width: 2px;
+}
+
+.edgeSelected { stroke-width: 3px; }
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.pillRemove {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.pillRemove:hover { color: var(--text); }
+.pillRemove:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.pillRemove svg { width: 10px; height: 10px; }

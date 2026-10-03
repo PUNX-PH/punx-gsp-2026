@@ -22,7 +22,7 @@ export type ResultView =
   | { kind: "text"; text: string }
   | { kind: "open-game" };
 
-export interface StepData {
+export type StepData = {
   id: string;
   type: string;
   label: string;
@@ -34,7 +34,7 @@ export interface StepData {
   result: ResultView;
   inputs: PortView[];
   outputs: PortView[];
-}
+};
 
 export interface StepDataArgs {
   graph: Graph;
