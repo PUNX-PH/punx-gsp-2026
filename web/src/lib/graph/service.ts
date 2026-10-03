@@ -228,7 +228,9 @@ export function makeGraphService(deps: GraphServiceDeps): GraphService {
         runs,
         lastRun: { get: () => lastRun, set: (runId) => void (lastRun = runId) },
       };
-      const result = await runGraph(parsed.graph, { executors: deps.executors ?? EXECUTORS, ctx });
+      // An unexpected failure is logged with the graph, the node and the kind of failure, never a message or file contents.
+      const log = (info: object) => console.error("graph node failed", { graphId: id, ...info });
+      const result = await runGraph(parsed.graph, { executors: deps.executors ?? EXECUTORS, ctx, log });
       if (lastRun !== record.lastRunId) await records.setLastRunId(id, lastRun);
 
       const finalNode = parsed.graph.nodes.find((n) => NODE_SPECS[n.type].final)!;

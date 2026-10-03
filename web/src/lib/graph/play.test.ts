@@ -1,11 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { builtinModel } from "@/lib/graph/builtin";
 import { sampleImage } from "@/lib/graph/image";
 import { makePalette } from "@/lib/graph/palette";
 import { makeGraphService } from "@/lib/graph/service";
 import { starterGraph } from "@/lib/graph/starter";
 import { MemoryGraphFiles, MemoryGraphRecords } from "@/lib/graph/store/memory";
-import { GraphError } from "@/lib/graph/types";
+import { EXECUTORS } from "@/lib/graph/nodes";
+import { type Executor, GraphError } from "@/lib/graph/types";
 import { MemoryFileStore, MemoryRunRecords } from "@/lib/runs/memory";
 import { makeRunService } from "@/lib/runs/service";
 import { makeGlb } from "@/lib/testing/glb";
@@ -137,5 +138,40 @@ describe("Play", () => {
     expect(error).toBeInstanceOf(GraphError);
     expect(error).toMatchObject({ status: 404, message: "Not found" });
     expect(context.runRecords.runs.size).toBe(0);
+  });
+});
+
+describe("Play, when a node fails unexpectedly", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("logs the graph, the node and the kind of failure, and never the message", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const boom: Executor = async () => {
+      throw new Error("secret-bytes");
+    };
+    let graphs = 0;
+    let runIds = 0;
+    const records = new MemoryGraphRecords();
+    const runs = makeRunService({ records: new MemoryRunRecords(), files: new MemoryFileStore(), now: Date.now, newId: () => `run${++runIds}` });
+    const service = makeGraphService({
+      records,
+      files: new MemoryGraphFiles(),
+      runs,
+      now: Date.now,
+      newId: () => `g${++graphs}`,
+      executors: { ...EXECUTORS, "palette-from-image": boom },
+    });
+    const made = await service.createGraph(alice, { starter: true });
+    const picture = await service.addAsset(alice, made.id, "p.png", await makePng(20, 20, [9, 9, 9]));
+    const graph = starterGraph();
+    graph.nodes[0].params = { asset: picture.sha256 };
+    await service.saveGraph(alice, made.id, { graph });
+
+    const played = await service.play(alice, made.id);
+
+    expect(played.kind === "ran" && played.result.nodes.n2).toEqual({ state: "failed", error: "Something went wrong on our side" });
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(logged.mock.calls[0][1]).toEqual({ graphId: made.id, node: "n2", type: "palette-from-image", failure: "Error" });
+    expect(JSON.stringify(logged.mock.calls)).not.toContain("secret-bytes");
   });
 });

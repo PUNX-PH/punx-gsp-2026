@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { setAsset, setTuning } from "@/lib/graph/edits";
+import { applyToWorkingCopy, setAsset, setTuning } from "@/lib/graph/edits";
 import { NODE_SPECS } from "@/lib/graph/registry";
 import type { NodeOutcome } from "@/lib/graph/runner";
 import type { Assets, Graph, GraphNode, Problem, Tuning } from "@/lib/graph/types";
@@ -108,13 +108,19 @@ export function GraphPlain({ id, name, initialGraph, initialAssets, initialRunId
     if (!file) return;
     setError("");
     if (file.size > MAX_FILE_BYTES) return setError(`${file.name}: larger than 4 MB`);
+    // The choice is made in the JSON box's graph (the working copy), so hand edits there are kept. Checked before the
+    // upload, so a file is not sent when its choice cannot be recorded.
+    const ready = applyToWorkingCopy(text, (g) => g);
+    if (!ready.ok) return setError(ready.error);
     setBusy(true);
     try {
       const uploaded = await fetch(`${apiUrl}/assets?name=${encodeURIComponent(file.name)}`, { method: "POST", body: file });
       if (uploaded.status === 401) return router.replace("/sign-in");
       const info = (await uploaded.json().catch(() => ({}))) as { error?: string; sha256?: string };
       if (!uploaded.ok || !info.sha256) return setError(info.error ?? "The upload did not finish.");
-      await save(setAsset(graph, node.id, info.sha256));
+      const chosen = applyToWorkingCopy(text, (g) => setAsset(g, node.id, info.sha256 as string));
+      if (!chosen.ok) return setError(chosen.error);
+      await save(chosen.graph);
     } catch {
       setError("The upload did not finish. Check your connection and try again.");
     } finally {
@@ -123,8 +129,14 @@ export function GraphPlain({ id, name, initialGraph, initialAssets, initialRunId
   }
 
   function tune(node: GraphNode, field: keyof Tuning, value: string) {
-    const current = node.params.tuning as Tuning;
-    adopt(setTuning(graph, node.id, { ...current, [field]: Number(value) }));
+    // Applied to the JSON box's graph, so whatever else was typed there is kept.
+    const edited = applyToWorkingCopy(text, (g) => {
+      const current = g.nodes.find((n) => n.id === node.id)?.params.tuning as Tuning | undefined;
+      return current ? setTuning(g, node.id, { ...current, [field]: Number(value) }) : g;
+    });
+    if (!edited.ok) return setError(edited.error);
+    setError("");
+    adopt(edited.graph);
   }
 
   async function saveText() {

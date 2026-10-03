@@ -65,7 +65,9 @@ export async function runGraph(graph: Graph, deps: RunDeps, onEvent: (event: Run
     // A source that failed or was skipped means this node cannot run, whether or not the input is optional.
     const broken = incoming.map((e) => e.from.node).find((from) => ["failed", "skipped"].includes(outcomes.get(from)?.state ?? ""));
     if (broken !== undefined) {
-      const because = `Skipped because ${specs[nodes.get(broken)!.type].label} failed.`;
+      // The reason is the node that actually failed: a skipped source passes on its own reason.
+      const source = outcomes.get(broken)!;
+      const because = source.state === "skipped" ? source.because! : `Skipped because ${specs[nodes.get(broken)!.type].label} failed.`;
       outcomes.set(id, { state: "skipped", because });
       emit({ type: "node-skipped", node: id, because });
       continue;

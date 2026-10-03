@@ -170,3 +170,19 @@ describe("a run that fails", () => {
     await expect(runGraph(g, { executors, ctx, specs })).rejects.toThrow(/loop/);
   });
 });
+
+describe("what a skipped node says", () => {
+  it("names the node that failed, not the node just upstream, however many are skipped in a row", async () => {
+    const failing: Executor = async () => {
+      throw new NodeError("x");
+    };
+    const { executors } = setup({ src: failing });
+    // a (fails) -> b (skipped) -> c (skipped)
+    const g = graph([["a", "src"], ["b", "mid"], ["c", "sink"]], [["a", "b"], ["b", "c"]]);
+
+    const result = await runGraph(g, { executors, ctx, specs });
+
+    expect(result.nodes.b.because).toBe("Skipped because Source failed.");
+    expect(result.nodes.c.because).toBe("Skipped because Source failed.");
+  });
+});

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { setAsset, setTuning } from "@/lib/graph/edits";
+import { applyToWorkingCopy, setAsset, setTuning } from "@/lib/graph/edits";
 import { starterGraph } from "@/lib/graph/starter";
+import type { Graph } from "@/lib/graph/types";
 
 const SHA = "a".repeat(64);
 
@@ -51,5 +52,38 @@ describe("setTuning", () => {
 
   it("returns an equal graph for a node that is not there", () => {
     expect(setTuning(starterGraph(), "nope", tuning)).toEqual(starterGraph());
+  });
+});
+
+describe("applyToWorkingCopy", () => {
+  const editPicture = (graph: Graph) => setAsset(graph, "n1", SHA);
+
+  it("builds on what is in the JSON box, so hand edits are not thrown away", () => {
+    const edited = starterGraph();
+    edited.nodes[4].params = { asset: "b".repeat(64) };
+    edited.edges.push({ from: { node: "n5", port: "model" }, to: { node: "n3", port: "hero" } }); // wired by hand
+    const result = applyToWorkingCopy(JSON.stringify(edited), editPicture);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.graph.edges).toHaveLength(4); // the hand-made wire is still there
+    expect(result.graph.nodes[0].params).toEqual({ asset: SHA }); // and the edit was made
+    expect(result.graph.nodes[4].params).toEqual({ asset: "b".repeat(64) });
+  });
+
+  it("says so, and changes nothing, when the JSON box does not parse", () => {
+    const result = applyToWorkingCopy("{ nope", editPicture);
+    expect(result).toEqual({ ok: false, error: "Fix the graph JSON first (it is not valid JSON), then try again." });
+  });
+
+  it.each([
+    ["a number", "5"],
+    ["a list", "[]"],
+    ["an object with no nodes", "{}"],
+    ["nodes that are not a list", '{"nodes":{},"edges":[]}'],
+  ])("says so when the JSON is %s and not yet a graph", (_label, text) => {
+    const result = applyToWorkingCopy(text, editPicture);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/not a graph yet/);
   });
 });
