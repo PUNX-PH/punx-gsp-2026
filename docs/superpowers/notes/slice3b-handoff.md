@@ -14,9 +14,11 @@ server changes.
 
 ## Where it stands
 
-- Branch `slice-3b-node-canvas`, cut from `slice-3a-graph-engine` at `8283fbb`. **Local only: nothing is pushed** (ask
-  before pushing; the repo is public, so scan for secrets and personal paths first). Merge order would be slice 1,
-  slice 2, 3a, then this.
+- Branch `slice-3b-node-canvas`, cut from `slice-3a-graph-engine` at `8283fbb`. **Pushed on 2026-10-04** to
+  `origin/slice-3b-node-canvas` (head `d3f5404`; its history carries all of slice 3a's commits, so 3a is on the remote
+  too, but there is no separate `slice-3a-graph-engine` branch there). No pull request is open. Ask before any further
+  push; the repo is public, so scan for secrets and personal paths first. Merge order would be slice 1, slice 2, 3a, then
+  this.
 - **Plan tasks 1 to 15 are complete** in the ledger (`.superpowers/sdd/2026-10-04-slice3b-node-canvas/progress.md`,
   git-ignored). Task 16 (deployed acceptance and wrap-up) has not started and needs the user's setup.
 - **Tests:** web 675 passing (`cd web && npm test`), lint, typecheck and `npm run build` clean. The gate is test, lint,

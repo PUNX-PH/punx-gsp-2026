@@ -15,8 +15,9 @@ For now a deliberately plain page at `/graphs` stands in for it.
 
 ## Where it stands
 
-- Branch `slice-3a-graph-engine`, cut from `slice-2-web-foundation` at `c2cd993`. **Local only: nothing is pushed**
-  (ask before pushing; the repo is public, so scan for secrets and personal paths first).
+- Branch `slice-3a-graph-engine`, cut from `slice-2-web-foundation` at `c2cd993`. **Pushed on 2026-10-04, but only as part
+  of `origin/slice-3b-node-canvas`**, whose history carries all of this branch's commits; there is no `slice-3a-graph-engine`
+  branch on the remote. Ask before any further push; the repo is public, so scan for secrets and personal paths first.
 - **Plan tasks 1 to 13 are complete** in the ledger (`.superpowers/sdd/2026-10-03-slice3a-graph-engine/progress.md`,
   git-ignored). Task 14 (deployed acceptance and wrap-up) has not started and needs the user's setup.
 - **The final whole-branch review is done** (a fresh opus reviewer, aimed at the upload, image-decoding and ownership
