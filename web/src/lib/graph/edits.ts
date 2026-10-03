@@ -24,8 +24,10 @@ export interface Edit {
   touched: string[];
 }
 
-const STEP_GAP_X = 200;
-const STEP_GAP_Y = 140;
+// A card is 232 px wide and up to about 260 px tall (a Game Template with its four labelled inputs), so a new step must be at
+// least that far from every other one in x or in y to avoid covering any part of it.
+const STEP_GAP_X = 260;
+const STEP_GAP_Y = 280;
 
 /** Why a step of this type may not be added to the graph, or null if it may. */
 export function addProblem(graph: Graph, type: string, specs: Record<string, NodeSpec> = NODE_SPECS): string | null {

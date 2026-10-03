@@ -1,6 +1,6 @@
 import type { EdgeChange, NodeChange } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
-import { connectionToEdge, edgeId, graphFromEdgeChanges, graphFromNodeChanges, toFlow } from "@/lib/canvas/flow";
+import { candidateEdge, connectionToEdge, edgeId, graphFromEdgeChanges, graphFromNodeChanges, toFlow } from "@/lib/canvas/flow";
 import { emptyRunView } from "@/lib/canvas/runView";
 import { stepNumbers } from "@/lib/canvas/stepNumbers";
 import type { Selection } from "@/lib/canvas/editorState";
@@ -75,11 +75,15 @@ describe("graphFromNodeChanges", () => {
     expect(result.touched).toEqual(["n4"]);
   });
 
-  it("reports which step was selected, and null when the selection was cleared", () => {
-    expect(at([{ id: "n1", type: "select", selected: false }, { id: "n3", type: "select", selected: true }]).selected).toBe("n3");
-    expect(at([{ id: "n3", type: "select", selected: true }, { id: "n1", type: "select", selected: false }]).selected).toBe("n3");
-    expect(at([{ id: "n1", type: "select", selected: false }]).selected).toBeNull();
-    expect(at([]).selected).toBeUndefined();
+  it("reports the newly selected step, and separately that something was deselected", () => {
+    const both = at([{ id: "n1", type: "select", selected: false }, { id: "n3", type: "select", selected: true }]);
+    expect([both.selected, both.deselected]).toEqual(["n3", true]);
+    const reversed = at([{ id: "n3", type: "select", selected: true }, { id: "n1", type: "select", selected: false }]);
+    expect([reversed.selected, reversed.deselected]).toEqual(["n3", true]);
+    const cleared = at([{ id: "n1", type: "select", selected: false }]);
+    expect([cleared.selected, cleared.deselected]).toEqual([undefined, true]);
+    const nothing = at([]);
+    expect([nothing.selected, nothing.deselected]).toEqual([undefined, false]);
   });
 
   it("ignores changes that are not edits (sizes)", () => {
@@ -99,15 +103,33 @@ describe("graphFromEdgeChanges", () => {
     expect(result.touched).toEqual(["n3"]);
   });
 
-  it("reports the selected wire, and null when it was cleared", () => {
-    expect(at([{ id: "n1.image->n2.image", type: "select", selected: true }]).selected).toEqual(wire("n1", "image", "n2", "image"));
-    expect(at([{ id: "n1.image->n2.image", type: "select", selected: false }]).selected).toBeNull();
-    expect(at([]).selected).toBeUndefined();
+  it("reports the newly selected wire, and separately that a wire was deselected", () => {
+    const selected = at([{ id: "n1.image->n2.image", type: "select", selected: true }]);
+    expect([selected.selected, selected.deselected]).toEqual([wire("n1", "image", "n2", "image"), false]);
+    const cleared = at([{ id: "n1.image->n2.image", type: "select", selected: false }]);
+    expect([cleared.selected, cleared.deselected]).toEqual([undefined, true]);
+    const nothing = at([]);
+    expect([nothing.selected, nothing.deselected]).toEqual([undefined, false]);
   });
 
   it("ignores a change for a wire that is not there", () => {
     const result = at([{ id: "nope.x->nope.y", type: "remove" }]);
     expect(result.graph).toEqual(starterGraph());
     expect(result.touched).toEqual([]);
+  });
+});
+
+describe("candidateEdge", () => {
+  it("is the wire from the output to the input, whichever end the drag started from", () => {
+    const output = { node: "n1", port: "image", type: "source" as const };
+    const input = { node: "n2", port: "image", type: "target" as const };
+    expect(candidateEdge(output, input)).toEqual(wire("n1", "image", "n2", "image"));
+    expect(candidateEdge(input, output)).toEqual(wire("n1", "image", "n2", "image"));
+  });
+
+  it("keeps the direction of the drag when both ends are the same kind, so the wire rule can say why it is refused", () => {
+    const a = { node: "n2", port: "image", type: "target" as const };
+    const b = { node: "n3", port: "palette", type: "target" as const };
+    expect(candidateEdge(a, b)).toEqual(wire("n3", "palette", "n2", "image"));
   });
 });

@@ -15,7 +15,8 @@ export interface Autosave {
   flush(): Promise<boolean>;
   /** Tries the newest graph again after a failure. */
   retry(): void;
-  dispose(): void;
+  /** Stops the timers and the listeners. With `flush`, anything still unsaved is saved first (a page being left must not lose an edit). */
+  dispose(options?: { flush?: boolean }): void;
 }
 
 export interface AutosaveOptions {
@@ -31,6 +32,7 @@ export function createAutosave({ save, delayMs, timers }: AutosaveOptions): Auto
   const listeners = new Set<(state: SaveState) => void>();
   let state: SaveState = { status: "idle" };
   let latest: Graph | null = null;
+  let saved: Graph | null = null; // the newest graph a save has succeeded for
   let timer: unknown = null;
   let inFlight: Promise<void> | null = null;
   let disposed = false;
@@ -67,6 +69,7 @@ export function createAutosave({ save, delayMs, timers }: AutosaveOptions): Auto
         result = { ok: false, message: "Something went wrong on our side", retryable: true };
       }
       inFlight = null;
+      if (result.ok) saved = graph;
       if (disposed) return;
       if (!result.ok) return setState({ status: "error", message: result.message, retryable: result.retryable });
       if (latest !== graph) {
@@ -109,10 +112,17 @@ export function createAutosave({ save, delayMs, timers }: AutosaveOptions): Auto
     retry() {
       if (state.status === "error") void startSave();
     },
-    dispose() {
+    dispose(options) {
       disposed = true;
       clearTimer();
       listeners.clear();
+      if (options?.flush) {
+        // One last save of whatever is newer than the last good one, after any save already on its way.
+        void (async () => {
+          if (inFlight) await inFlight;
+          if (latest && latest !== saved) await save(latest).catch(() => undefined);
+        })();
+      }
     },
   };
 }

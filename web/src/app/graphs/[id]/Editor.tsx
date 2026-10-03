@@ -30,13 +30,14 @@ import { type Choice, addChoices } from "@/lib/canvas/addMenu";
 import { type Autosave, type SaveState, createAutosave } from "@/lib/canvas/autosave";
 import { SESSION_EXPIRED, playGraph, saveGraph, uploadFile } from "@/lib/canvas/client";
 import { editorReducer, initialEditorState } from "@/lib/canvas/editorState";
-import { connectionToEdge, graphFromEdgeChanges, graphFromNodeChanges, toFlow } from "@/lib/canvas/flow";
+import { candidateEdge, connectionToEdge, graphFromEdgeChanges, graphFromNodeChanges, toFlow } from "@/lib/canvas/flow";
+import { fileProblem } from "@/lib/canvas/files";
 import { clampRect } from "@/lib/canvas/prefs";
 import { isOutOfDate, revealSchedule } from "@/lib/canvas/runView";
 import { stepNumbers } from "@/lib/canvas/stepNumbers";
 import { type Edit, addEdge, addNode, editAsset, editTuning, removeEdge, removeNode } from "@/lib/graph/edits";
 import { starterGraph } from "@/lib/graph/starter";
-import type { Assets, Graph, GraphEdge, PortRef } from "@/lib/graph/types";
+import type { Assets, Graph, PortRef } from "@/lib/graph/types";
 import { wiringProblem } from "@/lib/graph/wiring";
 
 export interface EditorProps {
@@ -120,7 +121,11 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
   const nodes = useMemo(() => flow.nodes.map((n) => (measured[n.id] ? { ...n, measured: measured[n.id] } : n)) as StepNode[], [flow.nodes, measured]);
   const edges = flow.edges as WireEdgeType[];
 
-  const apply = useCallback((edit: Edit) => dispatch({ type: "edited", graph: edit.graph, touched: edit.touched }), []);
+  const apply = useCallback((edit: Edit) => {
+    dispatch({ type: "edited", graph: edit.graph, touched: edit.touched });
+    // An upload error belongs to a step; if the step is gone, so is the error (a new step may reuse the id).
+    setUploadError((current) => (current && edit.graph.nodes.some((n) => n.id === current.nodeId) ? current : null));
+  }, []);
   const say = useCallback((message: string, at: { x: number; y: number } | null = null) => {
     setToastAt(at);
     dispatch({ type: "toast", message });
@@ -134,7 +139,7 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
     const stop = created.subscribe(setSave);
     return () => {
       stop();
-      created.dispose();
+      created.dispose({ flush: true }); // leaving the page (even by Back) must not lose an edit made a moment ago
       autosave.current = null;
     };
   }, [id]);
@@ -145,7 +150,8 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
   }, [graph]);
 
   useEffect(() => {
-    if (save.status !== "dirty" && save.status !== "saving") return;
+    // Unsaved changes: waiting to save, saving, or a save that failed (the changes are still only on this page).
+    if (save.status !== "dirty" && save.status !== "saving" && save.status !== "error") return;
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
@@ -178,8 +184,10 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
       const result = graphFromNodeChanges(graph, changes);
       if (result.graph !== graph) apply({ graph: result.graph, touched: result.touched });
       if (result.selected !== undefined) {
-        dispatch({ type: "select", selection: result.selected === null ? { kind: "none" } : { kind: "node", id: result.selected } });
-        if (result.selected !== null) setSideTab("settings");
+        dispatch({ type: "select", selection: { kind: "node", id: result.selected } });
+        setSideTab("settings");
+      } else if (result.deselected) {
+        dispatch({ type: "deselect", kind: "node" }); // clears a step selection only; a wire just selected stays
       }
     },
     [graph, apply],
@@ -189,7 +197,8 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
     (changes: EdgeChange<WireEdgeType>[]) => {
       const result = graphFromEdgeChanges(graph, changes);
       if (result.graph !== graph) apply({ graph: result.graph, touched: result.touched });
-      if (result.selected !== undefined) dispatch({ type: "select", selection: result.selected === null ? { kind: "none" } : { kind: "edge", edge: result.selected } });
+      if (result.selected !== undefined) dispatch({ type: "select", selection: { kind: "edge", edge: result.selected } });
+      else if (result.deselected) dispatch({ type: "deselect", kind: "edge" });
     },
     [graph, apply],
   );
@@ -217,9 +226,10 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
   const onConnectEnd = useCallback(
     (event: MouseEvent | TouchEvent, connection: FinalConnectionState) => {
       if (connection.isValid !== false || !connection.fromHandle || !connection.toHandle || !connection.fromNode || !connection.toNode) return;
-      const start = { node: connection.fromNode.id, port: connection.fromHandle.id ?? "" };
-      const end = { node: connection.toNode.id, port: connection.toHandle.id ?? "" };
-      const attempted: GraphEdge = connection.fromHandle.type === "source" ? { from: start, to: end } : { from: end, to: start };
+      const attempted = candidateEdge(
+        { node: connection.fromNode.id, port: connection.fromHandle.id ?? "", type: connection.fromHandle.type },
+        { node: connection.toNode.id, port: connection.toHandle.id ?? "", type: connection.toHandle.type },
+      );
       const problem = wiringProblem(graph.nodes, graph.edges, attempted);
       if (!problem) return;
       const point = "changedTouches" in event ? event.changedTouches[0] : event;
@@ -275,6 +285,9 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
         return setUploadError({ nodeId, message: result.message });
       }
       const current = latest.current;
+      const step = current.graph.nodes.find((n) => n.id === nodeId);
+      const wrongKind = step ? fileProblem(step.type, result.info.kind) : "That step is no longer in the graph.";
+      if (wrongKind) return setUploadError({ nodeId, message: wrongKind }); // never put a file a step cannot use into the graph
       dispatch({ type: "assets", assets: { ...current.assets, [result.sha256]: result.info } });
       apply(editAsset(current.graph, nodeId, result.sha256));
     },
@@ -359,6 +372,7 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
       onRemoveNode: (nodeId) => apply(removeNode(graph, nodeId)),
       onRemoveEdge: (edge) => apply(removeEdge(graph, edge)),
       onOpenGame: showGame,
+      canConnect: (edge) => wiringProblem(graph.nodes, graph.edges, edge) === null,
     }),
     [graph, apply, openMenu, flowToScreenPosition, showGame],
   );

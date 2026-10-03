@@ -70,13 +70,15 @@ export function connectionToEdge(c: { source: string | null; sourceHandle?: stri
 
 /**
  * The graph after React Flow's changes to its nodes: drags move steps, deletes remove them. `touched` is the steps whose
- * results that makes out of date. `selected` is the newly selected step, null when the selection was cleared, undefined
- * when the changes did not involve selection. Sizes and other bookkeeping are ignored.
+ * results that makes out of date. `selected` is the newly selected step (undefined when none was), and `deselected` says
+ * a step was deselected: React Flow reports the deselect of the old selection after the select of the new one, so the two
+ * are kept apart. Sizes and other bookkeeping are ignored.
  */
-export function graphFromNodeChanges(graph: Graph, changes: NodeChange[]): { graph: Graph; touched: string[]; selected: string | null | undefined } {
+export function graphFromNodeChanges(graph: Graph, changes: NodeChange[]): { graph: Graph; touched: string[]; selected: string | undefined; deselected: boolean } {
   let current = graph;
   const touched = new Set<string>();
-  let selected: string | null | undefined;
+  let selected: string | undefined;
+  let deselected = false;
 
   for (const change of changes) {
     if (change.type === "position" && change.position) {
@@ -87,19 +89,20 @@ export function graphFromNodeChanges(graph: Graph, changes: NodeChange[]): { gra
       for (const id of edit.touched) touched.add(id);
     } else if (change.type === "select") {
       if (change.selected) selected = change.id;
-      else if (selected === undefined) selected = null;
+      else deselected = true;
     }
   }
 
   const exists = new Set(current.nodes.map((n) => n.id));
-  return { graph: current, touched: [...touched].filter((id) => exists.has(id)), selected };
+  return { graph: current, touched: [...touched].filter((id) => exists.has(id)), selected, deselected };
 }
 
 /** The same for React Flow's changes to its edges: deletes remove wires, selection reports the wire. */
-export function graphFromEdgeChanges(graph: Graph, changes: EdgeChange[]): { graph: Graph; touched: string[]; selected: GraphEdge | null | undefined } {
+export function graphFromEdgeChanges(graph: Graph, changes: EdgeChange[]): { graph: Graph; touched: string[]; selected: GraphEdge | undefined; deselected: boolean } {
   let current = graph;
   const touched = new Set<string>();
-  let selected: GraphEdge | null | undefined;
+  let selected: GraphEdge | undefined;
+  let deselected = false;
 
   for (const change of changes) {
     if (change.type !== "remove" && change.type !== "select") continue;
@@ -111,9 +114,26 @@ export function graphFromEdgeChanges(graph: Graph, changes: EdgeChange[]): { gra
       for (const id of edit.touched) touched.add(id);
     } else if (change.selected) {
       selected = edge;
-    } else if (selected === undefined) {
-      selected = null;
+    } else {
+      deselected = true;
     }
   }
-  return { graph: current, touched: [...touched], selected };
+  return { graph: current, touched: [...touched], selected, deselected };
+}
+
+/** One end of a connection being made: a step, a port, and whether the handle is an output (source) or an input (target). */
+export interface HandleEnd {
+  node: string;
+  port: string;
+  type: "source" | "target";
+}
+
+/**
+ * The wire a drag from `start` to `end` would make: from the output to the input whichever end the drag started from.
+ * When both ends are the same kind the drag's own direction is kept, so the wire rule can say why it is refused.
+ */
+export function candidateEdge(start: HandleEnd, end: HandleEnd): GraphEdge {
+  const first = { node: start.node, port: start.port };
+  const second = { node: end.node, port: end.port };
+  return start.type === "source" ? { from: first, to: second } : { from: second, to: first };
 }

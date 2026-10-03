@@ -60,7 +60,14 @@ function Result({ result, onOpenGame }: { result: ResultView; onOpenGame?: () =>
       return (
         <div className={styles.result}>
           {onOpenGame ? (
-            <button type="button" className={cx(styles.chip, styles.openGame, "nodrag")} onClick={onOpenGame}>
+            <button
+              type="button"
+              className={cx(styles.chip, styles.openGame, "nodrag")}
+              onClick={(event) => {
+                event.stopPropagation(); // or the click also selects the card, which switches the panel back to Settings
+                onOpenGame();
+              }}
+            >
               Open game
             </button>
           ) : (

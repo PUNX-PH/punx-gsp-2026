@@ -60,6 +60,16 @@ export function markStale(view: RunView, graph: Graph, touched: string[]): RunVi
   };
 }
 
+/** Forgets everything about steps that are no longer in the graph, so a new step that reuses an id starts clean. */
+export function pruneRun(view: RunView, graph: Graph): RunView {
+  const exists = new Set(graph.nodes.map((n) => n.id));
+  const kept = Object.entries(view.outcomes).filter(([id]) => exists.has(id));
+  const problems = view.problems.filter((p) => p.node === null || exists.has(p.node));
+  const stale = view.stale.filter((id) => exists.has(id));
+  if (kept.length === Object.keys(view.outcomes).length && problems.length === view.problems.length && stale.length === view.stale.length) return view;
+  return { ...view, outcomes: Object.fromEntries(kept), order: view.order.filter((id) => exists.has(id)), problems, stale };
+}
+
 /** True when a step that leads to the Preview has changed since the game was made. */
 export function isOutOfDate(view: RunView, graph: Graph): boolean {
   const leading = stepNumbers(graph);

@@ -34,9 +34,9 @@
   --line: #d4d9e6;
   --text: #1b2030;
   --muted: #566079;
-  --accent: #d93f27;
+  --accent: #cf3a22;
   --on-accent: #ffffff;
-  --ring: #d93f27;
+  --ring: #cf3a22;
   --ok: #15803d;
   --bad: #c62828;
   --warn: #a16207;
@@ -284,12 +284,13 @@
   background: var(--wire);
 }
 
-/* While a wire is dragged: handles that accept it glow, the rest dim. */
-.card .handle:global(.connectingto):global(.valid) {
+/* While a wire is dragged, every handle says whether it would accept it: the ones that do glow, the rest dim. (StepCard sets
+   data-connectable on each handle; React Flow itself only marks the handle under the pointer.) */
+.card .handle[data-connectable="yes"] {
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--wire) 38%, transparent);
 }
 
-.card .handle:global(.connectingto):not(:global(.valid)) { opacity: 0.25; }
+.card .handle[data-connectable="no"] { opacity: 0.25; }
 
 .plus {
   position: absolute;
@@ -345,6 +346,7 @@
 
 .panel {
   display: flex;
+  flex: none;
   flex-direction: column;
   gap: 12px;
   padding: 16px;
@@ -600,10 +602,11 @@
 
 /* ---- the game view: docked, floating, full ---- */
 
+/* Inside the side panel, below the tabs: it takes what is left, so the game is not cut off by the tab bar. */
 .docked {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  height: 100%;
   min-height: 0;
 }
 
@@ -671,10 +674,11 @@
   border: 0;
 }
 
+/* The game area is always black, so this message has its own light color, whatever the theme. */
 .gameEmpty {
   margin: auto;
   padding: 24px;
-  color: var(--muted);
+  color: #b9bfd1;
   font-size: 13px;
   text-align: center;
 }
@@ -711,7 +715,9 @@
 }
 
 .side {
+  display: flex;
   flex: none;
+  flex-direction: column;
   width: 320px;
   overflow-y: auto;
   border-left: 1px solid var(--line);
@@ -891,4 +897,11 @@
   color: var(--muted);
   font-size: 13px;
   text-decoration: underline;
+}
+
+/* React Flow turns the outline off for a focused card; the keyboard needs to see which card has the focus. */
+.canvasArea :global(.react-flow__node.selectable:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 10px;
 }

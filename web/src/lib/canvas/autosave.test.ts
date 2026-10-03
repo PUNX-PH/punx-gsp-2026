@@ -210,3 +210,42 @@ describe("autosave.subscribe and dispose", () => {
     expect(clock.count()).toBe(0);
   });
 });
+
+describe("autosave.dispose with flush (review fix)", () => {
+  it("saves an edit that is still waiting for its quiet moment, and nothing after that", () => {
+    const { autosave, clock, calls } = setup();
+    autosave.edit(graphWith(1));
+
+    autosave.dispose({ flush: true });
+    expect(calls).toEqual([graphWith(1)]);
+
+    autosave.edit(graphWith(2));
+    clock.advance(DELAY * 10);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("saves the newest graph once a save that is already on its way has finished", async () => {
+    const { autosave, clock, calls, answers } = setup();
+    autosave.edit(graphWith(1));
+    clock.advance(DELAY);
+    autosave.edit(graphWith(2));
+
+    autosave.dispose({ flush: true });
+    expect(calls).toEqual([graphWith(1)]);
+    answers[0].resolve({ ok: true });
+    await tick();
+    expect(calls).toEqual([graphWith(1), graphWith(2)]);
+  });
+
+  it("saves nothing when there is nothing to save, or when it is disposed without flush", async () => {
+    const quiet = setup();
+    quiet.autosave.dispose({ flush: true });
+    expect(quiet.calls).toHaveLength(0);
+
+    const plain = setup();
+    plain.autosave.edit(graphWith(1));
+    plain.autosave.dispose();
+    plain.clock.advance(DELAY * 10);
+    expect(plain.calls).toHaveLength(0);
+  });
+});
