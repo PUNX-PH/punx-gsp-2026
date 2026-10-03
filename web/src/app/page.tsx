@@ -19,7 +19,7 @@ export default async function Home() {
       </p>
 
       <p>
-        <Link href="/runs/new">Add a run</Link>
+        <Link href="/graphs">Your graphs</Link> · <Link href="/runs/new">Add a run</Link>
       </p>
 
       {runs.length === 0 ? (
