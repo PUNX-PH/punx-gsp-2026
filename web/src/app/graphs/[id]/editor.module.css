@@ -340,3 +340,157 @@
 .pillRemove:hover { color: var(--text); }
 .pillRemove:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .pillRemove svg { width: 10px; height: 10px; }
+
+/* ---- the settings panel ---- */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.fileInput {
+  max-width: 100%;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+}
+
+.fileInput:focus-visible,
+.rangeRow input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.errorText {
+  margin: 0;
+  color: var(--bad);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.rangeRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rangeRow input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
+.value {
+  flex: none;
+  min-width: 4.5em;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.live {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  color: var(--warn);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.notes {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.panelSwatches .swatch {
+  width: 24px;
+  height: 24px;
+}
+
+/* ---- the add menu ---- */
+
+.menuBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+}
+
+.menu {
+  position: absolute;
+  top: 72px;
+  left: 24px;
+  display: flex;
+  flex-direction: column;
+  width: 280px;
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.menuItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuItem:hover:not(:disabled) { background: var(--surface-raised); }
+.menuItem:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.menuItem:disabled { cursor: not-allowed; opacity: 0.55; }
+
+.menuName { font-size: 13px; font-weight: 600; }
+.menuHelp { color: var(--muted); font-size: 11.5px; line-height: 1.4; }
+.menuReason { color: var(--warn); font-size: 11.5px; }
+.menuEmpty { margin: 0; padding: 10px; color: var(--muted); font-size: 12.5px; }
