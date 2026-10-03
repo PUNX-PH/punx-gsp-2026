@@ -16,7 +16,7 @@ game by wiring steps together on a node canvas. Blender prepares the assets; Uni
 The Unity runner template (Slice 1, `unity/runner-template`) is built and runs as a WebGL player. The web side
 is being designed: slice 2 (web foundation: Next.js on Vercel, `@punx.ai`-only Firebase sign-in, Firestore and
 Cloud Storage) is being built (inline, from the plan): `docs/superpowers/specs/2026-10-02-web-foundation-design.md`,
-`docs/superpowers/plans/2026-10-02-slice2-web-foundation.md`. Tasks 1, 3, 4, 5, 7 and 8 are done and the code for 2, 6 and 9 is written; what is left needs the user (Vercel project, Firebase project, the deployed checks). Slice 3 (the node editor) is split into 3a, the graph engine, and 3b, the canvas (not yet designed). Slice 3a is built
+`docs/superpowers/plans/2026-10-02-slice2-web-foundation.md`. Tasks 1, 3, 4, 5, 7 and 8 are done and the code for 2, 6 and 9 is written; what is left needs the user (Vercel project, Firebase project, the deployed checks). Slice 3 (the node editor) is split into 3a, the graph engine, and 3b, the canvas (spec written, awaiting review: `docs/superpowers/specs/2026-10-04-node-canvas-design.md`). Slice 3a is built
 and tested locally on branch `slice-3a-graph-engine` (plan tasks 1 to 13 of 14; spec
 `docs/superpowers/specs/2026-10-03-graph-engine-design.md`, plan `docs/superpowers/plans/2026-10-03-slice3a-graph-engine.md`);
 its deployed checks wait for the same Vercel and Firebase setup. Nothing else is built. Decisions live in the

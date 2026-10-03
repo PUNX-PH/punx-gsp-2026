@@ -186,7 +186,7 @@ Each slice gets its own plan and review.
 3. **Editor and runner** with the non-AI nodes (Reference Image, 3D Model, Palette from Image, Game
    Template, Preview), the settings schema and per-node errors, split in two (`2026-10-03-graph-engine-design.md`):
    **3a the graph engine** (graph format, typed wires, node executors, runner, saved graphs, uploads, API, a plain
-   page) and **3b the node canvas** on top of it (its own spec). Caching moves to the first slice that has a slow
+   page) and **3b the node canvas** on top of it (`2026-10-04-node-canvas-design.md`). Caching moves to the first slice that has a slow
    node (4 or 5).
 4. **Prompt and Describe Game** (AI), with schema validation of the model's output and rate limits.
 5. **Blender Prepare Asset** as a command-line script with fixtures, then as an optional node.
