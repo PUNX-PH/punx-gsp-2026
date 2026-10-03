@@ -113,21 +113,20 @@ describe("parseGraph refuses, in plain words", () => {
     ["settings on a node that takes none", (g: Json) => (g.nodes[1].params = { x: 1 }), /Palette from Image/],
     ["a wire to a node that does not exist", (g: Json) => (g.edges[0].to.node = "zz"), /"zz"/],
     ["a wire to a port that does not exist", (g: Json) => (g.edges[0].to.port = "nope"), /no port "nope"/],
-    ["a wire from an input port", (g: Json) => (g.edges[0].from = { node: "n2", port: "image" }), /input, not an output/],
+    ["a wire from an input port", (g: Json) => { g.edges[0].from = { node: "n2", port: "image" }; g.edges[0].to = { node: "n3", port: "palette" }; }, /input, not an output/],
     ["a wire to an output port", (g: Json) => (g.edges[0].to = { node: "n2", port: "palette" }), /output, not an input/],
     ["two wires into one input", (g: Json) => {
       g.nodes.push({ id: "n5", type: "reference-image", params: { asset: null }, position: { x: 0, y: 200 } });
       g.edges.push({ from: { node: "n5", port: "image" }, to: { node: "n2", port: "image" } });
-    }, /more than one wire/],
-    ["the same wire twice", (g: Json) => g.edges.push({ ...g.edges[0] }), /more than one wire/],
+    }, /already has a wire/],
+    ["the same wire twice", (g: Json) => g.edges.push({ ...g.edges[0] }), /already has a wire/],
   ])("%s", (_label, change, expected) => {
     expect(refused(changed(change as (g: Json) => void))).toMatch(expected as RegExp);
   });
 
   it("a wire of the wrong type, naming both types in plain words", () => {
-    const error = refused(changed((g) => (g.edges[0] = { from: { node: "n2", port: "palette" }, to: { node: "n2", port: "image" } })));
-    expect(error).toMatch(/palette/);
-    expect(error).toMatch(/picture/);
+    const error = refused(changed((g) => (g.edges[0] = { from: { node: "n1", port: "image" }, to: { node: "n3", port: "palette" } })));
+    expect(error).toBe("A picture can't go into a palette input.");
   });
 
   it("a __proto__ key that came from JSON.parse", () => {

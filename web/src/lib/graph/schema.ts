@@ -2,8 +2,9 @@
 // ids that cannot clash with object internals, and wires that join an output to an input of the same type. The parser
 // never looks anything up by a key it was given, and returns a fresh copy built from known keys. What it does NOT
 // require is a finished graph: a half-built one can always be saved; checks.ts says what stops a run.
-import { NODE_SPECS, type NodeSpec, WIRE_WORDS } from "@/lib/graph/registry";
+import { NODE_SPECS, type NodeSpec } from "@/lib/graph/registry";
 import type { Graph, GraphEdge, GraphNode, PortRef } from "@/lib/graph/types";
+import { wiringProblem } from "@/lib/graph/wiring";
 
 export const MAX_NODES = 50;
 export const MAX_EDGES = 200;
@@ -55,17 +56,11 @@ function parse(input: unknown, specs: Record<string, NodeSpec>): Graph {
   }
 
   const edges = rawEdges.map((raw) => parseEdge(raw));
-  const wired = new Set<string>();
+  const accepted: GraphEdge[] = [];
   for (const edge of edges) {
-    checkWiring(edge, byId, specs);
-    const target = `${edge.to.node}\u0000${edge.to.port}`;
-    if (wired.has(target)) {
-      const node = byId.get(edge.to.node)!;
-      const spec = specs[node.type];
-      const port = spec.inputs.find((p) => p.name === edge.to.port)!;
-      refuse(`${spec.label}'s ${port.label} input has more than one wire.`);
-    }
-    wired.add(target);
+    const problem = wiringProblem(nodes, accepted, edge, specs);
+    if (problem) refuse(problem);
+    accepted.push(edge);
   }
 
   return { schemaVersion: 1, nodes, edges };
@@ -113,34 +108,4 @@ function parseEdge(raw: unknown): GraphEdge {
   if (!isObject(raw)) return refuse("Every wire must be an object.");
   onlyKeys(raw, ["from", "to"], "A wire");
   return { from: parseEnd(raw.from), to: parseEnd(raw.to) };
-}
-
-// A wire joins an output of an existing node to an input of an existing node, and both carry the same type.
-function checkWiring(edge: GraphEdge, byId: Map<string, GraphNode>, specs: Record<string, NodeSpec>): void {
-  const from = byId.get(edge.from.node);
-  const to = byId.get(edge.to.node);
-  if (!from) refuse(`A wire refers to a node that does not exist ("${edge.from.node}").`);
-  if (!to) refuse(`A wire refers to a node that does not exist ("${edge.to.node}").`);
-  const fromSpec = specs[from!.type];
-  const toSpec = specs[to!.type];
-
-  const output = fromSpec.outputs.find((p) => p.name === edge.from.port);
-  if (!output) {
-    if (fromSpec.inputs.some((p) => p.name === edge.from.port)) {
-      refuse(`"${edge.from.port}" on ${fromSpec.label} is an input, not an output.`);
-    }
-    refuse(`Node ${from!.id} (${fromSpec.label}) has no port "${edge.from.port}".`);
-  }
-  const input = toSpec.inputs.find((p) => p.name === edge.to.port);
-  if (!input) {
-    if (toSpec.outputs.some((p) => p.name === edge.to.port)) {
-      refuse(`"${edge.to.port}" on ${toSpec.label} is an output, not an input.`);
-    }
-    refuse(`Node ${to!.id} (${toSpec.label}) has no port "${edge.to.port}".`);
-  }
-  if (output!.type !== input!.type) {
-    refuse(
-      `${fromSpec.label} gives a ${WIRE_WORDS[output!.type]}, but ${toSpec.label}'s ${input!.label} input takes a ${WIRE_WORDS[input!.type]}.`,
-    );
-  }
 }
