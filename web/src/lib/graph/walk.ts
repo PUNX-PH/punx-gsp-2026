@@ -17,6 +17,22 @@ export function ancestors(graph: Graph, roots: string[]): Set<string> {
   return seen;
 }
 
+/** The roots and every node downstream of them (the mirror of `ancestors`). */
+export function descendants(graph: Graph, roots: string[]): Set<string> {
+  const fed = new Map<string, string[]>();
+  for (const edge of graph.edges) fed.set(edge.from.node, [...(fed.get(edge.from.node) ?? []), edge.to.node]);
+
+  const seen = new Set<string>();
+  const pending = [...roots];
+  while (pending.length > 0) {
+    const id = pending.pop()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    pending.push(...(fed.get(id) ?? []));
+  }
+  return seen;
+}
+
 export type Order = { ok: true; order: string[] } | { ok: false; cycle: string[] };
 
 /**
