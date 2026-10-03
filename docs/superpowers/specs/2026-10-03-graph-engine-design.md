@@ -1,6 +1,7 @@
 # Graph engine (slice 3a): design
 
-Date: 2026-10-03. Status: awaiting review. Path: architectural (new subsystem). Parent:
+Date: 2026-10-03. Status: approved by the studio (2026-10-03); the loop-check note was added when the plan was written.
+Path: architectural (new subsystem). Parent:
 `2026-10-02-studio-platform-v1-design.md`, which this slice amends (see "Changes to the v1 spec"). Builds on
 `2026-10-02-web-foundation-design.md` (sign-in, the run store, the settings and GLB validators, the Preview page).
 
@@ -21,8 +22,8 @@ is checked in a browser through a deliberately plain page that is thrown away wh
 2. A person creates the starter graph, uploads a picture, presses Play, and plays a game whose colors come from
    that picture, on a desktop and on a phone.
 3. The same with their own GLB wired to the hero.
-4. Bad input is refused in plain words that name the node: a missing input, a wrong wire type, a loop, a file that is
-   not an image, an oversized image, unplayable tuning.
+4. Bad input is refused in plain words that name the node: a missing input, a wrong wire type, a file that is not an
+   image, an oversized image, unplayable tuning.
 5. One person cannot read, run or delete another person's graph or its files.
 6. Pressing Play twice leaves one run for the graph.
 7. No secret is in the repository.
@@ -140,6 +141,10 @@ a graph with no Preview.
 | A loop | "These steps loop back on themselves: Palette from Image, Game Template." |
 | A required input not connected | "Palette from Image needs a picture. Connect a Reference Image." |
 | A required file not chosen | "Reference Image: choose a picture." |
+
+With today's five node types a loop cannot be drawn: the wire-type rule on save already forbids it (no node's output
+type can reach an input upstream of itself). The loop check is kept as a guard for node types added later, and is tested
+with a made-up pair of types.
 
 A graph with problems is not run: the response is 422 with the list. Nodes that do not lead to the Preview are not
 checked and not run; they report "not used".
