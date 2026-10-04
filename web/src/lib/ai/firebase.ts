@@ -26,11 +26,14 @@ export class FirestoreAnswerCache implements AnswerCache {
 }
 
 export class FirestoreUsageLimits implements UsageLimits {
+  // Describe Game counts in `aiUsage`; other services that share these rules (Blender) count in a collection of their own.
+  constructor(private readonly collection: string = USAGE) {}
+
   // One transaction reads and counts the person's day and the site's day together, so two simultaneous requests cannot both
   // slip under a limit.
   async take(uid: string, day: string, limits: { perPerson: number; total: number }): Promise<TakeResult> {
-    const person = db().collection(USAGE).doc(personDocId(uid, day));
-    const site = db().collection(USAGE).doc(siteDocId(day));
+    const person = db().collection(this.collection).doc(personDocId(uid, day));
+    const site = db().collection(this.collection).doc(siteDocId(day));
     return db().runTransaction(async (transaction) => {
       const [mine, all] = await Promise.all([transaction.get(person), transaction.get(site)]);
       const mineCount = (mine.data()?.count as number | undefined) ?? 0;
@@ -44,8 +47,8 @@ export class FirestoreUsageLimits implements UsageLimits {
   }
 
   async give(uid: string, day: string): Promise<void> {
-    const person = db().collection(USAGE).doc(personDocId(uid, day));
-    const site = db().collection(USAGE).doc(siteDocId(day));
+    const person = db().collection(this.collection).doc(personDocId(uid, day));
+    const site = db().collection(this.collection).doc(siteDocId(day));
     await db().runTransaction(async (transaction) => {
       const [mine, all] = await Promise.all([transaction.get(person), transaction.get(site)]);
       transaction.set(person, { count: Math.max(0, ((mine.data()?.count as number | undefined) ?? 0) - 1) });
