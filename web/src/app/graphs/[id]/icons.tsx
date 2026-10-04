@@ -26,6 +26,20 @@ export function Icon({ type }: { type: string }) {
           <path d="M8 8.2l5-3.4M8 8.2L3 4.8M8 8.2V14" />
         </>,
       );
+    case "prepare-model":
+      return svg(
+        <>
+          <path d="M8 2l5 2.8v6.4L8 14l-5-2.8V4.8L8 2z" />
+          <path d="M5.6 8.2l1.7 1.7 3.1-3.3" />
+        </>,
+      );
+    case "make-shape":
+      return svg(
+        <>
+          <path d="M3.5 12.5L7 4.5l3.5 8z" />
+          <circle cx="12" cy="4.8" r="1.8" />
+        </>,
+      );
     case "palette-from-image":
       return svg(<path d="M8 2.5c2.5 3 4 4.7 4 6.7a4 4 0 0 1-8 0c0-2 1.5-3.7 4-6.7z" />);
     case "describe-game":

@@ -71,6 +71,18 @@ function Result({ result, onOpenGame }: { result: ResultView; onOpenGame?: () =>
           {result.reused && <p className={styles.reusedNote}>Reused your earlier answer</p>}
         </div>
       );
+    case "made":
+      return (
+        <div className={cx(styles.result, styles.described)}>
+          {result.swatch !== null && HEX.test(result.swatch) && (
+            <ul className={styles.swatches}>
+              <li className={styles.swatch} style={{ background: result.swatch }} title={result.swatch} />
+            </ul>
+          )}
+          <span className={styles.chip}>{result.line}</span>
+          {result.reused && <p className={styles.reusedNote}>Reused your earlier result</p>}
+        </div>
+      );
     case "open-game":
       return (
         <div className={styles.result}>

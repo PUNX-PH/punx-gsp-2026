@@ -43,6 +43,7 @@ function panel(id: string | null, options: Options = {}) {
       onChooseFile={() => {}}
       onTune={() => {}}
       onPrompt={() => {}}
+      onSettings={() => {}}
     />,
   );
 }
@@ -74,7 +75,7 @@ describe("SettingsPanel", () => {
 
   it("lets a model be chosen (GLB) and shows its name and size", () => {
     const html = panel("n5", { graph: editAsset(starterGraph(), "n5", MODEL_SHA).graph });
-    expect(html).toMatch(/<input[^>]*type="file"[^>]*accept="\.glb,model\/gltf-binary"/);
+    expect(html).toMatch(/<input[^>]*type="file"[^>]*accept="\.glb,\.fbx,\.obj"/);
     expect(html).toContain("hero.glb");
     expect(html).toContain("1.5 KB");
   });

@@ -446,6 +446,57 @@
   font-weight: 500;
 }
 
+.numberInput {
+  box-sizing: border-box;
+  width: 7em;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.choiceRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.choice {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.choice:hover { border-color: var(--muted); }
+
+.swatchButton {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(128, 134, 156, 0.55);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.choiceOn { border-color: var(--ring); box-shadow: 0 0 0 1px var(--ring); }
+.swatchButton.choiceOn { border: 2px solid var(--text); box-shadow: 0 0 0 2px var(--ring); }
+
+.numberInput:focus-visible,
+.choice:focus-visible,
+.swatchButton:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
 .promptBox {
   box-sizing: border-box;
   width: 100%;

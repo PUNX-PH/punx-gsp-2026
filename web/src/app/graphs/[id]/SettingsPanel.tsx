@@ -2,12 +2,14 @@
 
 // The settings of the selected step, in plain words: a file picker for the steps that take a file, three sliders for the
 // Game Template (with a live line when the combination cannot be played), and a short explanation for the others.
-import { useId } from "react";
+import { useId, useState } from "react";
 import { cx } from "@/app/graphs/[id]/cx";
 import styles from "@/app/graphs/[id]/editor.module.css";
 import { Icon } from "@/app/graphs/[id]/icons";
 import type { ResultView, StepData } from "@/lib/canvas/cardView";
+import { SHAPES, SHAPE_NAMES, TRIANGLES } from "@/lib/blender/types";
 import { TUNING_FIELDS, tuningProblem } from "@/lib/canvas/tuning";
+import { SAMPLE_PALETTE } from "@/lib/graph/palette";
 import { MAX_PROMPT_CHARACTERS } from "@/lib/graph/registry";
 import type { Assets, GraphNode, Tuning } from "@/lib/graph/types";
 
@@ -21,6 +23,8 @@ export interface SettingsPanelProps {
   onChooseFile: (nodeId: string, file: File) => void;
   onTune: (nodeId: string, tuning: Tuning) => void;
   onPrompt: (nodeId: string, prompt: string) => void;
+  /** Changes some of a step's settings (the Blender steps: triangles, color, shape). */
+  onSettings: (nodeId: string, patch: Record<string, unknown>) => void;
 }
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -89,6 +93,96 @@ function missingInputLine(port: { label: string; type: string }): string {
   return `Without ${article(port.label)} ${port.label}, a built-in shape is used.`;
 }
 
+// Prepare Model's triangle budget. What is typed is kept as typed until it is a whole number in range; only then does it reach the
+// graph (a number outside the range could not be saved, and then no later edit could be either). Leaving the box shows the last good one.
+function TrianglesBox({ nodeId, triangles, onSettings }: { nodeId: string; triangles: number; onSettings: SettingsPanelProps["onSettings"] }) {
+  const id = useId();
+  const [draft, setDraft] = useState(String(triangles));
+  return (
+    <div className={styles.field}>
+      <label htmlFor={id} className={styles.fieldLabel}>
+        Triangles
+      </label>
+      <input
+        id={id}
+        className={styles.numberInput}
+        type="number"
+        min={TRIANGLES.min}
+        max={TRIANGLES.max}
+        step={100}
+        value={draft}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          const typed = Number(event.target.value);
+          if (event.target.value.trim() !== "" && Number.isInteger(typed) && typed >= TRIANGLES.min && typed <= TRIANGLES.max) onSettings(nodeId, { triangles: typed });
+        }}
+        onBlur={() => setDraft(String(triangles))}
+      />
+      <p className={styles.hint}>{`Fewer triangles make a smaller, faster model (${TRIANGLES.min} to ${TRIANGLES.max}).`}</p>
+    </div>
+  );
+}
+
+// The color a Blender step paints with: one of the five palette swatches (the wired palette's, or the sample palette's), and for
+// Prepare Model also the model's own colors. A swatch that is not a #rrggbb color is never put in a style: the sample's takes its place.
+function ColorChoice(props: { nodeId: string; color: unknown; swatches: string[] | undefined; withOriginal: boolean; onSettings: SettingsPanelProps["onSettings"] }) {
+  const id = useId();
+  const shown = SAMPLE_PALETTE.map((sample, i) => (HEX.test(props.swatches?.[i] ?? "") ? props.swatches![i] : sample));
+  return (
+    <div className={styles.field} role="group" aria-labelledby={id}>
+      <span id={id} className={styles.fieldLabel}>
+        Color
+      </span>
+      {props.withOriginal && (
+        <button
+          type="button"
+          className={cx(styles.choice, props.color === "original" && styles.choiceOn)}
+          aria-pressed={props.color === "original"}
+          onClick={() => props.onSettings(props.nodeId, { color: "original" })}
+        >
+          {"Keep the model's colors"}
+        </button>
+      )}
+      <ul className={styles.choiceRow}>
+        {shown.map((hex, i) => (
+          <li key={i}>
+            <button
+              type="button"
+              className={cx(styles.swatchButton, props.color === i + 1 && styles.choiceOn)}
+              aria-pressed={props.color === i + 1}
+              aria-label={`Swatch ${i + 1}, ${hex}`}
+              style={{ background: hex }}
+              onClick={() => props.onSettings(props.nodeId, { color: i + 1 })}
+            />
+          </li>
+        ))}
+      </ul>
+      <p className={styles.hint}>Textures are dropped: the model is painted in flat colors.</p>
+    </div>
+  );
+}
+
+// Make Shape's seven shapes, by name.
+function ShapeChoice({ nodeId, shape, onSettings }: { nodeId: string; shape: unknown; onSettings: SettingsPanelProps["onSettings"] }) {
+  const id = useId();
+  return (
+    <div className={styles.field} role="group" aria-labelledby={id}>
+      <span id={id} className={styles.fieldLabel}>
+        Shape
+      </span>
+      <ul className={styles.choiceRow}>
+        {SHAPES.map((name) => (
+          <li key={name}>
+            <button type="button" className={cx(styles.choice, shape === name && styles.choiceOn)} aria-pressed={shape === name} onClick={() => onSettings(nodeId, { shape: name })}>
+              {SHAPE_NAMES[name]}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // The prompt of a Describe Game: what the person wants, in their own words. The notice is there so nobody is surprised
 // that the words (and the picture) leave the studio.
 function PromptBox({ nodeId, prompt, onPrompt }: { nodeId: string; prompt: string; onPrompt: SettingsPanelProps["onPrompt"] }) {
@@ -155,7 +249,7 @@ function TuningSliders({ node, data, onTune }: { node: GraphNode; data: StepData
   );
 }
 
-export function SettingsPanel({ node, data, uploading, error, onChooseFile, onTune, onPrompt }: SettingsPanelProps) {
+export function SettingsPanel({ node, data, uploading, error, onChooseFile, onTune, onPrompt, onSettings }: SettingsPanelProps) {
   if (!node || !data) {
     return (
       <div className={styles.panel}>
@@ -190,13 +284,25 @@ export function SettingsPanel({ node, data, uploading, error, onChooseFile, onTu
       {node.type === "model" && (
         <FilePicker
           what="model"
-          accept=".glb,model/gltf-binary"
-          note="A GLB file, up to 4 MB."
+          accept=".glb,.fbx,.obj"
+          note="A GLB, FBX or OBJ file, up to 4 MB. An FBX or OBJ needs a Prepare Model step before the game."
           uploading={uploading}
           error={error}
           result={data.result}
           onPick={(file) => onChooseFile(node.id, file)}
         />
+      )}
+      {node.type === "prepare-model" && (
+        <>
+          <TrianglesBox key={node.id} nodeId={node.id} triangles={typeof node.params.triangles === "number" ? node.params.triangles : TRIANGLES.default} onSettings={onSettings} />
+          <ColorChoice nodeId={node.id} color={node.params.color} swatches={data.swatches} withOriginal onSettings={onSettings} />
+        </>
+      )}
+      {node.type === "make-shape" && (
+        <>
+          <ShapeChoice nodeId={node.id} shape={node.params.shape} onSettings={onSettings} />
+          <ColorChoice nodeId={node.id} color={node.params.color} swatches={data.swatches} withOriginal={false} onSettings={onSettings} />
+        </>
       )}
       {node.type === "describe-game" && <PromptBox nodeId={node.id} prompt={typeof node.params.prompt === "string" ? node.params.prompt : ""} onPrompt={onPrompt} />}
       {node.type === "game-template" && <TuningSliders node={node} data={data} onTune={onTune} />}

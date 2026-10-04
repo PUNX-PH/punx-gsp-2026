@@ -37,7 +37,7 @@ import { fileProblem } from "@/lib/canvas/files";
 import { type GameView, clampRect, viewToReturnTo } from "@/lib/canvas/prefs";
 import { isOutOfDate, revealSchedule } from "@/lib/canvas/runView";
 import { stepNumbers } from "@/lib/canvas/stepNumbers";
-import { type Edit, addEdge, addNode, editAsset, editPrompt, editTuning, removeEdge, removeNode } from "@/lib/graph/edits";
+import { type Edit, addEdge, addNode, editAsset, editPrompt, editSettings, editTuning, removeEdge, removeNode } from "@/lib/graph/edits";
 import { describedStarterGraph, starterGraph } from "@/lib/graph/starter";
 import type { Assets, Graph, PortRef } from "@/lib/graph/types";
 import { wiringProblem } from "@/lib/graph/wiring";
@@ -509,6 +509,7 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
                   onChooseFile={chooseFile}
                   onTune={(nodeId, tuning) => apply(editTuning(graph, nodeId, tuning))}
                   onPrompt={(nodeId, prompt) => apply(editPrompt(graph, nodeId, prompt))}
+                  onSettings={(nodeId, patch) => apply(editSettings(graph, nodeId, patch))}
                 />
               )}
             </aside>
