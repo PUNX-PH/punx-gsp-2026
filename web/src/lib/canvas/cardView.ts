@@ -34,6 +34,10 @@ export type StepData = {
   status: StepStatus;
   statusText: string;
   result: ResultView;
+  /** A Game Template whose three numbers are set by a feel wired into it, so its sliders are locked. */
+  tuningLocked: boolean;
+  /** The numbers a Game Template's last run used (what a locked slider shows), or null before a run or after a failure. */
+  liveTuning: Tuning | null;
   inputs: PortView[];
   outputs: PortView[];
 };
@@ -132,6 +136,13 @@ export function stepData({ graph, node, assets, run, numbers, graphId, pending, 
   const isFileStep = Object.hasOwn(FILE_KIND, node.type);
   const result = isFileStep ? chosenFile(node, assets, graphId) : pending.has(node.id) ? { kind: "none" as const } : fromRun(node, run);
 
+  const isTemplate = node.type === "game-template";
+  const used = isTemplate && outcome?.state === "done" ? (outcome.result as { tuning?: Partial<Record<keyof Tuning, unknown>> } | undefined)?.tuning : undefined;
+  const liveTuning =
+    used && isNumber(used.speed) && isNumber(used.jumpHeight) && isNumber(used.obstacleSpacing)
+      ? { speed: used.speed, jumpHeight: used.jumpHeight, obstacleSpacing: used.obstacleSpacing }
+      : null;
+
   return {
     id: node.id,
     type: node.type,
@@ -141,6 +152,8 @@ export function stepData({ graph, node, assets, run, numbers, graphId, pending, 
     status,
     statusText,
     result,
+    tuningLocked: isTemplate && graph.edges.some((e) => e.to.node === node.id && e.to.port === "feel"),
+    liveTuning,
     inputs: spec.inputs.map((p) => ({
       name: p.name,
       label: p.label,

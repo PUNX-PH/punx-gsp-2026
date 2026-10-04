@@ -243,3 +243,33 @@ describe("a Describe Game step", () => {
     expect(card.outputs.map((p) => [p.name, p.type, p.wired])).toEqual([["palette", "palette", true], ["feel", "feel", true]]);
   });
 });
+
+describe("a Game Template and a feel", () => {
+  const node = (id: string, type: string, params: Record<string, unknown>) => ({ id, type, params, position: { x: 0, y: 0 } });
+  const withFeel = (): Graph => ({
+    schemaVersion: 1,
+    nodes: [node("n2", "describe-game", { prompt: "a run" }), node("n3", "game-template", { tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } }), node("n4", "preview", {})],
+    edges: [
+      { from: { node: "n2", port: "feel" }, to: { node: "n3", port: "feel" } },
+      { from: { node: "n3", port: "settings" }, to: { node: "n4", port: "settings" } },
+    ],
+  });
+  const ran = (tuning: unknown, state: "done" | "failed" = "done"): RunView => ({
+    ...emptyRunView(null),
+    outcomes: { n3: state === "done" ? { state, result: { tuning } } : { state, error: "x" } },
+  });
+  const AI_TUNING = { speed: 7, jumpHeight: 2.6, obstacleSpacing: 18 };
+
+  it("is locked while a feel is wired into it, and not otherwise", () => {
+    expect(step("n3", { graph: withFeel() }).tuningLocked).toBe(true);
+    expect(step("n3").tuningLocked).toBe(false); // the starter graph has no feel
+  });
+
+  it("shows the numbers its last run used, and nothing before a run, after a failure, or for another kind of step", () => {
+    expect(step("n3", { graph: withFeel(), run: ran(AI_TUNING) }).liveTuning).toEqual(AI_TUNING);
+    expect(step("n3", { graph: withFeel() }).liveTuning).toBeNull();
+    expect(step("n3", { graph: withFeel(), run: ran(AI_TUNING, "failed") }).liveTuning).toBeNull();
+    expect(step("n3", { graph: withFeel(), run: ran({ speed: "7" }) }).liveTuning).toBeNull();
+    expect(step("n2", { graph: withFeel(), run: ran(AI_TUNING) }).liveTuning).toBeNull();
+  });
+});

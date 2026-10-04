@@ -12,6 +12,9 @@ function withParams(graph: Graph, nodeId: string, change: Record<string, unknown
 /** Chooses the uploaded file (by hash) a node uses, or clears the choice. */
 export const setAsset = (graph: Graph, nodeId: string, sha256: string | null): Graph => withParams(graph, nodeId, { asset: sha256 });
 
+/** Sets a Describe Game's prompt, exactly as typed (it is cleaned when it is used, not while the person is typing). */
+export const editPrompt = (graph: Graph, nodeId: string, prompt: string): Edit => ({ graph: withParams(graph, nodeId, { prompt }), touched: [nodeId] });
+
 /** Sets a Game Template's tuning. */
 export const setTuning = (graph: Graph, nodeId: string, tuning: Tuning): Graph =>
   withParams(graph, nodeId, { tuning: { speed: tuning.speed, jumpHeight: tuning.jumpHeight, obstacleSpacing: tuning.obstacleSpacing } });

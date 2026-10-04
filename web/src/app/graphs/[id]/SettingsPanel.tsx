@@ -8,6 +8,7 @@ import styles from "@/app/graphs/[id]/editor.module.css";
 import { Icon } from "@/app/graphs/[id]/icons";
 import type { ResultView, StepData } from "@/lib/canvas/cardView";
 import { TUNING_FIELDS, tuningProblem } from "@/lib/canvas/tuning";
+import { MAX_PROMPT_CHARACTERS } from "@/lib/graph/registry";
 import type { Assets, GraphNode, Tuning } from "@/lib/graph/types";
 
 export interface SettingsPanelProps {
@@ -19,6 +20,7 @@ export interface SettingsPanelProps {
   error: string | null;
   onChooseFile: (nodeId: string, file: File) => void;
   onTune: (nodeId: string, tuning: Tuning) => void;
+  onPrompt: (nodeId: string, prompt: string) => void;
 }
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -87,10 +89,31 @@ function missingInputLine(port: { label: string; type: string }): string {
   return `Without ${article(port.label)} ${port.label}, a built-in shape is used.`;
 }
 
+// The prompt of a Describe Game: what the person wants, in their own words. The notice is there so nobody is surprised
+// that the words (and the picture) leave the studio.
+function PromptBox({ nodeId, prompt, onPrompt }: { nodeId: string; prompt: string; onPrompt: SettingsPanelProps["onPrompt"] }) {
+  const id = useId();
+  const left = MAX_PROMPT_CHARACTERS - Array.from(prompt).length;
+  return (
+    <div className={styles.field}>
+      <label htmlFor={id} className={styles.fieldLabel}>
+        Describe your game
+      </label>
+      <textarea id={id} className={styles.promptBox} rows={5} maxLength={MAX_PROMPT_CHARACTERS} value={prompt} onChange={(event) => onPrompt(nodeId, event.target.value)} />
+      <p className={styles.hint}>{`${left} characters left`}</p>
+      <p className={styles.hint}>{"Your description and picture are sent to Anthropic's Claude to make this."}</p>
+    </div>
+  );
+}
+
 function TuningSliders({ node, data, onTune }: { node: GraphNode; data: StepData; onTune: SettingsPanelProps["onTune"] }) {
   const id = useId();
   const tuning = node.params.tuning as Tuning;
-  const problem = tuningProblem(tuning);
+  // While a feel is wired in, the numbers are Describe Game's: the sliders show what the last run used (or the saved ones
+  // before a run) and cannot be moved. Unplugging the feel gives them back.
+  const locked = data.tuningLocked;
+  const shown = locked ? (data.liveTuning ?? tuning) : tuning;
+  const problem = locked ? null : tuningProblem(tuning);
   return (
     <>
       {TUNING_FIELDS.map((field) => (
@@ -105,15 +128,17 @@ function TuningSliders({ node, data, onTune }: { node: GraphNode; data: StepData
               min={field.min}
               max={field.max}
               step={field.step}
-              value={tuning[field.key]}
+              value={shown[field.key]}
+              disabled={locked}
               onChange={(event) => onTune(node.id, { ...tuning, [field.key]: Number(event.target.value) })}
             />
             <output className={styles.value}>
-              {tuning[field.key]} {field.unit}
+              {`${shown[field.key]} ${field.unit}`}
             </output>
           </div>
         </div>
       ))}
+      {locked && <p className={styles.hint}>Set by Describe Game</p>}
       {problem && (
         <p role="status" className={styles.live}>
           {problem}
@@ -130,7 +155,7 @@ function TuningSliders({ node, data, onTune }: { node: GraphNode; data: StepData
   );
 }
 
-export function SettingsPanel({ node, data, uploading, error, onChooseFile, onTune }: SettingsPanelProps) {
+export function SettingsPanel({ node, data, uploading, error, onChooseFile, onTune, onPrompt }: SettingsPanelProps) {
   if (!node || !data) {
     return (
       <div className={styles.panel}>
@@ -173,6 +198,7 @@ export function SettingsPanel({ node, data, uploading, error, onChooseFile, onTu
           onPick={(file) => onChooseFile(node.id, file)}
         />
       )}
+      {node.type === "describe-game" && <PromptBox nodeId={node.id} prompt={typeof node.params.prompt === "string" ? node.params.prompt : ""} onPrompt={onPrompt} />}
       {node.type === "game-template" && <TuningSliders node={node} data={data} onTune={onTune} />}
       {node.type === "palette-from-image" && colors.length > 0 && (
         <ul className={cx(styles.swatches, styles.panelSwatches)}>

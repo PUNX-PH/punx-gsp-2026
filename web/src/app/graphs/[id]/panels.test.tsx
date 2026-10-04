@@ -42,6 +42,7 @@ function panel(id: string | null, options: Options = {}) {
       error={options.error ?? null}
       onChooseFile={() => {}}
       onTune={() => {}}
+      onPrompt={() => {}}
     />,
   );
 }
@@ -140,5 +141,68 @@ describe("AddMenu", () => {
 
   it("says so when nothing fits", () => {
     expect(renderToString(<AddMenu choices={[]} onPick={noop} onClose={noop} />)).toContain("No step fits here.");
+  });
+});
+
+describe("SettingsPanel for Describe Game and a locked Game Template", () => {
+  const node = (id: string, type: string, params: Record<string, unknown>) => ({ id, type, params, position: { x: 0, y: 0 } });
+  const described = (prompt: string): Graph => ({
+    schemaVersion: 1,
+    nodes: [
+      node("n1", "reference-image", { asset: null }),
+      node("n2", "describe-game", { prompt }),
+      node("n3", "game-template", { tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } }),
+      node("n4", "preview", {}),
+    ],
+    edges: [
+      { from: { node: "n1", port: "image" }, to: { node: "n2", port: "image" } },
+      { from: { node: "n2", port: "palette" }, to: { node: "n3", port: "palette" } },
+      { from: { node: "n2", port: "feel" }, to: { node: "n3", port: "feel" } },
+      { from: { node: "n3", port: "settings" }, to: { node: "n4", port: "settings" } },
+    ],
+  });
+  const rangeInputs = (html: string) => html.split("<input").filter((part) => part.includes('type="range"'));
+
+  it("has a box for the prompt (at most 500 characters), holding what was typed, with the characters left", () => {
+    const html = panel("n2", { graph: described("a fast neon night run") });
+    expect(html).toContain("Describe Game");
+    expect(html).toContain("Describe your game");
+    expect(html).toMatch(/<textarea[^>]*maxLength="500"[^>]*>a fast neon night run<\/textarea>/);
+    expect(html).toContain("479 characters left");
+  });
+
+  it("counts an emoji as one character", () => {
+    expect(panel("n2", { graph: described("👻".repeat(100)) })).toContain("400 characters left");
+  });
+
+  it("says plainly that the description and picture go to Anthropic's Claude", () => {
+    expect(panel("n2", { graph: described("") })).toContain("Your description and picture are sent to Anthropic&#x27;s Claude to make this.");
+  });
+
+  it("locks the three sliders while a feel is wired in, shows the numbers of the last run, and says who sets them", () => {
+    const graph = described("a run");
+    const run: RunView = { ...emptyRunView(null), outcomes: { n3: { state: "done", result: { tuning: { speed: 7, jumpHeight: 2.6, obstacleSpacing: 18 } } } } };
+    const html = panel("n3", { graph, run });
+    const ranges = rangeInputs(html);
+    expect(ranges).toHaveLength(3);
+    for (const range of ranges) expect(range).toContain('disabled=""');
+    expect(html).toContain("Set by Describe Game");
+    expect(html).toContain("7 m/s");
+    expect(html).toContain("2.6 m");
+    expect(html).toContain("18 m");
+  });
+
+  it("shows the saved numbers, still locked, before anything has run", () => {
+    const html = panel("n3", { graph: described("a run") });
+    expect(html).toContain("Set by Describe Game");
+    expect(html).toContain("6 m/s");
+  });
+
+  it("leaves the sliders free, with no note, when no feel is wired in", () => {
+    const html = panel("n3");
+    const ranges = rangeInputs(html);
+    expect(ranges).toHaveLength(3);
+    for (const range of ranges) expect(range).not.toContain("disabled");
+    expect(html).not.toContain("Set by Describe Game");
   });
 });

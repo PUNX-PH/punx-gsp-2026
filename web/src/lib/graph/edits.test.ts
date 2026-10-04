@@ -4,6 +4,7 @@ import {
   addNode,
   addProblem,
   editAsset,
+  editPrompt,
   editTuning,
   moveNode,
   removeEdge,
@@ -211,5 +212,32 @@ describe("moveNode, editAsset and editTuning", () => {
     const edit = editTuning(starterGraph(), "n3", { speed: 2.3000000000000003, jumpHeight: 1.5, obstacleSpacing: 12.004 });
     expect(edit.graph.nodes[2].params).toEqual({ tuning: { speed: 2.3, jumpHeight: 1.5, obstacleSpacing: 12 } });
     expect(edit.touched).toEqual(["n3"]);
+  });
+});
+
+describe("editPrompt", () => {
+  const graph: Graph = {
+    schemaVersion: 1,
+    nodes: [
+      { id: "n1", type: "describe-game", params: { prompt: "a fast run" }, position: { x: 0, y: 0 } },
+      { id: "n2", type: "describe-game", params: { prompt: "a slow walk" }, position: { x: 0, y: 300 } },
+    ],
+    edges: [],
+  };
+
+  it("changes the prompt of that step only, and says that step's results are out of date", () => {
+    const edit = editPrompt(graph, "n1", "a spooky run");
+    expect(edit.graph.nodes.map((n) => n.params)).toEqual([{ prompt: "a spooky run" }, { prompt: "a slow walk" }]);
+    expect(edit.touched).toEqual(["n1"]);
+  });
+
+  it("leaves the graph it was given alone", () => {
+    const before = structuredClone(graph);
+    editPrompt(graph, "n1", "changed");
+    expect(graph).toEqual(before);
+  });
+
+  it("keeps the prompt exactly as typed (cleaning happens when it is used, not while the person is typing)", () => {
+    expect(editPrompt(graph, "n1", "  spaced \n out  ").graph.nodes[0].params.prompt).toBe("  spaced \n out  ");
   });
 });
