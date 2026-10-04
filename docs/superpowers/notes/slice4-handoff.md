@@ -2,7 +2,9 @@
 
 **Update 2026-10-04: slice 4 is merged into `main` (a fast-forward, `cadf97c`), pushed, and the production build is green and live** on
 https://punx-gsp.vercel.app. **There is still no `ANTHROPIC_API_KEY`**, so Describe Game answers "The AI service did not answer" and
-the live checks have not been run. "Where it stands" below describes the branch before the merge; "Blocked on the studio" is what is left.
+the live checks have not been run. **Parked (2026-10-05): the studio has no funds for Anthropic API credits yet** (a claude.ai Team plan does
+not include the API; the key comes from the Claude Console, which bills separately). Resume when a funded Console workspace and key
+exist. "Where it stands" below describes the branch before the merge; "Blocked on the studio" is what is left.
 
 Read this after `slice3b-results.md`. It says where slice 4 stands, what only the studio can do, and how to continue. The
 authorities are the spec `docs/superpowers/specs/2026-10-04-describe-game-design.md` and the plan

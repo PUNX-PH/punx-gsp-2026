@@ -43,7 +43,7 @@ come from an uploaded file, and keep Blender and Unity workers sandboxed with no
 
 ## Work in progress
 
-Slice 4's code is done and live; what is left is the studio's setup (an Anthropic account and key with a monthly spend limit, the data-terms
+Slice 4's code is done and live but **parked until the studio has API funds** (2026-10-05); what is left is the studio's setup (a funded Claude Console workspace and key with a monthly spend limit, the data-terms
 decision, `ANTHROPIC_API_KEY` as a Sensitive Production variable in Vercel, then a redeploy), then the live checks and
 `slice4-results.md`. Ask before any push: pushing `main` starts a production build. Also open (none of it blocks
 slice 5): the password pre-registration decision (the Email/Password provider is still enabled next to Google), the checks listed
