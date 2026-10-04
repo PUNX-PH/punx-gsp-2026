@@ -3,12 +3,14 @@
 // exist, or has no such file all look the same ("Not found"). A graph is saved as a whole after it parses; a half-built
 // graph can always be saved (what stops a run is checked at Play).
 import type { DescribeGameService } from "@/lib/ai/types";
+import type { BlenderService } from "@/lib/blender/types";
 import type { User } from "@/lib/auth/ports";
 import { checkGlb } from "@/lib/glb";
 import { checkGraph } from "@/lib/graph/checks";
 import { readImage, sniffKind } from "@/lib/graph/image";
 import { checkFbx } from "@/lib/modelFiles";
 import { EXECUTORS } from "@/lib/graph/nodes";
+import { PLAY_BUDGET_MS } from "@/lib/graph/playTime";
 import { NODE_SPECS, WIRE_WORDS } from "@/lib/graph/registry";
 import { type RunResult, runGraph } from "@/lib/graph/runner";
 import { parseGraph } from "@/lib/graph/schema";
@@ -63,6 +65,8 @@ export interface GraphServiceDeps {
   executors?: Record<string, Executor>;
   /** Describe Game's service. Without one, a graph that uses Describe Game fails that step plainly. */
   ai?: DescribeGameService;
+  /** Prepare Model and Make Shape. Without one, a graph that uses them fails those steps plainly. */
+  blender?: BlenderService;
 }
 
 // What Describe Game gets when no AI service is wired (a deployment without the key): the step fails in plain words, nothing else does.
@@ -71,6 +75,18 @@ const noAi: DescribeGameService = {
     throw new NodeError("Describe Game: The AI service did not answer. Try again.");
   },
 };
+
+// What the Blender steps get when no service is wired (a deployment without the worker): they fail in plain words, nothing else does.
+const noBlender: BlenderService = {
+  async prepare() {
+    throw new NodeError("Prepare Model: The Blender service did not answer. Try again.");
+  },
+  async shape() {
+    throw new NodeError("Make Shape: The Blender service did not answer. Try again.");
+  },
+};
+
+const SHA256_HEX = /^[0-9a-f]{64}$/;
 
 const withoutControls = (text: string) => text.replace(/\p{Cc}/gu, "");
 
@@ -241,10 +257,29 @@ export function makeGraphService(deps: GraphServiceDeps): GraphService {
 
       // The Preview replaces the graph's earlier run; the holder tells us afterwards whether the run changed.
       let lastRun = record.lastRunId;
+      // Files steps make (Blender's results) live in the graph's folder beside its uploads. A step can read one only after this Play
+      // has stored it or found it there again, so a hash is never a way to reach another graph's files.
+      const made = new Set<string>();
       const ctx: ExecutorContext = {
         user,
+        graphId: id,
         assets: record.assets,
-        readAsset: async (sha256) => (Object.hasOwn(record.assets, sha256) ? files.get(id, sha256) : null),
+        readAsset: async (sha256) => (Object.hasOwn(record.assets, sha256) || made.has(sha256) ? files.get(id, sha256) : null),
+        derived: {
+          async put(bytes) {
+            const sha256 = await sha256Hex(bytes);
+            await files.put(id, sha256, bytes, "model/gltf-binary");
+            made.add(sha256);
+            return sha256;
+          },
+          async recall(sha256) {
+            if (!SHA256_HEX.test(sha256) || !(await files.get(id, sha256))) return false;
+            made.add(sha256);
+            return true;
+          },
+        },
+        deadline: now() + PLAY_BUDGET_MS,
+        blender: deps.blender ?? noBlender,
         runs,
         lastRun: { get: () => lastRun, set: (runId) => void (lastRun = runId) },
         ai: deps.ai ?? noAi,
