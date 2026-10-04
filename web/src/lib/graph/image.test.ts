@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { MAX_IMAGE_PIXELS, readImage, sampleImage, sniffKind } from "@/lib/graph/image";
+import { MAX_IMAGE_PIXELS, pictureForModel, readImage, sampleImage, sniffKind } from "@/lib/graph/image";
 import { makeGlb } from "@/lib/testing/glb";
 import { makeJpeg, makePng, makePngFromPixels } from "@/lib/testing/images";
 
@@ -110,5 +110,55 @@ describe("sampleImage", () => {
   it("refuses what readImage refuses", async () => {
     expect((await sampleImage(text("hello world"))).ok).toBe(false);
     expect((await sampleImage(await makePng(6000, 5000, [1, 2, 3]))).ok).toBe(false);
+  });
+});
+
+describe("pictureForModel (the copy of a picture that is sent to the model)", () => {
+  const jpegOf = async (bytes: Uint8Array) => {
+    const result = await pictureForModel(bytes);
+    if (!result.ok) throw new Error(result.error);
+    return result.jpeg;
+  };
+
+  it("is a JPEG of at most 1024 pixels on its long side, keeping the proportions", async () => {
+    const jpeg = await jpegOf(await makePng(3000, 2000, [200, 30, 30]));
+    expect(Array.from(jpeg.slice(0, 3))).toEqual([0xff, 0xd8, 0xff]);
+    const { width, height, format } = await sharp(jpeg).metadata();
+    expect(format).toBe("jpeg");
+    expect([width, height]).toEqual([1024, 683]);
+  });
+
+  it("limits the long side whichever side that is, and does not enlarge a small picture", async () => {
+    const tall = await sharp(await jpegOf(await makePng(1000, 4000, [1, 2, 3]))).metadata();
+    expect([tall.width, tall.height]).toEqual([256, 1024]);
+    const small = await sharp(await jpegOf(await makePng(300, 200, [1, 2, 3]))).metadata();
+    expect([small.width, small.height]).toEqual([300, 200]);
+  });
+
+  it("puts a transparent picture on white, since a JPEG has no transparency", async () => {
+    const { data } = await sharp(await jpegOf(await makePng(40, 40, [255, 0, 0], 0))).raw().toBuffer({ resolveWithObject: true });
+    expect(Array.from(data.slice(0, 3)).every((channel) => channel >= 250)).toBe(true);
+  });
+
+  it("turns a photo that is stored sideways upright and drops its metadata (a portrait stays a portrait)", async () => {
+    const sideways = await sharp({ create: { width: 200, height: 100, channels: 3, background: { r: 9, g: 9, b: 9 } } })
+      .withMetadata({ orientation: 6 })
+      .jpeg()
+      .toBuffer();
+    expect((await sharp(sideways).metadata()).orientation).toBe(6); // the test picture really is stored sideways
+    const copy = await sharp(await jpegOf(new Uint8Array(sideways))).metadata();
+    expect([copy.width, copy.height]).toEqual([100, 200]);
+    expect(copy.orientation).toBeUndefined();
+    expect(copy.exif).toBeUndefined();
+  });
+
+  it("refuses what the reader refuses, in the reader's own words", async () => {
+    expect(await pictureForModel(text("hello world"))).toEqual({ ok: false, error: "this is not a PNG or JPEG picture" });
+    const corrupt = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(await pictureForModel(corrupt)).toEqual({ ok: false, error: "this picture could not be read. Choose another file." });
+    expect(await pictureForModel(await makePng(6000, 5000, [1, 2, 3]))).toEqual({
+      ok: false,
+      error: "this picture is more than 25 million pixels. Choose a smaller one.",
+    });
   });
 });

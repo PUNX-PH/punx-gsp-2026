@@ -99,3 +99,25 @@ export async function sampleImage(bytes: Uint8Array): Promise<{ ok: true; pixels
   if (count === 0) return { ok: false, error: TRANSPARENT };
   return { ok: true, pixels: pixels.slice(0, count * 3) };
 }
+
+const MODEL_PICTURE_SIDE = 1024;
+
+/**
+ * The copy of a picture that is sent to the model: upright, at most 1024 pixels on its long side (never enlarged), on white
+ * where it was transparent, as a JPEG with no metadata. The upload itself is never forwarded. Fails with the reader's sentences.
+ */
+export async function pictureForModel(bytes: Uint8Array): Promise<{ ok: true; jpeg: Uint8Array } | Failure> {
+  const header = await inspect(bytes);
+  if (!header.ok) return header;
+  try {
+    const jpeg = await sharp(bytes, DECODE)
+      .rotate()
+      .resize(MODEL_PICTURE_SIDE, MODEL_PICTURE_SIDE, { fit: "inside", withoutEnlargement: true })
+      .flatten({ background: "#ffffff" })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+    return { ok: true, jpeg: new Uint8Array(jpeg) };
+  } catch {
+    return { ok: false, error: UNREADABLE };
+  }
+}
