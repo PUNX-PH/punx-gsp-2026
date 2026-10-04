@@ -217,3 +217,25 @@ describe("minPlayableSpacing (the smallest obstacle spacing the winnability rule
     expect(minPlayableSpacing(6, 4)).toBeGreaterThan(minPlayableSpacing(6, 3));
   });
 });
+
+describe("minPlayableSpacing on every one-decimal speed (the check compares a float, as Unity reads it)", () => {
+  const jumps = [2.2, 2.4, 2.6, 3, 3.5, 4, 5];
+
+  it("is playable at every speed from 1 to 20 in steps of 0.1, for each jump height where spacing can help", () => {
+    const failures: string[] = [];
+    let tried = 0;
+    for (let tenths = 10; tenths <= 200; tenths++) {
+      const speed = tenths / 10;
+      for (const jump of jumps) {
+        if (winnabilityError(speed, jump, 1000) !== null) continue; // the jump itself is too low for this speed
+        tried++;
+        const spacing = minPlayableSpacing(speed, jump);
+        if (winnabilityError(speed, jump, spacing) !== null) failures.push(`${speed} m/s, ${jump} m -> ${spacing}`);
+        // And it is the smallest: one step less is not playable.
+        if (winnabilityError(speed, jump, Number((spacing - 0.1).toFixed(1))) === null) failures.push(`${speed} m/s, ${jump} m -> ${spacing} is not the smallest`);
+      }
+    }
+    expect(tried).toBeGreaterThan(500);
+    expect(failures).toEqual([]);
+  });
+});

@@ -99,6 +99,12 @@ describe("parseAnswer and the numbers that cannot be played", () => {
     expect(winnabilityError(12, 3, minPlayableSpacing(12, 3))).toBeNull();
   });
 
+  it("mends the numbers that sit on the float edge (4.1 m/s at a 2.4 m jump), instead of refusing an answer it was meant to repair", () => {
+    const parsed = parseAnswer(changed((r) => (r.tuning = { speed: 4.1, jumpHeight: 2.4, obstacleSpacing: 4 })));
+    expect(parsed.ok).toBe(true);
+    expect(parsed.ok && winnabilityError(4.1, 2.4, parsed.answer.tuning.obstacleSpacing)).toBeNull();
+  });
+
   it("leaves a spacing that is already playable alone", () => {
     const parsed = parseAnswer(changed((r) => (r.tuning = { speed: 6, jumpHeight: 2.2, obstacleSpacing: 30 })));
     expect(parsed.ok && parsed.answer.tuning.obstacleSpacing).toBe(30);

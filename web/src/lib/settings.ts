@@ -149,7 +149,13 @@ function requiredSpacing(speed: number, jumpHeight: number): number {
 
 /** The smallest obstacle spacing, to 0.1 m, that the rule above accepts for this speed and jump height. */
 export function minPlayableSpacing(speedValue: number, jumpHeightValue: number): number {
-  return roundUp(requiredSpacing(fl(speedValue), fl(jumpHeightValue)));
+  const required = requiredSpacing(fl(speedValue), fl(jumpHeightValue));
+  let spacing = roundUp(required);
+  // The check reads the spacing as a float, and a value that rounds to just under `required` once it is a float (4.1 m/s at a
+  // 2.4 m jump) is refused: step up until it is not. (The message in winnabilityError keeps its own rounding, so that it says the same
+  // thing as the Unity template; this is only for callers that must land on a value that passes.)
+  while (fl(spacing) < required) spacing = Math.round((spacing + 0.1) * 10) / 10;
+  return spacing;
 }
 
 // Rounded up to 0.1 so that the value in the message passes the check itself.
