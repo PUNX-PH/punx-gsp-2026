@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MAX_IMAGE_PIXELS, pictureForModel, readImage, sampleImage, sniffKind } from "@/lib/graph/image";
 import { makeGlb } from "@/lib/testing/glb";
 import { makeJpeg, makePng, makePngFromPixels } from "@/lib/testing/images";
+import { makeFbx, makeObj } from "@/lib/testing/modelFiles";
 
 const text = (s: string) => new TextEncoder().encode(s);
 const triples = (pixels: Uint8Array) =>
@@ -13,6 +14,12 @@ describe("sniffKind", () => {
     ["a PNG", Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]), "png"],
     ["a JPEG", Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0, 0]), "jpeg"],
     ["a GLB", makeGlb({ asset: { version: "2.0" } }), "glb"],
+    ["a binary FBX", makeFbx(7400), "fbx"],
+    ["an ASCII FBX (kept as an FBX so it gets its own refusal)", text("; FBX 7.3.0 project file\n"), "fbx"],
+    ["an OBJ", makeObj(), "obj"],
+    ["JSON that mentions vertices", text('{"v": 1, "f": 2}'), null],
+    ["an OBJ without faces", text("v 0 0 0\nv 1 0 0\n"), null],
+    ["a .blend file", text("BLENDER-v300REND"), null],
     ["an SVG", text("<svg xmlns='http://www.w3.org/2000/svg'/>"), null],
     ["a GIF", text("GIF89a......"), null],
     ["nothing", new Uint8Array(0), null],

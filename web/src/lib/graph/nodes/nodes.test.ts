@@ -10,9 +10,11 @@ import { makePng } from "@/lib/testing/images";
 
 const SHA = "a".repeat(64);
 const MODEL_SHA = "b".repeat(64);
+const FBX_SHA = "c".repeat(64);
 const assets: Assets = {
   [SHA]: { name: "photo.png", size: 900, kind: "image", contentType: "image/png", width: 30, height: 20, uploadedAt: 0 },
   [MODEL_SHA]: { name: "hero.glb", size: 1500, kind: "model", contentType: "model/gltf-binary", uploadedAt: 0 },
+  [FBX_SHA]: { name: "robot.fbx", size: 4000, kind: "model", format: "fbx", contentType: "application/octet-stream", uploadedAt: 0 },
 };
 
 function context(files: Record<string, Uint8Array> = {}): ExecutorContext {
@@ -27,6 +29,13 @@ describe("the Reference Image node", () => {
     expect(await referenceImage({}, { asset: SHA }, context())).toEqual({
       output: picture,
       result: { name: "photo.png", width: 30, height: 20 },
+    });
+  });
+
+  it("says what kind of file the model is, for an FBX recorded with its format", async () => {
+    expect(await model({}, { asset: FBX_SHA }, context())).toEqual({
+      output: { type: "model", sha256: FBX_SHA, name: "robot.fbx", size: 4000, format: "fbx" },
+      result: { name: "robot.fbx", size: 4000, format: "fbx" },
     });
   });
 

@@ -7,6 +7,7 @@ import type { User } from "@/lib/auth/ports";
 import { checkGlb } from "@/lib/glb";
 import { checkGraph } from "@/lib/graph/checks";
 import { readImage, sniffKind } from "@/lib/graph/image";
+import { checkFbx } from "@/lib/modelFiles";
 import { EXECUTORS } from "@/lib/graph/nodes";
 import { NODE_SPECS, WIRE_WORDS } from "@/lib/graph/registry";
 import { type RunResult, runGraph } from "@/lib/graph/runner";
@@ -195,9 +196,16 @@ export function makeGraphService(deps: GraphServiceDeps): GraphService {
       } else if (kind === "glb") {
         const checked = checkGlb(shown, bytes);
         if (!checked.ok) throw new GraphError(400, checked.error);
-        info = { name: shown, size: bytes.length, kind: "model", contentType: "model/gltf-binary" };
+        info = { name: shown, size: bytes.length, kind: "model", format: "glb", contentType: "model/gltf-binary" };
+      } else if (kind === "fbx") {
+        const checked = checkFbx(shown, bytes);
+        if (!checked.ok) throw new GraphError(400, checked.error);
+        info = { name: shown, size: bytes.length, kind: "model", format: "fbx", contentType: "application/octet-stream" };
+      } else if (kind === "obj") {
+        // sniffKind only says "obj" for text that already reads as one: nothing more to check here.
+        info = { name: shown, size: bytes.length, kind: "model", format: "obj", contentType: "text/plain" };
       } else {
-        throw new GraphError(400, `${shown}: not a PNG, JPEG or GLB file`);
+        throw new GraphError(400, `${shown}: not a PNG, JPEG, GLB, FBX or OBJ file`);
       }
 
       const sha256 = await sha256Hex(bytes);

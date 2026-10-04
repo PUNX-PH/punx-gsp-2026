@@ -9,7 +9,7 @@ describe("fileProblem", () => {
 
   it("says what the step needs when the file is the wrong kind, so a bad choice never reaches the saved graph", () => {
     expect(fileProblem("reference-image", "model")).toBe("This step needs a picture (a PNG or JPEG), not a 3D model.");
-    expect(fileProblem("model", "image")).toBe("This step needs a 3D model (a GLB file), not a picture.");
+    expect(fileProblem("model", "image")).toBe("This step needs a 3D model (a GLB, FBX or OBJ file), not a picture.");
   });
 
   it("has nothing to say about a step that takes no file", () => {

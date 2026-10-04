@@ -2,6 +2,7 @@
 // the declared type), the size is checked before any pixel is decoded, and every failure becomes a plain sentence
 // without a node name (the caller adds that).
 import sharp from "sharp";
+import { isAsciiFbx, isBinaryFbx, looksLikeObj } from "@/lib/modelFiles";
 
 export const MAX_IMAGE_PIXELS = 25_000_000;
 
@@ -19,7 +20,7 @@ sharp.concurrency(1);
 
 const DECODE = { limitInputPixels: MAX_IMAGE_PIXELS, failOn: "error" } as const;
 
-export type FileKind = "png" | "jpeg" | "glb";
+export type FileKind = "png" | "jpeg" | "glb" | "fbx" | "obj";
 
 const SIGNATURES: [FileKind, number[]][] = [
   ["png", [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]],
@@ -27,12 +28,13 @@ const SIGNATURES: [FileKind, number[]][] = [
   ["glb", [0x67, 0x6c, 0x54, 0x46]], // "glTF"
 ];
 
-/** What a file is, from its first bytes alone; null when it is none of the three. */
+/** What a file is, from its bytes alone (never its name); null when it is none of these. A text file counts as an OBJ only if it reads as one. */
 export function sniffKind(bytes: Uint8Array): FileKind | null {
   for (const [kind, signature] of SIGNATURES) {
     if (bytes.length >= signature.length && signature.every((b, i) => bytes[i] === b)) return kind;
   }
-  return null;
+  if (isBinaryFbx(bytes) || isAsciiFbx(bytes)) return "fbx"; // an ASCII FBX is named here so that the upload can refuse it in its own words
+  return looksLikeObj(bytes) ? "obj" : null;
 }
 
 type Failure = { ok: false; error: string };

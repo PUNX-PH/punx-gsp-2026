@@ -9,6 +9,7 @@ import { MemoryFileStore, MemoryRunRecords } from "@/lib/runs/memory";
 import { makeRunService } from "@/lib/runs/service";
 import { makeGlb } from "@/lib/testing/glb";
 import { makeJpeg, makePng } from "@/lib/testing/images";
+import { makeFbx, makeObj } from "@/lib/testing/modelFiles";
 
 const alice = { uid: "alice", email: "alice@punx.ai" };
 const bob = { uid: "bob", email: "bob@punx.ai" };
@@ -178,9 +179,56 @@ describe("uploading a file", () => {
     const { service } = setup();
     const made = await service.createGraph(alice, {});
     const error = await failure(service.addAsset(alice, made.id, "photo.png", new TextEncoder().encode("not a picture at all")));
-    expect(error).toMatchObject({ status: 400, message: "photo.png: not a PNG, JPEG or GLB file" });
+    expect(error).toMatchObject({ status: 400, message: "photo.png: not a PNG, JPEG, GLB, FBX or OBJ file" });
     // a real GLB under a .png name is still a GLB
     expect(await service.addAsset(alice, made.id, "sneaky.png", glb())).toMatchObject({ kind: "model" });
+  });
+
+  it("accepts an FBX and an OBJ as models, and a GLB says it is one", async () => {
+    const { service } = setup();
+    const made = await service.createGraph(alice, {});
+    expect(await service.addAsset(alice, made.id, "hero.glb", glb())).toMatchObject({ kind: "model", format: "glb", contentType: "model/gltf-binary" });
+    expect(await service.addAsset(alice, made.id, "robot.fbx", makeFbx(7400))).toMatchObject({ kind: "model", format: "fbx", contentType: "application/octet-stream" });
+    expect(await service.addAsset(alice, made.id, "cube.obj", makeObj())).toMatchObject({ kind: "model", format: "obj", contentType: "text/plain" });
+  });
+
+  it("decides FBX and OBJ from their bytes too: an FBX named model.glb is an FBX, OBJ text named thing.png is an OBJ", async () => {
+    const { service } = setup();
+    const made = await service.createGraph(alice, {});
+    expect(await service.addAsset(alice, made.id, "model.glb", makeFbx(7400))).toMatchObject({ kind: "model", format: "fbx" });
+    expect(await service.addAsset(alice, made.id, "thing.png", makeObj())).toMatchObject({ kind: "model", format: "obj" });
+  });
+
+  it("refuses the lookalikes, a .blend and an ASCII FBX with the file's name and a plain cause", async () => {
+    const { service } = setup();
+    const made = await service.createGraph(alice, {});
+    const text = (s: string) => new TextEncoder().encode(s);
+    const unknown = (name: string) => `${name}: not a PNG, JPEG, GLB, FBX or OBJ file`;
+    for (const [name, bytes] of [
+      ["a.obj", text('{"vertices": [], "faces": []}')],
+      ["b.obj", text("name,x,y\nfoo,1,2\n")],
+      ["c.obj", text("<html><body>v 1 2 3</body></html>")],
+      ["d.obj", text("v 0 0 0\nv 1 0 0\n")],
+      ["e.blend", text("BLENDER-v300REND")],
+    ] as const) {
+      expect(await failure(service.addAsset(alice, made.id, name, bytes))).toMatchObject({ status: 400, message: unknown(name) });
+    }
+    expect(await failure(service.addAsset(alice, made.id, "f.fbx", text("; FBX 7.3.0 project file\n")))).toMatchObject({
+      status: 400,
+      message: "f.fbx: an ASCII FBX file; save it as a binary FBX, or as a GLB",
+    });
+    expect(await failure(service.addAsset(alice, made.id, "g.fbx", makeFbx(100)))).toMatchObject({
+      status: 400,
+      message: "g.fbx: an FBX version this app cannot read (it needs 6100 or newer)",
+    });
+  });
+
+  it("lets a 3D Model step be saved with an uploaded FBX (it is a model)", async () => {
+    const { service } = setup();
+    const made = await service.createGraph(alice, {});
+    const fbx = await service.addAsset(alice, made.id, "robot.fbx", makeFbx(7400));
+    const graph: Graph = { schemaVersion: 1, nodes: [{ id: "n1", type: "model", params: { asset: fbx.sha256 }, position: { x: 0, y: 0 } }], edges: [] };
+    expect((await service.saveGraph(alice, made.id, { graph })).graph.nodes[0].params).toEqual({ asset: fbx.sha256 });
   });
 
   it("refuses a picture over the pixel limit, and a GLB that is not valid", async () => {

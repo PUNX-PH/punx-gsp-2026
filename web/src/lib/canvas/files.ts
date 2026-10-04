@@ -1,9 +1,9 @@
-// Whether an uploaded file is the kind a step takes. The server stores any PNG, JPEG or GLB; a picture chosen on a 3D
+// Whether an uploaded file is the kind a step takes. The server stores any PNG, JPEG, GLB, FBX or OBJ; a picture chosen on a 3D
 // Model step would be refused when the graph is saved, and then no later edit could be saved either. So it is caught here,
 // before the choice reaches the graph.
 const WANTS: Record<string, { kind: "image" | "model"; says: string }> = {
   "reference-image": { kind: "image", says: "a picture (a PNG or JPEG)" },
-  model: { kind: "model", says: "a 3D model (a GLB file)" },
+  model: { kind: "model", says: "a 3D model (a GLB, FBX or OBJ file)" },
 };
 const NAMES = { image: "a picture", model: "a 3D model" } as const;
 

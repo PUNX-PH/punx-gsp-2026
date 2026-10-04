@@ -86,7 +86,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
   model: {
     type: "model",
     label: "3D Model",
-    help: "A model of your own, as a GLB file.",
+    help: "A model of your own, as a GLB, FBX or OBJ file.",
     final: false,
     inputs: [],
     outputs: [port("model", "3D model", "Your model.", "model")],

@@ -213,7 +213,7 @@ describe("files", () => {
     const { api } = await withGraph();
     const response = await api.addAsset(request("POST", "/api/graphs/g1/assets?name=photo.png", { body: new TextEncoder().encode("not a picture") }), "g1");
     expect(response.status).toBe(400);
-    expect(await readJson(response)).toEqual({ error: "photo.png: not a PNG, JPEG or GLB file" });
+    expect(await readJson(response)).toEqual({ error: "photo.png: not a PNG, JPEG, GLB, FBX or OBJ file" });
   });
 });
 
