@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryAuth } from "@/lib/auth/memory";
 import { makeGraphApi } from "@/lib/graph/api";
 import { type GraphService, makeGraphService } from "@/lib/graph/service";
-import { starterGraph } from "@/lib/graph/starter";
+import { describedStarterGraph, starterGraph } from "@/lib/graph/starter";
 import { MemoryGraphFiles, MemoryGraphRecords } from "@/lib/graph/store/memory";
 import { MemoryFileStore, MemoryRunRecords } from "@/lib/runs/memory";
 import { makeRunService } from "@/lib/runs/service";
@@ -267,5 +267,22 @@ describe("a failure that is not the person's fault", () => {
     expect(text).toContain("getGraph");
     expect(text).toContain("g42");
     expect(text).not.toContain("secret-bytes");
+  });
+});
+
+describe("creating a graph from the Describe a game starter", () => {
+  it("accepts starter: \"described\" and makes that graph", async () => {
+    const { api } = setup();
+    const response = await api.createGraph(request("POST", "/api/graphs", { body: asJson({ starter: "described" }) }));
+    expect(response.status).toBe(201);
+    expect((await readJson(response)).graph).toEqual(describedStarterGraph());
+  });
+
+  it.each([["another word", "other"], ["a number", 1], ["null", null]])("refuses a starter that is %s, in the existing words, and makes nothing", async (_label, starter) => {
+    const { api, service } = setup();
+    const response = await api.createGraph(request("POST", "/api/graphs", { body: asJson({ starter }) }));
+    expect(response.status).toBe(400);
+    expect((await readJson(response)).error).toMatch(/starter/);
+    expect(await service.listGraphs({ uid: "alice", email: "alice@punx.ai" })).toEqual([]);
   });
 });

@@ -11,7 +11,7 @@ import { EXECUTORS } from "@/lib/graph/nodes";
 import { NODE_SPECS, WIRE_WORDS } from "@/lib/graph/registry";
 import { type RunResult, runGraph } from "@/lib/graph/runner";
 import { parseGraph } from "@/lib/graph/schema";
-import { starterGraph } from "@/lib/graph/starter";
+import { describedStarterGraph, starterGraph } from "@/lib/graph/starter";
 import type { GraphFiles, GraphRecords } from "@/lib/graph/store/ports";
 import {
   type AssetInfo,
@@ -41,7 +41,8 @@ const FILE_KIND: Record<string, AssetInfo["kind"]> = { "reference-image": "image
 export type PlayResult = { kind: "invalid"; problems: Problem[] } | { kind: "ran"; result: RunResult; runId?: string };
 
 export interface GraphService {
-  createGraph(user: User, input: { name?: string; starter?: boolean }): Promise<GraphRecord>;
+  /** `starter: true` is the picture-and-palette starter, `"described"` the Describe a game one, anything else an empty graph. */
+  createGraph(user: User, input: { name?: string; starter?: boolean | "described" }): Promise<GraphRecord>;
   listGraphs(user: User): Promise<GraphRecord[]>;
   getGraph(user: User, id: string): Promise<GraphRecord>;
   saveGraph(user: User, id: string, input: { name?: string; graph: unknown }): Promise<GraphRecord>;
@@ -126,7 +127,7 @@ export function makeGraphService(deps: GraphServiceDeps): GraphService {
         name: cleanName(input.name),
         createdAt: now(),
         updatedAt: now(),
-        graph: input.starter ? starterGraph() : { schemaVersion: 1, nodes: [], edges: [] },
+        graph: input.starter === "described" ? describedStarterGraph() : input.starter ? starterGraph() : { schemaVersion: 1, nodes: [], edges: [] },
         assets: {},
         lastRunId: null,
       };

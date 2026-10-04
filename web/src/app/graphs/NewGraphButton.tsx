@@ -14,11 +14,11 @@ export function NewGraphButton() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function create() {
+  async function create(starter: true | "described") {
     setError("");
     setBusy(true);
     try {
-      const response = await fetch("/api/graphs", { method: "POST", body: JSON.stringify({ starter: true }) });
+      const response = await fetch("/api/graphs", { method: "POST", body: JSON.stringify({ starter }) });
       if (response.status === 401) return router.replace("/sign-in");
       if (!response.ok) return setError(await message(response, "Could not make a graph."));
       const created = (await response.json()) as { id: string };
@@ -32,7 +32,10 @@ export function NewGraphButton() {
 
   return (
     <p>
-      <button type="button" className={styles.play} onClick={create} disabled={busy}>
+      <button type="button" className={styles.play} onClick={() => create("described")} disabled={busy}>
+        New: describe a game
+      </button>{" "}
+      <button type="button" className={styles.secondary} onClick={() => create(true)} disabled={busy}>
         New from starter
       </button>
       {error && <span className={styles.errorText}> {error}</span>}
