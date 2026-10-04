@@ -173,14 +173,17 @@ export function guardPalette(slots: readonly string[]): string[] {
   let hudPanel = panel;
   let groundColor = ground;
 
-  // The score must read on the background: darken the background first, then lighten the score.
-  const scoreReads = () => contrastRatio(score, background) >= PALETTE_RULES.scoreOnBackground;
-  background = nudge(background, -1, () => scoreReads());
-  score = nudge(score, 1, () => scoreReads());
+  // The score must read on the background: move the two apart, the background first (a lighter score goes lighter, a darker
+  // score goes darker). Each is judged with the candidate color, so it stops at the first step that reads.
+  const towards: 1 | -1 = luminance(score) >= luminance(background) ? 1 : -1;
+  background = nudge(background, towards === 1 ? -1 : 1, (c) => contrastRatio(score, c) >= PALETTE_RULES.scoreOnBackground);
+  score = nudge(score, towards, (c) => contrastRatio(c, background) >= PALETTE_RULES.scoreOnBackground);
 
-  // HUD text (slot 0) must read on the panel; the ground must stand out from the background.
-  hudPanel = nudge(hudPanel, 1, (c) => contrastRatio(background, c) >= PALETTE_RULES.hudTextOnPanel);
-  groundColor = nudge(groundColor, 1, (c) => contrastRatio(c, background) >= PALETTE_RULES.groundOnBackground);
+  // HUD text (slot 0) must read on the panel; the ground must stand out from the background. Both move away from the background,
+  // lighter if white can reach the requirement against it and darker otherwise (one of the two always can).
+  const awayFromBackground = (need: number): 1 | -1 => (contrastRatio("#ffffff", background) >= need ? 1 : -1);
+  hudPanel = nudge(hudPanel, awayFromBackground(PALETTE_RULES.hudTextOnPanel), (c) => contrastRatio(background, c) >= PALETTE_RULES.hudTextOnPanel);
+  groundColor = nudge(groundColor, awayFromBackground(PALETTE_RULES.groundOnBackground), (c) => contrastRatio(c, background) >= PALETTE_RULES.groundOnBackground);
 
   return [background, groundColor, hudPanel, spare, score];
 }

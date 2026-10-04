@@ -106,6 +106,30 @@ describe("guardPalette (the readability rules on five colors that were not taken
     reads(fixed);
   });
 
+  // A model can choose a light sky: the rules must hold in the other direction too (HUD text and score are dark, the panel is darker still).
+  it("makes a light sky with a dark score readable without touching the colors that already read", () => {
+    const fixed = guardPalette(["#f0f4f8", "#e2e8f0", "#ffffff", "#ff6f59", "#1f2937"]);
+    reads(fixed);
+    expect(fixed[0]).toBe("#f0f4f8"); // the sky and the score already read together
+    expect(fixed[4]).toBe("#1f2937");
+    expect(fixed[3]).toBe("#ff6f59");
+  });
+
+  it("moves a light score away from a light sky instead of driving the sky to black", () => {
+    const fixed = guardPalette(["#f0f4f8", "#9ca3af", "#475569", "#ff6f59", "#e5e7eb"]);
+    reads(fixed);
+    expect(contrastRatio(fixed[0], "#ffffff")).toBeLessThan(1.5); // the sky is still light
+    expect(contrastRatio(fixed[4], fixed[0])).toBeLessThan(8); // and the score stops where it reads, not at black
+  });
+
+  it("darkens a sky-blue sky only as far as a white score needs", () => {
+    const fixed = guardPalette(["#87ceeb", "#2e8b57", "#ffffff", "#ff6f59", "#ffffff"]);
+    reads(fixed);
+    expect(fixed[4]).toBe("#ffffff");
+    expect(contrastRatio(fixed[4], fixed[0])).toBeLessThan(5); // not an overshoot to black (21)
+    expect(fixed[0]).not.toBe("#000000");
+  });
+
   it("refuses anything but five colors", () => {
     expect(() => guardPalette(["#000000", "#111111", "#222222", "#333333"])).toThrow("guardPalette needs five colors");
     expect(() => guardPalette([...SAMPLE_PALETTE, "#ffffff"])).toThrow("guardPalette needs five colors");
