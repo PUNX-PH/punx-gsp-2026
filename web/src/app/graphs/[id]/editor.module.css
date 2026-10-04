@@ -200,6 +200,27 @@
   margin-top: 8px;
 }
 
+/* Describe Game's answer: the swatches, the numbers, the summary and the note stack in a column. */
+.described {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.summary {
+  margin: 0;
+  color: var(--text);
+  font-size: 11.5px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.reusedNote {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .thumb {
   flex: none;
   width: 44px;

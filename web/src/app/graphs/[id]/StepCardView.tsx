@@ -56,6 +56,21 @@ function Result({ result, onOpenGame }: { result: ResultView; onOpenGame?: () =>
           <span className={styles.chip}>{result.text}</span>
         </div>
       );
+    case "described":
+      return (
+        <div className={cx(styles.result, styles.described)}>
+          <ul className={cx(styles.swatches)}>
+            {result.colors
+              .filter((color) => HEX.test(color))
+              .map((color, i) => (
+                <li key={`${color}-${i}`} className={styles.swatch} style={{ background: color }} title={color} />
+              ))}
+          </ul>
+          <span className={styles.chip}>{result.numbers}</span>
+          <p className={styles.summary}>{result.summary}</p>
+          {result.reused && <p className={styles.reusedNote}>Reused your earlier answer</p>}
+        </div>
+      );
     case "open-game":
       return (
         <div className={styles.result}>

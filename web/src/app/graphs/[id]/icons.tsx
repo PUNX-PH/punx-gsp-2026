@@ -28,6 +28,13 @@ export function Icon({ type }: { type: string }) {
       );
     case "palette-from-image":
       return svg(<path d="M8 2.5c2.5 3 4 4.7 4 6.7a4 4 0 0 1-8 0c0-2 1.5-3.7 4-6.7z" />);
+    case "describe-game":
+      return svg(
+        <>
+          <path d="M3 3.5h10v7H8.2L5 13v-2.5H3z" />
+          <path d="M5.8 6h4.4M5.8 8h2.6" />
+        </>,
+      );
     case "game-template":
       return svg(
         <>

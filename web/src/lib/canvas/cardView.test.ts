@@ -174,3 +174,72 @@ describe("a step's result", () => {
     expect(data.result).toMatchObject({ kind: "image", name: hostile });
   });
 });
+
+describe("a Describe Game step", () => {
+  const node = (id: string, type: string, params: Record<string, unknown>) => ({ id, type, params, position: { x: 0, y: 0 } });
+  const described = (prompt = "a fast neon night run"): Graph => ({
+    schemaVersion: 1,
+    nodes: [
+      node("n1", "reference-image", { asset: SHA }),
+      node("n2", "describe-game", { prompt }),
+      node("n3", "game-template", { tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } }),
+      node("n4", "preview", {}),
+    ],
+    edges: [
+      { from: { node: "n1", port: "image" }, to: { node: "n2", port: "image" } },
+      { from: { node: "n2", port: "palette" }, to: { node: "n3", port: "palette" } },
+      { from: { node: "n2", port: "feel" }, to: { node: "n3", port: "feel" } },
+      { from: { node: "n3", port: "settings" }, to: { node: "n4", port: "settings" } },
+    ],
+  });
+  const answer = {
+    palette: ["#101828", "#f97316", "#fde68a", "#34d399", "#f8fafc"],
+    tuning: { speed: 7, jumpHeight: 2.6, obstacleSpacing: 18 },
+    summary: "A fast neon night run.",
+    reused: false,
+  };
+  const runWith = (outcome: NodeOutcome): RunView => ({ ...emptyRunView(null), outcomes: { n2: outcome } });
+
+  it("shows the five colors, the three numbers and the summary from a finished run", () => {
+    expect(step("n2", { graph: described(), run: runWith({ state: "done", result: answer }) }).result).toEqual({
+      kind: "described",
+      colors: answer.palette,
+      numbers: "speed 7 · jump 2.6 · spacing 18",
+      summary: "A fast neon night run.",
+      reused: false,
+    });
+  });
+
+  it("says whether the answer was reused", () => {
+    expect(step("n2", { graph: described(), run: runWith({ state: "done", result: { ...answer, reused: true } }) }).result).toMatchObject({ reused: true });
+  });
+
+  it.each([
+    ["colors that are not a list", { ...answer, palette: "red" }],
+    ["a color that is not text", { ...answer, palette: [1, 2, 3, 4, 5] }],
+    ["no numbers", { ...answer, tuning: undefined }],
+    ["numbers that are text", { ...answer, tuning: { speed: "7", jumpHeight: 2.6, obstacleSpacing: 18 } }],
+    ["a summary that is not text", { ...answer, summary: 5 }],
+    ["no reused flag", { ...answer, reused: undefined }],
+    ["nothing", undefined],
+  ])("shows nothing for a result with %s", (_label, result) => {
+    expect(step("n2", { graph: described(), run: runWith({ state: "done", result }) }).result).toEqual({ kind: "none" });
+  });
+
+  it("asks for the game to be described when the prompt is empty (the card says it without the step's name)", () => {
+    const graph = described("");
+    const run = applyPlay(emptyRunView(null), graph, { kind: "invalid", problems: [{ node: "n2", message: "Describe Game: describe your game first." }] });
+    expect(step("n2", { graph, run })).toMatchObject({ status: "attention", statusText: "Describe your game first." });
+  });
+
+  it("shows the sentence of a failure as it was given", () => {
+    const failed: NodeOutcome = { state: "failed", error: "Describe Game: The AI service did not answer. Try again." };
+    expect(step("n2", { graph: described(), run: runWith(failed) })).toMatchObject({ status: "failed", statusText: "Describe Game: The AI service did not answer. Try again." });
+  });
+
+  it("lists a picture input that is optional, and a palette and a feel output", () => {
+    const card = step("n2", { graph: described() });
+    expect(card.inputs.map((p) => [p.name, p.type, p.required, p.wired])).toEqual([["image", "image", false, true]]);
+    expect(card.outputs.map((p) => [p.name, p.type, p.wired])).toEqual([["palette", "palette", true], ["feel", "feel", true]]);
+  });
+});

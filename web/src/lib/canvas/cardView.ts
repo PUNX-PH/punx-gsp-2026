@@ -2,7 +2,7 @@
 // its ports. The card component only draws this, so every wording and every rule here is tested without a browser.
 import type { RunView } from "@/lib/canvas/runView";
 import { NODE_SPECS, type NodeSpec } from "@/lib/graph/registry";
-import type { Assets, Graph, GraphNode, WireType } from "@/lib/graph/types";
+import type { Assets, Graph, GraphNode, Tuning, WireType } from "@/lib/graph/types";
 
 export type StepStatus = "idle" | "running" | "done" | "skipped" | "failed" | "not-used" | "attention";
 
@@ -20,6 +20,8 @@ export type ResultView =
   | { kind: "model"; name: string; size: string }
   | { kind: "palette"; colors: string[] }
   | { kind: "text"; text: string }
+  /** What Describe Game answered: five colors, the three numbers as a line, a one-line summary, and whether it was a stored answer. */
+  | { kind: "described"; colors: string[]; numbers: string; summary: string; reused: boolean }
   | { kind: "open-game" };
 
 export type StepData = {
@@ -72,6 +74,22 @@ function chosenFile(node: GraphNode, assets: Assets, graphId: string): ResultVie
   return { kind: "model", name: info.name, size: formatSize(info.size) };
 }
 
+/** "speed 6 · jump 2.2 · spacing 12": the three numbers on one line. */
+const tuningLine = (tuning: Tuning) => `speed ${tuning.speed} · jump ${tuning.jumpHeight} · spacing ${tuning.obstacleSpacing}`;
+
+const isNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+
+// What a finished Describe Game step handed over (lib/graph/nodes/describeGame.ts), or null when the result is not that.
+function described(result: unknown): ResultView | null {
+  const r = result as { palette?: unknown; tuning?: Partial<Record<keyof Tuning, unknown>>; summary?: unknown; reused?: unknown } | null | undefined;
+  if (typeof r !== "object" || r === null) return null;
+  const { palette, tuning, summary, reused } = r;
+  if (!Array.isArray(palette) || !palette.every((c) => typeof c === "string")) return null;
+  if (typeof tuning !== "object" || tuning === null || !isNumber(tuning.speed) || !isNumber(tuning.jumpHeight) || !isNumber(tuning.obstacleSpacing)) return null;
+  if (typeof summary !== "string" || typeof reused !== "boolean") return null;
+  return { kind: "described", colors: palette as string[], numbers: tuningLine(tuning as Tuning), summary, reused };
+}
+
 function fromRun(node: GraphNode, run: RunView): ResultView {
   const outcome = run.outcomes[node.id];
   // A game made earlier is still there to open after a reload, before anything has run on this page (and when an edit
@@ -82,8 +100,9 @@ function fromRun(node: GraphNode, run: RunView): ResultView {
   if (node.type === "palette-from-image" && Array.isArray(outcome.result)) return { kind: "palette", colors: outcome.result as string[] };
   if (node.type === "game-template") {
     const tuning = (outcome.result as { tuning?: { speed: number; jumpHeight: number; obstacleSpacing: number } } | undefined)?.tuning;
-    if (tuning) return { kind: "text", text: `speed ${tuning.speed} · jump ${tuning.jumpHeight} · spacing ${tuning.obstacleSpacing}` };
+    if (tuning) return { kind: "text", text: tuningLine(tuning) };
   }
+  if (node.type === "describe-game") return described(outcome.result) ?? { kind: "none" };
   if (node.type === "preview" && run.runId) return { kind: "open-game" };
   return { kind: "none" };
 }

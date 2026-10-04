@@ -152,3 +152,44 @@ describe("StepCardView", () => {
     expect(css).toMatch(/\.fileName\s*\{[^}]*text-overflow:\s*ellipsis/);
   });
 });
+
+describe("StepCardView for Describe Game", () => {
+  const node = (id: string, type: string, params: Record<string, unknown>) => ({ id, type, params, position: { x: 0, y: 0 } });
+  const graph: Graph = {
+    schemaVersion: 1,
+    nodes: [node("n1", "reference-image", { asset: null }), node("n2", "describe-game", { prompt: "a run" }), node("n3", "preview", {})],
+    edges: [{ from: { node: "n1", port: "image" }, to: { node: "n2", port: "image" } }],
+  };
+  const answer = {
+    palette: ["#101828", "#f97316", "#fde68a", "#34d399", "#f8fafc"],
+    tuning: { speed: 7, jumpHeight: 2.6, obstacleSpacing: 18 },
+    summary: "A fast neon night run.",
+    reused: false,
+  };
+  const card = (result: unknown) => render(data("n2", { graph, run: { ...emptyRunView(null), outcomes: { n2: { state: "done", result } } } }));
+
+  it("draws the five swatches, the numbers and the summary", () => {
+    const html = card(answer);
+    expect(html.match(new RegExp(`class="${styles.swatch}"`, "g"))).toHaveLength(5);
+    expect(html).toContain("speed 7 · jump 2.6 · spacing 18");
+    expect(html).toContain("A fast neon night run.");
+    expect(html).not.toContain("Reused your earlier answer");
+  });
+
+  it("says Reused your earlier answer when no new call was made", () => {
+    expect(card({ ...answer, reused: true })).toContain("Reused your earlier answer");
+  });
+
+  it("shows a hostile summary as text and never as markup (Review Focus 2)", () => {
+    const html = card({ ...answer, summary: "<script>alert(1)</script><img src=x onerror=alert(1)>" });
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain("<img src=x");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+
+  it("draws nothing for a color that is not a plain #rrggbb (it could be a style)", () => {
+    const html = card({ ...answer, palette: ["red", "#f97316; background: url(x)", "#fde68a", "#34d399", "#f8fafc"] });
+    expect(html.match(new RegExp(`class="${styles.swatch}"`, "g"))).toHaveLength(3);
+    expect(html).not.toContain("url(x)");
+  });
+});
