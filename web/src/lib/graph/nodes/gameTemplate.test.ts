@@ -38,6 +38,22 @@ describe("the Game Template node", () => {
     expect(result).toEqual({ tuning });
   });
 
+  it("uses the feel that is connected instead of its own sliders, and leaves its own setting alone", async () => {
+    const feel = { type: "feel" as const, tuning: { speed: 8, jumpHeight: 3, obstacleSpacing: 20 } };
+    const params = { tuning };
+    const { output, result } = await gameTemplate({ feel }, params, ctx);
+
+    expect(output?.type === "settings" && output.tuning).toEqual(feel.tuning);
+    expect(output?.type === "settings" && JSON.parse(output.settingsText).tuning).toEqual(feel.tuning);
+    expect(result).toEqual({ tuning: feel.tuning });
+    expect(params.tuning).toEqual(tuning); // unplugging the feel brings the sliders' values back
+  });
+
+  it("still checks a feel exactly as it checks its own numbers", async () => {
+    const unplayable = { type: "feel" as const, tuning: { speed: 12, jumpHeight: 1.5, obstacleSpacing: 4 } };
+    await expect(gameTemplate({ feel: unplayable }, { tuning }, ctx)).rejects.toBeInstanceOf(NodeError);
+  });
+
   it("uses the palette that is connected", async () => {
     const colors = ["#000000", "#111111", "#222222", "#333333", "#ffffff"];
     const { output } = await gameTemplate({ palette: { type: "palette", colors } }, { tuning }, ctx);

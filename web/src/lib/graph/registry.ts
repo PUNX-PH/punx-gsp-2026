@@ -105,6 +105,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     final: false,
     inputs: [
       port("palette", "palette", "The game's colors. Without one, a sample palette is used.", "palette"),
+      port("feel", "feel", "How fast, how high and how far apart. Without one, the sliders below are used.", "feel"),
       port("hero", "hero model", "The player's model. Without one, a built-in shape is used.", "model"),
       port("obstacle", "obstacle model", "The obstacles' model. Without one, a built-in shape is used.", "model"),
       port("collectible", "collectible model", "The collectibles' model. Without one, a built-in shape is used.", "model"),

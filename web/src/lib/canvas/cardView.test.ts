@@ -61,6 +61,7 @@ describe("a step's identity", () => {
     const template = step("n3");
     expect(template.inputs.map((p) => [p.name, p.label, p.type, p.required, p.wired])).toEqual([
       ["palette", "palette", "palette", false, true],
+      ["feel", "feel", "feel", false, false],
       ["hero", "hero model", "model", false, false],
       ["obstacle", "obstacle model", "model", false, false],
       ["collectible", "collectible model", "model", false, false],

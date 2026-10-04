@@ -7,7 +7,9 @@ import { validateSettings } from "@/lib/settings";
 const ROLES = Object.keys(ROLE_FILES) as Role[];
 
 export const gameTemplate: Executor = async (inputs, params) => {
-  const { speed, jumpHeight, obstacleSpacing } = params.tuning as Tuning; // its shape was checked when the graph was saved
+  // A connected feel replaces the sliders for this run (the saved setting is left alone, so unplugging it brings them back).
+  // Either way the numbers are checked below like any others; the settings' own shape was checked when the graph was saved.
+  const { speed, jumpHeight, obstacleSpacing } = inputs.feel?.type === "feel" ? inputs.feel.tuning : (params.tuning as Tuning);
   const tuning: Tuning = { speed, jumpHeight, obstacleSpacing };
 
   const palette = inputs.palette?.type === "palette" ? inputs.palette.colors : [...SAMPLE_PALETTE];
