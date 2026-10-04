@@ -1,5 +1,9 @@
 # Slice 4 handoff: Describe Game, the AI step (written 2026-10-04)
 
+**Update 2026-10-04: slice 4 is merged into `main` (a fast-forward, `cadf97c`), pushed, and the production build is green and live** on
+https://punx-gsp.vercel.app. **There is still no `ANTHROPIC_API_KEY`**, so Describe Game answers "The AI service did not answer" and
+the live checks have not been run. "Where it stands" below describes the branch before the merge; "Blocked on the studio" is what is left.
+
 Read this after `slice3b-results.md`. It says where slice 4 stands, what only the studio can do, and how to continue. The
 authorities are the spec `docs/superpowers/specs/2026-10-04-describe-game-design.md` and the plan
 `docs/superpowers/plans/2026-10-04-slice4-describe-game.md` (16 tasks, executed inline, as the user chose).
@@ -83,7 +87,7 @@ Only the live site can show these; nothing in the tests touches the real Anthrop
    step ("Your description and picture are sent to Anthropic's Claude to make this."), but the decision is the studio's.
 3. In Vercel, Project Settings, Environment Variables: add `ANTHROPIC_API_KEY` (**Sensitive**, Production). Optional:
    `AI_MODEL`, `AI_DAILY_LIMIT_PER_PERSON`, `AI_DAILY_LIMIT_TOTAL` (see `web/.env.example`). Redeploy.
-4. Then, with the user: push the branch, wait for the build, and run the seven done-criteria below.
+4. Then run the seven done-criteria below (the code is already deployed; adding the variable needs a redeploy, not a push).
 
 ## The live checks (plan Task 16, Step 5)
 
