@@ -20,7 +20,7 @@ again; finished steps are kept, so it carries on."). Describe Game choosing shap
 
 ## Where it stands
 
-- Branch `slice-5-blender-assets`, cut from `main` at `165ec0a` (the spec and plan commits), 16 commits plus this note. **Not pushed, not
+- Branch `slice-5-blender-assets`, cut from `main` at `165ec0a` (the spec and plan commits), 17 commits (this note included). **Not pushed, not
   merged.** Ask before any push (the repo is public; pushing `main` starts a production build).
 - **Plan tasks 1 to 16 are done** (ledger: `.superpowers/sdd/2026-10-05-slice5-blender-assets/progress.md`, git-ignored). The one whole-branch
   review is done (a fresh Opus 5.5 reviewer; one Critical and three Important findings, all fixed; the minors are below). Task 17, the
