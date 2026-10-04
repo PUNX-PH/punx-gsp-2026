@@ -19,7 +19,9 @@ export interface ClaudeClient {
   };
 }
 
-const DEFAULT_TIMEOUT_MS = 60_000;
+export const DEFAULT_TIMEOUT_MS = 60_000;
+/** Retries after the first attempt. With the timeout above, a call can take (retries + 1) x the timeout: the Play route's time limit must outlast that. */
+export const MAX_RETRIES = 1;
 // Room for a short reasoning pass as well as the answer (reasoning counts towards the limit); the answer itself is a few hundred tokens.
 const MAX_TOKENS = 4096;
 // A refused request is re-run on Anthropic's recommended fallback model, chosen by the kind of refusal (this model, first-party API).
@@ -72,6 +74,5 @@ export function makeClaudeModel(options: { client: ClaudeClient; model: string; 
 export function getClaudeClient(): ClaudeClient {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new AiUnavailableError();
-  // One retry at most: with a 60 second timeout the worst case stays well inside a Vercel function's time.
-  return new Anthropic({ apiKey, maxRetries: 1 });
+  return new Anthropic({ apiKey, maxRetries: MAX_RETRIES });
 }
