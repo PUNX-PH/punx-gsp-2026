@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contrastRatio, makePalette, PALETTE_RULES, SAMPLE_PALETTE } from "@/lib/graph/palette";
+import { contrastRatio, guardPalette, makePalette, PALETTE_RULES, SAMPLE_PALETTE } from "@/lib/graph/palette";
 
 const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 
@@ -78,5 +78,36 @@ describe("makePalette", () => {
 
   it("refuses to make a palette from nothing", () => {
     expect(() => makePalette(new Uint8Array(0))).toThrow();
+  });
+});
+
+describe("guardPalette (the readability rules on five colors that were not taken from pixels)", () => {
+  // Slot order: background, ground, panel, accent, score.
+  const reads = ([background, ground, panel, , score]: string[]) => {
+    expect(contrastRatio(score, background)).toBeGreaterThanOrEqual(PALETTE_RULES.scoreOnBackground);
+    expect(contrastRatio(background, panel)).toBeGreaterThanOrEqual(PALETTE_RULES.hudTextOnPanel);
+    expect(contrastRatio(ground, background)).toBeGreaterThanOrEqual(PALETTE_RULES.groundOnBackground);
+  };
+
+  it("leaves colors that already read exactly as they are", () => {
+    expect(guardPalette([...SAMPLE_PALETTE])).toEqual([...SAMPLE_PALETTE]);
+  });
+
+  it("fixes a score that cannot be read on the background, and keeps the order and the count", () => {
+    const fixed = guardPalette(["#1b1f3b", "#ff6f59", "#ffd166", "#06d6a0", "#222222"]);
+    expect(fixed).toHaveLength(5);
+    reads(fixed);
+    expect(fixed[3]).toBe("#06d6a0"); // the accent has no rule and is left alone
+  });
+
+  it("makes a palette of five identical colors readable", () => {
+    const fixed = guardPalette(Array(5).fill("#808080"));
+    expect(fixed).toHaveLength(5);
+    reads(fixed);
+  });
+
+  it("refuses anything but five colors", () => {
+    expect(() => guardPalette(["#000000", "#111111", "#222222", "#333333"])).toThrow("guardPalette needs five colors");
+    expect(() => guardPalette([...SAMPLE_PALETTE, "#ffffff"])).toThrow("guardPalette needs five colors");
   });
 });

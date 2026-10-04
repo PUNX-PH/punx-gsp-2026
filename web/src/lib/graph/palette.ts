@@ -157,10 +157,21 @@ export function makePalette(pixels: Uint8Array): string[] {
   const groundAt = middle.reduce((best, c, i) => (saturationOf(c) > saturationOf(middle[best]) ? i : best), 0);
   const [spare, panel] = middle.filter((_, i) => i !== groundAt);
 
-  let background = byLight[0];
-  let score = byLight[4];
+  return guardPalette([byLight[0], middle[groundAt], panel, spare, byLight[4]]);
+}
+
+/**
+ * The template's five slots as given, in the order [background, ground, panel, accent, score], nudged until the HUD can be
+ * read: the score on the background (4.5), the HUD text on the panel (3), the ground against the background (1.5). Colors
+ * that already read are returned as they are. Used for colors taken from pixels and for colors a model chose.
+ */
+export function guardPalette(slots: readonly string[]): string[] {
+  if (slots.length !== SLOTS) throw new Error("guardPalette needs five colors");
+  const [first, ground, panel, spare, last] = slots;
+  let background = first;
+  let score = last;
   let hudPanel = panel;
-  let groundColor = middle[groundAt];
+  let groundColor = ground;
 
   // The score must read on the background: darken the background first, then lighten the score.
   const scoreReads = () => contrastRatio(score, background) >= PALETTE_RULES.scoreOnBackground;
