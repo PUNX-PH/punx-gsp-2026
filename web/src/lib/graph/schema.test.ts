@@ -34,8 +34,8 @@ function refused(input: unknown) {
 }
 
 describe("the node registry", () => {
-  it("has the five node types, with plain names and help on every port", () => {
-    expect(Object.keys(NODE_SPECS).sort()).toEqual(["game-template", "model", "palette-from-image", "preview", "reference-image"]);
+  it("has the six node types, with plain names and help on every port", () => {
+    expect(Object.keys(NODE_SPECS).sort()).toEqual(["describe-game", "game-template", "model", "palette-from-image", "preview", "reference-image"]);
     for (const spec of Object.values(NODE_SPECS)) {
       expect(spec.label).not.toBe("");
       expect(spec.help).not.toBe("");
@@ -157,5 +157,29 @@ describe("parseGraph and the tuning of a Game Template (Review Focus 3)", () => 
   it("reads 1e999 from real JSON as Infinity and refuses it", () => {
     const text = JSON.stringify(valid()).replace('"speed":6', '"speed":1e999');
     expect(refused(JSON.parse(text))).toMatch(/Game Template/);
+  });
+});
+
+describe("parseGraph and the prompt of a Describe Game", () => {
+  const described = (params: unknown): Json => ({ schemaVersion: 1, nodes: [{ id: "n1", type: "describe-game", params, position: { x: 0, y: 0 } }], edges: [] });
+
+  it("accepts a prompt, an empty one (a half-built graph can always be saved), 500 characters, and 500 emoji", () => {
+    for (const prompt of ["a fast neon night run", "", "a".repeat(500), "😀".repeat(500)]) {
+      expect(parseGraph(described({ prompt })).ok, prompt.slice(0, 10)).toBe(true);
+    }
+  });
+
+  it("refuses 501 characters, naming the step and the limit", () => {
+    expect(refused(described({ prompt: "a".repeat(501) }))).toMatch(/Describe Game.*longer than 500 characters/);
+    expect(refused(described({ prompt: "😀".repeat(501) }))).toMatch(/longer than 500 characters/);
+  });
+
+  it.each([
+    ["a number", { prompt: 5 }],
+    ["no prompt", {}],
+    ["an extra setting", { prompt: "x", extra: 1 }],
+    ["null", { prompt: null }],
+  ])("refuses %s", (_label, params) => {
+    expect(refused(described(params))).toMatch(/Describe Game/);
   });
 });

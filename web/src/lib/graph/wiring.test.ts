@@ -93,3 +93,23 @@ describe("wiringProblem and the feel wire", () => {
     expect(wiringProblem(pair, [], wire("a", "feel", "b", "feel"), specs)).toBeNull();
   });
 });
+
+describe("wiringProblem and the Describe Game step", () => {
+  const graph = [
+    node("n1", "reference-image", { asset: null }),
+    node("n2", "describe-game", { prompt: "" }),
+    node("n3", "game-template", { tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } }),
+    node("n4", "palette-from-image"),
+  ];
+
+  it("accepts a picture in, and a palette and a feel out to the Game Template", () => {
+    expect(wiringProblem(graph, [], wire("n1", "image", "n2", "image"))).toBeNull();
+    expect(wiringProblem(graph, [], wire("n2", "palette", "n3", "palette"))).toBeNull();
+    expect(wiringProblem(graph, [], wire("n2", "feel", "n3", "feel"))).toBeNull();
+  });
+
+  it("refuses its feel into the palette input, and its palette into the feel input, in plain words", () => {
+    expect(wiringProblem(graph, [], wire("n2", "feel", "n3", "palette"))).toBe("A feel can't go into a palette input.");
+    expect(wiringProblem(graph, [], wire("n2", "palette", "n3", "feel"))).toBe("A palette can't go into a feel input.");
+  });
+});

@@ -10,7 +10,7 @@ const withoutPreview = (): Graph => removeNode(starterGraph(), "n4").graph;
 describe("addChoices", () => {
   it("lists every step type with its plain name and help", () => {
     const choices = addChoices(withoutPreview());
-    expect(choices.map((c) => c.type)).toEqual(["reference-image", "model", "palette-from-image", "game-template", "preview"]);
+    expect(choices.map((c) => c.type)).toEqual(["reference-image", "model", "palette-from-image", "describe-game", "game-template", "preview"]);
     for (const choice of choices) {
       expect(choice.label).toBe(NODE_SPECS[choice.type].label);
       expect(choice.help).toBe(NODE_SPECS[choice.type].help);
@@ -32,13 +32,13 @@ describe("addChoices", () => {
       edges: [],
     };
     const choices = addChoices(full);
-    expect(choices).toHaveLength(5);
+    expect(choices).toHaveLength(6);
     for (const choice of choices) expect(choice.disabledReason).toBe("A graph can have at most 50 steps.");
   });
 
   it("from an open output, offers only the steps that accept that wire type, and says which input to use", () => {
     const graph = withoutPreview();
-    expect(addChoices(graph, { node: "n1", port: "image" }).map((c) => [c.type, c.wireInto])).toEqual([["palette-from-image", "image"]]);
+    expect(addChoices(graph, { node: "n1", port: "image" }).map((c) => [c.type, c.wireInto])).toEqual([["palette-from-image", "image"], ["describe-game", "image"]]);
     expect(addChoices(graph, { node: "n2", port: "palette" }).map((c) => [c.type, c.wireInto])).toEqual([["game-template", "palette"]]);
     expect(addChoices(graph, { node: "n5", port: "model" }).map((c) => [c.type, c.wireInto])).toEqual([["game-template", "hero"]]);
     expect(addChoices(graph, { node: "n3", port: "settings" }).map((c) => [c.type, c.wireInto, c.disabledReason])).toEqual([["preview", "settings", undefined]]);
@@ -52,5 +52,18 @@ describe("addChoices", () => {
   it("offers nothing for an output that does not exist", () => {
     expect(addChoices(starterGraph(), { node: "n1", port: "nope" })).toEqual([]);
     expect(addChoices(starterGraph(), { node: "zz", port: "image" })).toEqual([]);
+  });
+});
+
+describe("addChoices and Describe Game", () => {
+  it("offers Describe Game with its plain name and help", () => {
+    const choice = addChoices(withoutPreview()).find((c) => c.type === "describe-game");
+    expect(choice).toMatchObject({ label: "Describe Game", help: NODE_SPECS["describe-game"].help });
+  });
+
+  it("offers the Game Template from an open feel output, into its feel input", () => {
+    const graph: Graph = { ...withoutPreview(), nodes: [...withoutPreview().nodes, { id: "n9", type: "describe-game", params: { prompt: "" }, position: { x: 0, y: 400 } }] };
+    expect(addChoices(graph, { node: "n9", port: "feel" }).map((c) => [c.type, c.wireInto])).toEqual([["game-template", "feel"]]);
+    expect(addChoices(graph, { node: "n9", port: "palette" }).map((c) => [c.type, c.wireInto])).toEqual([["game-template", "palette"]]);
   });
 });

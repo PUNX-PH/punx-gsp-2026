@@ -163,3 +163,31 @@ describe("checkGraph and loops (with made-up node types: today's five cannot loo
     expect(checkGraph(g, {}, specs)).toContainEqual({ node: "a1", message: "These steps loop back on themselves: Alpha, Beta." });
   });
 });
+
+describe("checkGraph and Describe Game", () => {
+  const described = (prompt: string): Graph => ({
+    schemaVersion: 1,
+    nodes: [
+      node("n1", "reference-image", { asset: SHA }),
+      node("n2", "describe-game", { prompt }),
+      node("n3", "game-template", { tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } }),
+      node("n4", "preview"),
+    ],
+    edges: [wire("n1", "image", "n2", "image"), wire("n2", "palette", "n3", "palette"), wire("n2", "feel", "n3", "feel"), wire("n3", "settings", "n4", "settings")],
+  });
+
+  it("finds nothing wrong with a prompt that has words in it", () => {
+    expect(checkGraph(described("a fast neon night run"), assets)).toEqual([]);
+  });
+
+  it.each([["an empty prompt", ""], ["a prompt of only spaces and new lines", "  \n \t "]])("asks for the game to be described: %s", (_label, prompt) => {
+    expect(checkGraph(described(prompt), assets)).toEqual([{ node: "n2", message: "Describe Game: describe your game first." }]);
+  });
+
+  it("does not need a picture: the input is optional", () => {
+    const g = described("a fast neon night run");
+    g.nodes = g.nodes.filter((n) => n.id !== "n1");
+    g.edges = g.edges.filter((e) => e.from.node !== "n1");
+    expect(checkGraph(g, assets)).toEqual([]);
+  });
+});

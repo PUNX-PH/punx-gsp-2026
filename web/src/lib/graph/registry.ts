@@ -43,6 +43,15 @@ function fileParam(params: Record<string, unknown>): string | null {
   return asset === null || (typeof asset === "string" && SHA256_HEX.test(asset)) ? null : "asset must be an uploaded file, or nothing yet.";
 }
 
+export const MAX_PROMPT_CHARACTERS = 500;
+
+function promptParam(params: Record<string, unknown>): string | null {
+  if (!hasExactly(params, ["prompt"])) return "prompt is the only setting a Describe Game step has.";
+  const { prompt } = params;
+  if (typeof prompt !== "string") return "prompt must be text.";
+  return Array.from(prompt).length > MAX_PROMPT_CHARACTERS ? `the description is longer than ${MAX_PROMPT_CHARACTERS} characters.` : null;
+}
+
 function tuningParam(params: Record<string, unknown>): string | null {
   const bad = "tuning must have speed, jumpHeight and obstacleSpacing, each a finite number.";
   if (!hasExactly(params, ["tuning"])) return bad;
@@ -97,6 +106,20 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     defaultParams: () => ({}),
     shapeProblem: noParams,
     incompleteProblem: () => null,
+  },
+  "describe-game": {
+    type: "describe-game",
+    label: "Describe Game",
+    help: "Turns your words, and a picture if you give one, into the game's colors and feel.",
+    final: false,
+    inputs: [port("image", "picture", "A picture to take the look from. Optional.", "image")],
+    outputs: [
+      port("palette", "palette", "Five colors for the game.", "palette"),
+      port("feel", "feel", "How fast, how high and how far apart.", "feel"),
+    ],
+    defaultParams: () => ({ prompt: "" }),
+    shapeProblem: promptParam,
+    incompleteProblem: (params) => (typeof params.prompt === "string" && params.prompt.trim() === "" ? "describe your game first." : null),
   },
   "game-template": {
     type: "game-template",
