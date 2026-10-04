@@ -2,6 +2,7 @@
 // with in-memory fakes. Everything about who may see a graph is decided here: a graph that is not yours, does not
 // exist, or has no such file all look the same ("Not found"). A graph is saved as a whole after it parses; a half-built
 // graph can always be saved (what stops a run is checked at Play).
+import type { DescribeGameService } from "@/lib/ai/types";
 import type { User } from "@/lib/auth/ports";
 import { checkGlb } from "@/lib/glb";
 import { checkGraph } from "@/lib/graph/checks";
@@ -19,6 +20,7 @@ import {
   type Graph,
   GraphError,
   type GraphRecord,
+  NodeError,
   type Problem,
 } from "@/lib/graph/types";
 import { randomId, sha256Hex } from "@/lib/runs/service";
@@ -57,7 +59,16 @@ export interface GraphServiceDeps {
   now: () => number;
   newId?: () => string;
   executors?: Record<string, Executor>;
+  /** Describe Game's service. Without one, a graph that uses Describe Game fails that step plainly. */
+  ai?: DescribeGameService;
 }
+
+// What Describe Game gets when no AI service is wired (a deployment without the key): the step fails in plain words, nothing else does.
+const noAi: DescribeGameService = {
+  async describe() {
+    throw new NodeError("Describe Game: The AI service did not answer. Try again.");
+  },
+};
 
 const withoutControls = (text: string) => text.replace(/\p{Cc}/gu, "");
 
@@ -227,6 +238,7 @@ export function makeGraphService(deps: GraphServiceDeps): GraphService {
         readAsset: async (sha256) => (Object.hasOwn(record.assets, sha256) ? files.get(id, sha256) : null),
         runs,
         lastRun: { get: () => lastRun, set: (runId) => void (lastRun = runId) },
+        ai: deps.ai ?? noAi,
       };
       // An unexpected failure is logged with the graph, the node and the kind of failure, never a message or file contents.
       const log = (info: object) => console.error("graph node failed", { graphId: id, ...info });

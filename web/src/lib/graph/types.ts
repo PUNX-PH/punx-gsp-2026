@@ -1,5 +1,6 @@
 // The shared vocabulary of the graph engine: what a graph is, what travels along its wires, and what a node's code is
 // given. The runner's own result types live in runner.ts; the node catalog (labels, ports) is in registry.ts.
+import type { DescribeGameService } from "@/lib/ai/types";
 import type { User } from "@/lib/auth/ports";
 import type { RunService } from "@/lib/runs/types";
 
@@ -110,6 +111,8 @@ export interface ExecutorContext {
   runs: Pick<RunService, "createRun" | "putFile" | "deleteRun">;
   /** The run this graph's Preview last stored; Preview replaces it. */
   lastRun: { get(): string | null; set(id: string | null): void };
+  /** Describe Game turns a person's words and picture into a palette and a feel through this (cache, limits and the model). */
+  ai: DescribeGameService;
 }
 
 export type Executor = (

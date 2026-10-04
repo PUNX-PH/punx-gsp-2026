@@ -6,7 +6,10 @@ import { makeGraphService } from "@/lib/graph/service";
 import { starterGraph } from "@/lib/graph/starter";
 import { MemoryGraphFiles, MemoryGraphRecords } from "@/lib/graph/store/memory";
 import { EXECUTORS } from "@/lib/graph/nodes";
-import { type Executor, GraphError } from "@/lib/graph/types";
+import { type DescribedGame, type DescribeGameService } from "@/lib/ai/types";
+import { MemoryAnswerCache, MemoryUsageLimits } from "@/lib/ai/memory";
+import { makeDescribeGameService } from "@/lib/ai/service";
+import { type Executor, GraphError, type Graph, NodeError } from "@/lib/graph/types";
 import { MemoryFileStore, MemoryRunRecords } from "@/lib/runs/memory";
 import { makeRunService } from "@/lib/runs/service";
 import { makeGlb } from "@/lib/testing/glb";
@@ -173,5 +176,117 @@ describe("Play, when a node fails unexpectedly", () => {
     expect(logged).toHaveBeenCalledTimes(1);
     expect(logged.mock.calls[0][1]).toEqual({ graphId: made.id, node: "n2", type: "palette-from-image", failure: "Error" });
     expect(JSON.stringify(logged.mock.calls)).not.toContain("secret-bytes");
+  });
+});
+
+describe("Play with a Describe Game step", () => {
+  const answer: DescribedGame = {
+    palette: ["#101828", "#f97316", "#fde68a", "#34d399", "#f8fafc"],
+    tuning: { speed: 7, jumpHeight: 2.6, obstacleSpacing: 18 },
+    summary: "A fast neon night run.",
+  };
+
+  /** Reference Image -> Describe Game -> Game Template -> Preview, with a picture chosen and a prompt typed. */
+  async function describedGame(ai?: DescribeGameService) {
+    let graphs = 0;
+    let runIds = 0;
+    const records = new MemoryGraphRecords();
+    const runRecords = new MemoryRunRecords();
+    const runs = makeRunService({ records: runRecords, files: new MemoryFileStore(), now: Date.now, newId: () => `run${++runIds}` });
+    const service = makeGraphService({ records, files: new MemoryGraphFiles(), runs, now: Date.now, newId: () => `g${++graphs}`, ...(ai ? { ai } : {}) });
+    const made = await service.createGraph(alice, {});
+    const picture = await service.addAsset(alice, made.id, "p.png", await makePng(40, 40, [200, 40, 40]));
+    const node = (id: string, type: string, params: Record<string, unknown>, x: number) => ({ id, type, params, position: { x, y: 0 } });
+    const graph: Graph = {
+      schemaVersion: 1,
+      nodes: [
+        node("n1", "reference-image", { asset: picture.sha256 }, 0),
+        node("n2", "describe-game", { prompt: "a fast neon night run" }, 260),
+        node("n3", "game-template", { tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } }, 520),
+        node("n4", "preview", {}, 780),
+      ],
+      edges: [
+        { from: { node: "n1", port: "image" }, to: { node: "n2", port: "image" } },
+        { from: { node: "n2", port: "palette" }, to: { node: "n3", port: "palette" } },
+        { from: { node: "n2", port: "feel" }, to: { node: "n3", port: "feel" } },
+        { from: { node: "n3", port: "settings" }, to: { node: "n4", port: "settings" } },
+      ],
+    };
+    await service.saveGraph(alice, made.id, { graph });
+    return { service, id: made.id, runs, runRecords };
+  }
+
+  it("plays to the end, and the stored game has the AI's colors and numbers, not the sliders'", async () => {
+    const asked: unknown[] = [];
+    const { service, id, runs } = await describedGame({
+      async describe(_user, input) {
+        asked.push(input);
+        return { answer, reused: false };
+      },
+    });
+
+    const played = await service.play(alice, id);
+
+    expect(played.kind === "ran" && played.result.state).toBe("done");
+    const settings = JSON.parse(new TextDecoder().decode((await runs.readFile(alice, "run1", "settings.json")).bytes));
+    expect(settings.palette).toEqual(answer.palette);
+    expect(settings.tuning).toEqual(answer.tuning);
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toMatchObject({ prompt: "a fast neon night run", picture: { sha256: expect.stringMatching(/^[0-9a-f]{64}$/) } });
+  });
+
+  it("marks Describe Game failed with its sentence and skips what depends on it, leaving no run", async () => {
+    const { service, id, runRecords } = await describedGame({
+      async describe() {
+        throw new NodeError("Describe Game: You have used today's AI answers. Try again tomorrow.");
+      },
+    });
+
+    const played = await service.play(alice, id);
+
+    expect(played.kind === "ran" && played.result.nodes.n2).toEqual({ state: "failed", error: "Describe Game: You have used today's AI answers. Try again tomorrow." });
+    expect(played.kind === "ran" && played.result.nodes.n3.state).toBe("skipped");
+    expect(played.kind === "ran" && played.result.nodes.n4.state).toBe("skipped");
+    expect(runRecords.runs.size).toBe(0);
+  });
+
+  it("asks the model once when the unchanged graph is played twice (with the real service and the fakes)", async () => {
+    let asked = 0;
+    const ai = makeDescribeGameService({
+      cache: new MemoryAnswerCache(),
+      limits: new MemoryUsageLimits(),
+      model: {
+        async ask() {
+          asked++;
+          return {
+            raw: { palette: { background: "#101828", ground: "#f97316", panel: "#fde68a", accent: "#34d399", score: "#f8fafc" }, tuning: answer.tuning, summary: answer.summary },
+            usage: { inputTokens: 3000, outputTokens: 300 },
+          };
+        },
+      },
+      modelId: "claude-sonnet-5-5",
+      perPerson: 30,
+      total: 300,
+      now: Date.now,
+    });
+    const { service, id } = await describedGame(ai);
+
+    const first = await service.play(alice, id);
+    const second = await service.play(alice, id);
+
+    expect(first.kind === "ran" && first.result.nodes.n2.result).toMatchObject({ reused: false });
+    expect(second.kind === "ran" && second.result.nodes.n2.result).toMatchObject({ reused: true });
+    expect(asked).toBe(1);
+  });
+
+  it("fails that step plainly when no AI service is wired, and still plays graphs that do not use it", async () => {
+    const { service, id } = await describedGame();
+    const played = await service.play(alice, id);
+    expect(played.kind === "ran" && played.result.nodes.n2).toEqual({ state: "failed", error: "Describe Game: The AI service did not answer. Try again." });
+
+    const context = setup(); // the helper above builds a service with no ai at all
+    const { id: starterId } = await ready(context);
+    const starter = await context.service.play(alice, starterId);
+    expect(starter.kind === "ran" && starter.result.state).toBe("done");
   });
 });
