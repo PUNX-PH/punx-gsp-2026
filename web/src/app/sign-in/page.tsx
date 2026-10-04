@@ -1,15 +1,42 @@
 "use client";
 
-import { isSignInWithEmailLink, sendSignInLinkToEmail, signInWithEmailLink, signOut } from "firebase/auth";
+import {
+  type Auth,
+  GoogleAuthProvider,
+  isSignInWithEmailLink,
+  sendSignInLinkToEmail,
+  signInWithEmailLink,
+  signInWithPopup,
+  signOut,
+} from "firebase/auth";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { isAllowedEmail } from "@/lib/access";
 import { clientAuth } from "@/lib/firebaseClient";
-import { resolveLinkEmail } from "@/lib/signInState";
+import { googleSignInMessage, resolveLinkEmail } from "@/lib/signInState";
 
 const DOMAIN = process.env.NEXT_PUBLIC_ALLOWED_EMAIL_DOMAIN ?? "";
 const REMEMBERED_EMAIL = "signInEmail";
 
-type Status = "idle" | "sending" | "sent" | "finishing";
+type Status = "idle" | "sending" | "google" | "sent" | "finishing";
+
+/**
+ * Hands a Firebase ID token to the server for a session cookie, then forgets the sign-in on this side: the server session
+ * is what counts, and nothing stays signed in in the browser. Returns what to tell the person, or null when it worked.
+ */
+async function startServerSession(auth: Auth, idToken: string, fallback: string): Promise<string | null> {
+  try {
+    const response = await fetch("/api/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    });
+    if (response.ok) return null;
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
+    return body.error ?? fallback;
+  } finally {
+    await signOut(auth);
+  }
+}
 
 export default function SignInPage() {
   const [email, setEmail] = useState("");
@@ -34,20 +61,13 @@ export default function SignInPage() {
       setStatus("finishing");
       try {
         const credential = await signInWithEmailLink(auth, address, window.location.href);
-        const idToken = await credential.user.getIdToken();
-        const response = await fetch("/api/session", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ idToken }),
-        });
-        await signOut(auth); // the server session is what counts; keep nothing signed in on the client
-        if (response.ok) {
+        const failure = await startServerSession(auth, await credential.user.getIdToken(), "Sign-in failed. Ask for a new link.");
+        if (failure === null) {
           window.localStorage.removeItem(REMEMBERED_EMAIL);
           window.location.replace("/");
           return;
         }
-        const body = (await response.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? "Sign-in failed. Ask for a new link.");
+        setError(failure);
       } catch {
         setError("This sign-in link is not valid any more. Ask for a new one.");
       }
@@ -73,19 +93,49 @@ export default function SignInPage() {
     }
   }
 
+  async function signInWithGoogle() {
+    setError("");
+    if (DOMAIN === "") return setError("Sign-in is not set up yet.");
+
+    setStatus("google");
+    try {
+      const auth = clientAuth();
+      const provider = new GoogleAuthProvider();
+      // Only a hint for Google's account chooser. Who may sign in is decided by the server, from the verified address in the token.
+      provider.setCustomParameters({ hd: DOMAIN, prompt: "select_account" });
+      const credential = await signInWithPopup(auth, provider);
+      const failure = await startServerSession(auth, await credential.user.getIdToken(), "Sign-in failed. Try again.");
+      if (failure === null) {
+        window.location.replace("/");
+        return;
+      }
+      setError(failure);
+    } catch (caught) {
+      const message = googleSignInMessage((caught as { code?: string }).code);
+      if (message) setError(message);
+    }
+    setStatus("idle");
+  }
+
   return (
     <main className="page">
       <h1>Sign in</h1>
       {status === "finishing" && <p>Signing you in…</p>}
       {status === "sent" && <p>Check your inbox: we sent a sign-in link to {email.trim()}. Open it on this device.</p>}
-      {(status === "idle" || status === "sending") && (
-        <form onSubmit={sendLink} className="page">
-          <label htmlFor="email">Your {DOMAIN} email address</label>
-          <input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-          <button type="submit" disabled={status === "sending"}>
-            {status === "sending" ? "Sending…" : "Email me a sign-in link"}
+      {(status === "idle" || status === "sending" || status === "google") && (
+        <>
+          <button type="button" onClick={signInWithGoogle} disabled={status !== "idle"}>
+            {status === "google" ? "Opening Google…" : "Continue with Google"}
           </button>
-        </form>
+          <p>or</p>
+          <form onSubmit={sendLink} className="page">
+            <label htmlFor="email">Your {DOMAIN} email address</label>
+            <input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            <button type="submit" disabled={status !== "idle"}>
+              {status === "sending" ? "Sending…" : "Email me a sign-in link"}
+            </button>
+          </form>
+        </>
       )}
       {error && <p className="error" role="alert">{error}</p>}
     </main>

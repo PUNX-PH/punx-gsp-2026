@@ -91,6 +91,10 @@ that file.
   sign-in **and** on every request, verified email required); all-Firebase storage (Firestore + Cloud Storage, Blaze
   plan); uploads go through the server (4 MB GLB cap fits under Vercel's 4.5 MB limit), so no signed links; accounts and
   AI came into scope on the user's choice, with the work split into three web slices.
+- **Google sign-in was added on 2026-10-04** next to the email link ("Continue with Google" on `/sign-in`, a popup, then the same
+  `/api/session` path). The server did not change: it checks the verified address and the `@punx.ai` domain on the ID token
+  whatever the provider. The `hd` parameter sent to Google is only a hint for its account chooser. Both providers are enabled in
+  Firebase. A Google-only setup (turn the Email/Password provider off) would close the password pre-registration risk below.
 - The cookie is `__Host-session` (the plan said `session`; the final review asked for the prefix). Origin is checked on
   every POST, PUT and DELETE; every page and route calls `requireUser`/`currentUser` itself; there is no `proxy.ts`.
 - A refused credential (`AuthRejectedError`) is a 401 or a redirect; any other failure from Firebase is a logged 500. Logs

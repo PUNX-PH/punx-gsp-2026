@@ -1,4 +1,4 @@
-// The browser side of Firebase: only email-link sign-in uses it. The web config is public by design (it names the
+// The browser side of Firebase: only sign-in uses it (the email link and Google). The web config is public by design (it names the
 // project; it grants nothing), and is inlined at build time from NEXT_PUBLIC_FIREBASE_* variables.
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
