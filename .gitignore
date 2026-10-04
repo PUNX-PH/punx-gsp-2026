@@ -31,3 +31,8 @@
 *-firebase-adminsdk-*.json
 serviceAccount*.json
 service-account*.json
+# The Blender worker invoker key (blender-worker/README.md says to keep it outside the repository; this is the net) and Python caches
+blender-invoker-key*.json
+*-invoker-key*.json
+__pycache__/
+*.pyc

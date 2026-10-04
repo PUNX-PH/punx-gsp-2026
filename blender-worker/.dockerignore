@@ -6,3 +6,5 @@ smoke.mjs
 README.md
 Dockerfile
 .dockerignore
+__pycache__
+*.pyc

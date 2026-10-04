@@ -20,12 +20,14 @@ Dockerfile            Node 24 + Blender 5.2 LTS (pinned, checksum-verified)
 
 | Call | Body | Answer |
 |---|---|---|
-| `GET /healthz` | none | 200, `ok` (no Blender run) |
+| `GET /health` | none | 200, `ok` (no Blender run; not `/healthz`, which Cloud Run reserves and answers itself) |
 | `POST /prepare?format=glb\|fbx\|obj&triangles=100..5000&color=original\|#rrggbb` | the model file, up to 32 MiB | 200 and the GLB, with `X-Triangles-Before` and `X-Triangles-After` |
 | `POST /shape` | `{"shape": "cube\|sphere\|cone\|cylinder\|pyramid\|coin\|ring", "color": "#rrggbb"}` | 200 and the GLB, with `X-Triangles-After` |
 
 Every failure is a status and `{"error": "<code>"}` and nothing else: `bad-request` 400 (also 404 and 405), `too-big` 413, `bad-format` 415,
-`empty` 422, `failed` 500, `timeout` 504. A job is killed at 60 seconds. Blender runs with an environment that holds no secret, as an
+`empty` 422, `failed` 500, `timeout` 504 (Blender ran and said no to the file), and `unavailable` 503 (the service itself is broken: Blender
+could not be started, a library is missing, no room for a job folder; the web app does not blame the person's file for that). A job is
+killed at 60 seconds. Blender runs with an environment that holds no secret, as an
 unprivileged user, and its output is never logged or returned.
 
 ## Run the tests
@@ -64,26 +66,39 @@ Without Docker, Google Cloud Build can build it from source as part of the deplo
 ## Deploy to Cloud Run (once, by the studio)
 
 Use the project that holds Firebase and the same region as its Cloud Storage bucket. Enable Cloud Run, Cloud Build and Artifact
-Registry first. `REGION` and `PROJECT` are yours:
+Registry first. `REGION` and `PROJECT` are yours.
+
+**1. A runtime account with no permissions.** This container opens files that people uploaded, with a program written in C++ (Blender and its
+importers). If one of those files ever broke out of Blender, the account the container runs as is what it would get. Left alone, Cloud Run runs a
+service as the project's default Compute Engine account, which can hold the Editor role (every graph and upload in Firestore and Storage). So
+make an account with no roles and run the worker as that:
 
 ```bash
-gcloud run deploy blender-worker --source blender-worker --region REGION --no-allow-unauthenticated \
-  --max-instances 2 --concurrency 1 --memory 2Gi --cpu 1 --timeout 120
+gcloud iam service-accounts create blender-runner --display-name "Blender worker runtime (no roles)"
 ```
 
-Private (`--no-allow-unauthenticated`): only an account with the invoker role can call it. Make that account, give it only that role, and
-make a key for the web app:
+(Also worth doing once: check IAM for the project's default Compute Engine account and remove Editor from it if it has it.)
+
+**2. Deploy it, private, as that account:**
+
+```bash
+gcloud run deploy blender-worker --source blender-worker --region REGION --no-allow-unauthenticated   --service-account blender-runner@PROJECT.iam.gserviceaccount.com   --max-instances 2 --concurrency 1 --memory 2Gi --cpu 1 --timeout 120
+```
+
+**3. An account that may only call it, and a key for the web app.** Only an account with the invoker role can call a private service. Make
+the key **outside the repository** (the repository is public; `.gitignore` also catches `*-invoker-key*.json` as a net):
 
 ```bash
 gcloud iam service-accounts create blender-invoker --display-name "Blender worker invoker"
-gcloud run services add-iam-policy-binding blender-worker --region REGION \
-  --member "serviceAccount:blender-invoker@PROJECT.iam.gserviceaccount.com" --role roles/run.invoker
-gcloud iam service-accounts keys create blender-invoker-key.json --iam-account blender-invoker@PROJECT.iam.gserviceaccount.com
+gcloud run services add-iam-policy-binding blender-worker --region REGION   --member "serviceAccount:blender-invoker@PROJECT.iam.gserviceaccount.com" --role roles/run.invoker
+gcloud iam service-accounts keys create "$HOME/blender-invoker-key.json" --iam-account blender-invoker@PROJECT.iam.gserviceaccount.com
 ```
 
-In Vercel (Production, then redeploy) add `BLENDER_WORKER_URL` (the service's URL) and `BLENDER_WORKER_KEY` (the key file's content on one
-line, marked Sensitive: `node -e "console.log(JSON.stringify(require('./blender-invoker-key.json')))"`). Delete the key file afterwards.
-Set a budget alert on the project. Then check it end to end:
+**4. Vercel and a budget alert.** In Vercel (Production, then redeploy) add `BLENDER_WORKER_URL` (the service's URL) and `BLENDER_WORKER_KEY`
+(the key file's content on one line, marked Sensitive: `node -e "console.log(JSON.stringify(require(process.env.HOME + '/blender-invoker-key.json')))"`).
+Delete the key file afterwards. Set a budget alert on the project.
+
+**5. Check it end to end** (the token is yours, from `gcloud`; it also checks that a call with no token is refused):
 
 ```bash
 node blender-worker/smoke.mjs https://blender-worker-xxxx.a.run.app "$(gcloud auth print-identity-token)"
