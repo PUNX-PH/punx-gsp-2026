@@ -1,5 +1,11 @@
 # Slice 2 handoff: web foundation (written 2026-10-02, end of session)
 
+**Update 2026-10-04: slice 2 is deployed and checked** at https://punx-gsp.vercel.app. The Vercel and Firebase setup is done, and the
+deployed checks passed except the few listed as not run in `slice2-results.md`, which is the record to read first. The sections
+"Blocked on the user" and "Next steps once unblocked" below are history. What is still open: the password pre-registration
+decision (Google sign-in was added; see the decisions below), the merge, pull request or keep choice for the branches, and slice 1's
+player-hardening gate before any use beyond punx.ai.
+
 Read this first in a new session, then `CLAUDE.md`. It says where slice 2 stands, what only the user can do, and
 how to continue. The authorities are the spec `docs/superpowers/specs/2026-10-02-web-foundation-design.md` and the
 plan `docs/superpowers/plans/2026-10-02-slice2-web-foundation.md` (10 tasks, executed inline, as the user chose).

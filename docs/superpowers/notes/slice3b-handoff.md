@@ -1,5 +1,9 @@
 # Slice 3b handoff: node canvas (written 2026-10-04)
 
+**Update 2026-10-04: slice 3b is deployed and checked** on https://punx-gsp.vercel.app. The record is `slice3b-results.md`: the seven
+done-criteria (one only partly: an oversized picture was not tried live) and the browser-only checks from the list below that were not
+individually reported. "Blocked on the user" and "Next steps once unblocked" below are history.
+
 Read this after `slice3a-handoff.md`. It says where slice 3b stands, what only the user can do, and how to continue. The
 authorities are the spec `docs/superpowers/specs/2026-10-04-node-canvas-design.md` and the plan
 `docs/superpowers/plans/2026-10-04-slice3b-node-canvas.md` (16 tasks, executed inline, as the user chose).

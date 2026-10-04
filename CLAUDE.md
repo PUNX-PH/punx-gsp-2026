@@ -13,16 +13,12 @@ game by wiring steps together on a node canvas. Blender prepares the assets; Uni
 
 ## Status
 
-The Unity runner template (Slice 1, `unity/runner-template`) is built and runs as a WebGL player. The web side
-is being designed: slice 2 (web foundation: Next.js on Vercel, `@punx.ai`-only Firebase sign-in, Firestore and
-Cloud Storage) is being built (inline, from the plan): `docs/superpowers/specs/2026-10-02-web-foundation-design.md`,
-`docs/superpowers/plans/2026-10-02-slice2-web-foundation.md`. Tasks 1, 3, 4, 5, 7 and 8 are done and the code for 2, 6 and 9 is written; what is left needs the user (Vercel project, Firebase project, the deployed checks). Slice 3 (the node editor) is split into 3a, the graph engine, and 3b, the canvas. Slice 3a is built
-and tested locally on branch `slice-3a-graph-engine` (plan tasks 1 to 13 of 14; spec
-`docs/superpowers/specs/2026-10-03-graph-engine-design.md`, plan `docs/superpowers/plans/2026-10-03-slice3a-graph-engine.md`).
-Slice 3b is built and tested locally on branch `slice-3b-node-canvas` (plan tasks 1 to 15 of 16; spec
-`docs/superpowers/specs/2026-10-04-node-canvas-design.md`, plan `docs/superpowers/plans/2026-10-04-slice3b-node-canvas.md`);
-the deployed checks of both wait for the same Vercel and Firebase setup. Nothing else is built. Decisions live in the
-design specs (`docs/superpowers/specs/`).
+The Unity runner template (Slice 1, `unity/runner-template`) is built and runs as a WebGL player. The web side is **deployed and checked**
+at https://punx-gsp.vercel.app (Vercel, root directory `web`, Production Branch `slice-3b-node-canvas`): slice 2 (web foundation:
+Next.js, `@punx.ai`-only sign-in by Google or an emailed link, Firestore, Cloud Storage), slice 3a (the graph engine) and slice 3b (the
+node canvas). The branch `slice-3b-node-canvas` is pushed and carries all three; `main` is still the setup commit. Results are in
+`docs/superpowers/notes/slice2-results.md`, `slice3a-results.md` and `slice3b-results.md`; decisions live in the design specs
+(`docs/superpowers/specs/`). Nothing else is built: the AI step (Prompt and Describe Game) is slice 4 and the Blender step is slice 5.
 
 ## Skills (in `.claude/skills/`; origins in `.claude/skills-sources/SOURCES.md`)
 
@@ -45,6 +41,9 @@ come from an uploaded file, and keep Blender and Unity workers sandboxed with no
 
 ## Work in progress
 
-Slice 1 (the Unity runner template) is finished except the phone check; slice 2 (the web app) is built and reviewed but blocked on the user's Vercel and Firebase setup. Slices 3a (the graph engine) and 3b (the node canvas) are built and tested locally, each on its own branch, with their deployed checks open. Read
-`docs/superpowers/notes/slice2-handoff.md` first, then `docs/superpowers/notes/slice3a-handoff.md`, then
-`docs/superpowers/notes/slice3b-handoff.md`, then `docs/superpowers/notes/2026-10-02-slice1-handoff.md` before doing anything else.
+Nothing is being built. What is open (none of it blocks the next slice): the password pre-registration decision (the Email/Password
+provider is still enabled next to Google), the merge, pull request or keep choice for the branches (order: slice 1, 2, 3a, 3b), the
+checks listed as not run in the three results notes, and slice 1's player-hardening gate before any use beyond punx.ai. Start slice 4 or 5
+only when the user asks. Read `docs/superpowers/notes/slice2-results.md` first (it also has what went wrong deploying to Vercel and
+how it was fixed), then `slice3a-results.md`, `slice3b-results.md` and the handoffs (`slice2-handoff.md`, `slice3a-handoff.md`,
+`slice3b-handoff.md`, `2026-10-02-slice1-handoff.md`) before doing anything else.

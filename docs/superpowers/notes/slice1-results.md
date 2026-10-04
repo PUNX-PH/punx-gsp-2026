@@ -1,5 +1,8 @@
 # Slice 1 results: the Unity runner template (2026-10-02)
 
+**Update 2026-10-04: the phone check is done.** The user opened a Preview on a phone from the deployed site and reported it passed
+(see `slice2-results.md`); the instructions at the end of this note (administrator shell, LAN server) are no longer needed.
+
 The template builds for WebGL, loads a `settings.json` plus three GLB files at runtime, and runs in the browser.
 **One check is still open: the phone check needs a person with a phone** (see the end).
 

@@ -1,5 +1,10 @@
 # Slice 3a handoff: graph engine (written 2026-10-03)
 
+**Update 2026-10-04: slice 3a is deployed and checked** on https://punx-gsp.vercel.app (with slices 2 and 3b, from
+`slice-3b-node-canvas`). The record is `slice3a-results.md`: what was checked, what was not (a missing input and an oversized picture
+live; a portrait photo and an emoji file name), and that `sharp` and the Firebase adapters work on Vercel. "Blocked on the user" and
+"Next steps once unblocked" below are history; the deferred minors are still open.
+
 Read this after `docs/superpowers/notes/slice2-handoff.md` and before `CLAUDE.md`'s other notes. It says where slice 3a
 stands, what only the user can do, and how to continue. The authorities are the spec
 `docs/superpowers/specs/2026-10-03-graph-engine-design.md` and the plan
