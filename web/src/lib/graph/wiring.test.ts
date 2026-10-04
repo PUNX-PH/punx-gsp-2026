@@ -76,3 +76,20 @@ describe("wiringProblem", () => {
     expect(existing).toHaveLength(1);
   });
 });
+
+describe("wiringProblem and the feel wire", () => {
+  // A step that gives a feel, and one that takes one: enough to try the wire type before any real step uses it.
+  const base = NODE_SPECS["palette-from-image"];
+  const feelSource: NodeSpec = { ...base, type: "feel-source", inputs: [], outputs: [{ name: "feel", label: "feel", help: "", type: "feel", required: false }] };
+  const feelSink: NodeSpec = { ...base, type: "feel-sink", inputs: [{ name: "feel", label: "feel", help: "", type: "feel", required: false }], outputs: [] };
+  const specs = { ...NODE_SPECS, "feel-source": feelSource, "feel-sink": feelSink };
+  const pair = [node("a", "feel-source"), node("b", "feel-sink"), node("c", "game-template", { tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } })];
+
+  it("refuses a feel in a palette input, in the same words as every other wire type", () => {
+    expect(wiringProblem(pair, [], wire("a", "feel", "c", "palette"), specs)).toBe("A feel can't go into a palette input.");
+  });
+
+  it("accepts a feel into a feel input", () => {
+    expect(wiringProblem(pair, [], wire("a", "feel", "b", "feel"), specs)).toBeNull();
+  });
+});

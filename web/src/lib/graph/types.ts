@@ -3,8 +3,8 @@
 import type { User } from "@/lib/auth/ports";
 import type { RunService } from "@/lib/runs/types";
 
-/** What a wire carries. (`text` arrives with the Prompt node.) */
-export type WireType = "image" | "model" | "palette" | "settings";
+/** What a wire carries. A `feel` is the three tuning numbers (how fast, how high, how far apart). */
+export type WireType = "image" | "model" | "palette" | "feel" | "settings";
 
 /** The three models a runner game uses, and the file each is stored under in a run. */
 export type Role = "hero" | "obstacle" | "collectible";
@@ -96,6 +96,7 @@ export type WireValue =
   | { type: "image"; sha256: string; name: string; width: number; height: number }
   | { type: "model"; sha256: string; name: string; size: number }
   | { type: "palette"; colors: string[] }
+  | { type: "feel"; tuning: Tuning }
   | { type: "settings"; settingsText: string; tuning: Tuning; models: Record<Role, ModelSource> };
 
 // ---- what a node's code is given ----

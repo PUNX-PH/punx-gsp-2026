@@ -68,4 +68,19 @@ describe("the stylesheet's other rules (deferred minors)", () => {
   it("has a way to hide text from the eye but not from a screen reader", () => {
     expect(block(".visuallyHidden")).toMatch(/clip(-path)?:/);
   });
+
+  it("gives the feel wire its own color, used by the wire, its handles and its pill", () => {
+    expect(block(".wire_feel")).toMatch(/--wire:\s*var\(--wire-feel\)/);
+  });
+});
+
+describe.each(THEMES)("the %s theme: the feel wire", (_name, t) => {
+  // A wire is a graphic, not text: it needs 3 to 1 against what it is drawn on.
+  it.each([
+    ["the canvas", "canvas"],
+    ["a card", "surface"],
+  ])("stands out from %s by at least 3 to 1", (_label, background) => {
+    expect(t["wire-feel"], "the theme needs a --wire-feel color").toBeDefined();
+    expect(contrastRatio(t["wire-feel"], t[background])).toBeGreaterThanOrEqual(3);
+  });
 });

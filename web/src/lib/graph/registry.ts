@@ -28,7 +28,7 @@ export interface NodeSpec {
 }
 
 /** How each wire type is named to a person. */
-export const WIRE_WORDS: Record<WireType, string> = { image: "picture", model: "3D model", palette: "palette", settings: "game" };
+export const WIRE_WORDS: Record<WireType, string> = { image: "picture", model: "3D model", palette: "palette", feel: "feel", settings: "game" };
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 
