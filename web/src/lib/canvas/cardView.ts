@@ -1,6 +1,8 @@
 // What one card shows, worked out from the graph, the run and the uploaded files: its status in words, its result, and
 // its ports. The card component only draws this, so every wording and every rule here is tested without a browser.
+import { SHAPE_NAMES, type Shape } from "@/lib/blender/types";
 import type { RunView } from "@/lib/canvas/runView";
+import { SAMPLE_PALETTE } from "@/lib/graph/palette";
 import { NODE_SPECS, type NodeSpec } from "@/lib/graph/registry";
 import type { Assets, Graph, GraphNode, Tuning, WireType } from "@/lib/graph/types";
 
@@ -22,6 +24,8 @@ export type ResultView =
   | { kind: "text"; text: string }
   /** What Describe Game answered: five colors, the three numbers as a line, a one-line summary, and whether it was a stored answer. */
   | { kind: "described"; colors: string[]; numbers: string; summary: string; reused: boolean }
+  /** What a Blender step made: a line of plain facts, the color it was painted (a #rrggbb string) or null, and whether it was a stored result. */
+  | { kind: "made"; line: string; swatch: string | null; reused: boolean }
   | { kind: "open-game" };
 
 export type StepData = {
@@ -38,6 +42,8 @@ export type StepData = {
   tuningLocked: boolean;
   /** The numbers a Game Template's last run used (what a locked slider shows), or null before a run or after a failure. */
   liveTuning: Tuning | null;
+  /** The five colors a Prepare Model or Make Shape panel offers: the wired palette's once it has been made, otherwise the sample palette. */
+  swatches?: string[];
   inputs: PortView[];
   outputs: PortView[];
 };
@@ -94,6 +100,45 @@ function described(result: unknown): ResultView | null {
   return { kind: "described", colors: palette as string[], numbers: tuningLine(tuning as Tuning), summary, reused };
 }
 
+const HEX = /^#[0-9a-f]{6}$/i;
+const count = (n: number) => n.toLocaleString("en-US");
+
+// What a finished Prepare Model step handed over (lib/graph/nodes/prepareModel.ts), or null when the result is not that.
+function prepared(result: unknown): ResultView | null {
+  const r = result as { trianglesBefore?: unknown; trianglesAfter?: unknown; size?: unknown; color?: unknown; reused?: unknown } | null | undefined;
+  if (typeof r !== "object" || r === null) return null;
+  const { trianglesBefore, trianglesAfter, size, color, reused } = r;
+  if (!isNumber(trianglesAfter) || !isNumber(size) || typeof reused !== "boolean") return null;
+  if (trianglesBefore !== null && !isNumber(trianglesBefore)) return null;
+  if (color !== null && !(typeof color === "string" && HEX.test(color))) return null;
+  const triangles = trianglesBefore !== null && trianglesBefore !== trianglesAfter ? `${count(trianglesBefore)} triangles to ${count(trianglesAfter)}` : `${count(trianglesAfter)} triangles`;
+  return { kind: "made", line: `${triangles}, ${formatSize(size)}, ${color === null ? "original colors" : `flat ${color}`}`, swatch: color, reused };
+}
+
+// What a finished Make Shape step handed over (lib/graph/nodes/makeShape.ts), or null when the result is not that.
+function shapeMade(result: unknown): ResultView | null {
+  const r = result as { shape?: unknown; color?: unknown; trianglesAfter?: unknown; size?: unknown; reused?: unknown } | null | undefined;
+  if (typeof r !== "object" || r === null) return null;
+  const { shape, color, trianglesAfter, size, reused } = r;
+  if (typeof shape !== "string" || !Object.hasOwn(SHAPE_NAMES, shape)) return null;
+  if (typeof color !== "string" || !HEX.test(color) || !isNumber(trianglesAfter) || !isNumber(size) || typeof reused !== "boolean") return null;
+  return { kind: "made", line: `${SHAPE_NAMES[shape as Shape]}, ${count(trianglesAfter)} triangles, ${formatSize(size)}`, swatch: color, reused };
+}
+
+// The colors of the palette wired into a Blender step, once the step that makes them has run (a Palette from Image or a Describe
+// Game step); the sample palette otherwise, and whenever what came back is not five #rrggbb colors.
+function swatchesFor(graph: Graph, node: GraphNode, run: RunView): string[] {
+  const edge = graph.edges.find((e) => e.to.node === node.id && e.to.port === "palette");
+  const source = edge ? graph.nodes.find((n) => n.id === edge.from.node) : undefined;
+  const outcome = source ? run.outcomes[source.id] : undefined;
+  let colors: unknown;
+  if (outcome?.state === "done") {
+    if (source?.type === "palette-from-image") colors = outcome.result;
+    else if (source?.type === "describe-game") colors = (outcome.result as { palette?: unknown } | null | undefined)?.palette;
+  }
+  return Array.isArray(colors) && colors.length === 5 && colors.every((c) => typeof c === "string" && HEX.test(c)) ? (colors as string[]) : [...SAMPLE_PALETTE];
+}
+
 function fromRun(node: GraphNode, run: RunView): ResultView {
   const outcome = run.outcomes[node.id];
   // A game made earlier is still there to open after a reload, before anything has run on this page (and when an edit
@@ -107,6 +152,8 @@ function fromRun(node: GraphNode, run: RunView): ResultView {
     if (tuning) return { kind: "text", text: tuningLine(tuning) };
   }
   if (node.type === "describe-game") return described(outcome.result) ?? { kind: "none" };
+  if (node.type === "prepare-model") return prepared(outcome.result) ?? { kind: "none" };
+  if (node.type === "make-shape") return shapeMade(outcome.result) ?? { kind: "none" };
   if (node.type === "preview" && run.runId) return { kind: "open-game" };
   return { kind: "none" };
 }
@@ -154,6 +201,7 @@ export function stepData({ graph, node, assets, run, numbers, graphId, pending, 
     result,
     tuningLocked: isTemplate && graph.edges.some((e) => e.to.node === node.id && e.to.port === "feel"),
     liveTuning,
+    ...(node.type === "prepare-model" || node.type === "make-shape" ? { swatches: swatchesFor(graph, node, run) } : {}),
     inputs: spec.inputs.map((p) => ({
       name: p.name,
       label: p.label,

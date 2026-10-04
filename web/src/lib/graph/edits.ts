@@ -15,6 +15,9 @@ export const setAsset = (graph: Graph, nodeId: string, sha256: string | null): G
 /** Sets a Describe Game's prompt, exactly as typed (it is cleaned when it is used, not while the person is typing). */
 export const editPrompt = (graph: Graph, nodeId: string, prompt: string): Edit => ({ graph: withParams(graph, nodeId, { prompt }), touched: [nodeId] });
 
+/** Changes some of a step's settings (the Blender steps: triangles, color, shape) and keeps the rest. */
+export const editSettings = (graph: Graph, nodeId: string, change: Record<string, unknown>): Edit => ({ graph: withParams(graph, nodeId, change), touched: [nodeId] });
+
 /** Sets a Game Template's tuning. */
 export const setTuning = (graph: Graph, nodeId: string, tuning: Tuning): Graph =>
   withParams(graph, nodeId, { tuning: { speed: tuning.speed, jumpHeight: tuning.jumpHeight, obstacleSpacing: tuning.obstacleSpacing } });
