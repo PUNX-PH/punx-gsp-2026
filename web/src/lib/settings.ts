@@ -130,8 +130,7 @@ export function winnabilityError(speedValue: number, jumpHeightValue: number, ob
   }
 
   // One jump per obstacle: the hero must be back on the ground, with the margin to spare, before the next take-off.
-  const airTime = 2 * Math.sqrt((2 * jumpHeight) / GRAVITY);
-  const minSpacing = speed * (airTime + MIN_TIMING_WINDOW);
+  const minSpacing = requiredSpacing(speed, jumpHeight);
   if (obstacleSpacing < minSpacing) {
     return (
       `settings.tuning.obstacleSpacing: ${f(obstacleSpacing)} m is too short at ${f(speed)} m/s, the hero needs ` +
@@ -139,6 +138,18 @@ export function winnabilityError(speedValue: number, jumpHeightValue: number, ob
     );
   }
   return null;
+}
+
+// The hero must be back on the ground, with the timing margin to spare, before the next take-off: the time in the air at this
+// jump height plus the margin, at this speed. (Both numbers are already floats, as Unity reads them.)
+function requiredSpacing(speed: number, jumpHeight: number): number {
+  const airTime = 2 * Math.sqrt((2 * jumpHeight) / GRAVITY);
+  return speed * (airTime + MIN_TIMING_WINDOW);
+}
+
+/** The smallest obstacle spacing, to 0.1 m, that the rule above accepts for this speed and jump height. */
+export function minPlayableSpacing(speedValue: number, jumpHeightValue: number): number {
+  return roundUp(requiredSpacing(fl(speedValue), fl(jumpHeightValue)));
 }
 
 // Rounded up to 0.1 so that the value in the message passes the check itself.

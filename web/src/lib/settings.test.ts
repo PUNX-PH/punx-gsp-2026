@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { rolesNeeded, validateSettings, winnabilityError } from "@/lib/settings";
+import { minPlayableSpacing, rolesNeeded, validateSettings, winnabilityError } from "@/lib/settings";
 
 // web/src/lib -> repo root is three levels up.
 const FIXTURES = fileURLToPath(new URL("../../../fixtures/settings/", import.meta.url));
@@ -192,5 +192,28 @@ describe("winnability agrees with the Unity template on the shared grid", () => 
     expect(bits.length).toBe(Number(golden("points")));
     expect(playable).toBe(Number(golden("accepted")));
     expect(createHash("sha256").update(bits.join("")).digest("hex")).toBe(golden("sha256"));
+  });
+});
+
+describe("minPlayableSpacing (the smallest obstacle spacing the winnability rule accepts)", () => {
+  const speeds = [1, 2.5, 4, 6, 8, 12, 16, 20];
+  const jumps = [2.2, 2.5, 3, 3.5, 4, 5];
+
+  it("is playable, and 0.1 m less is not, wherever the jump is high enough for the speed", () => {
+    let tried = 0;
+    for (const speed of speeds)
+      for (const jump of jumps) {
+        if (winnabilityError(speed, jump, 1000) !== null) continue; // the jump itself is too low: spacing cannot help
+        tried++;
+        const spacing = minPlayableSpacing(speed, jump);
+        expect(winnabilityError(speed, jump, spacing), `${speed} m/s, ${jump} m`).toBeNull();
+        expect(winnabilityError(speed, jump, Number((spacing - 0.1).toFixed(1))), `${speed} m/s, ${jump} m, less`).not.toBeNull();
+      }
+    expect(tried).toBeGreaterThan(20); // the grid really exercises the rule
+  });
+
+  it("grows with the speed, and with the jump", () => {
+    expect(minPlayableSpacing(12, 3)).toBeGreaterThan(minPlayableSpacing(6, 3));
+    expect(minPlayableSpacing(6, 4)).toBeGreaterThan(minPlayableSpacing(6, 3));
   });
 });
