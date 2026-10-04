@@ -1,0 +1,2 @@
+# An OBJ with no geometry at all: comments only. The worker must answer 422 empty. Used by smoke.mjs.
+# (It passes the wrapper's own check, which only looks for NUL bytes; Blender then finds no mesh.)

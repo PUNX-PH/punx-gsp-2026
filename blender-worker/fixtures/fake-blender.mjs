@@ -23,6 +23,7 @@ if (Object.keys(process.env).some((name) => name.includes("SECRET"))) process.ex
 const input = option(after, "--in");
 const text = input ? fs.readFileSync(input, "latin1") : "";
 if (text.includes("EMPTY")) process.exit(3);
+if (option(after, "--format") === "obj" && !/^v /m.test(text)) process.exit(3); // an OBJ with no vertices: the real Blender finds no mesh
 if (text.includes("BROKEN")) process.exit(4);
 if (text.includes("CRASH")) process.exit(1);
 if (text.includes("SLEEP")) {
