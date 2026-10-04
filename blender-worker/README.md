@@ -77,7 +77,8 @@ make an account with no roles and run the worker as that:
 gcloud iam service-accounts create blender-runner --display-name "Blender worker runtime (no roles)"
 ```
 
-(Also worth doing once: check IAM for the project's default Compute Engine account and remove Editor from it if it has it.)
+(Leave the default Compute Engine account alone for now: Cloud Build may use it to build the image on a source deploy, so narrowing its roles
+is something to do after the first successful deploy, with the build roles kept. What matters is that the worker does not run as it.)
 
 **2. Deploy it, private, as that account:**
 
