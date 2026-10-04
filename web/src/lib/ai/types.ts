@@ -11,17 +11,20 @@ export interface DescribedGame {
   summary: string;
 }
 
-/** What the step calls: it caches, counts, asks the model, checks the answer, and says in plain words when it cannot. */
+/**
+ * What the step calls: it caches, counts, asks the model, checks the answer, and says in plain words when it cannot. A `deadline`
+ * (epoch milliseconds, Play's) makes it refuse to start a call that could not finish and shortens the call to fit.
+ */
 export interface DescribeGameService {
   describe(
     user: User,
-    input: { prompt: string; picture: { sha256: string; bytes: Uint8Array } | null },
+    input: { prompt: string; picture: { sha256: string; bytes: Uint8Array } | null; deadline?: number },
   ): Promise<{ answer: DescribedGame; reused: boolean }>;
 }
 
 /** The model behind it. `raw` is whatever the model said, parsed as JSON but not trusted; `picture` is already a small JPEG. */
 export interface DescribeGameModel {
-  ask(request: { prompt: string; picture: Uint8Array | null }): Promise<{ raw: unknown; usage: { inputTokens: number; outputTokens: number } }>;
+  ask(request: { prompt: string; picture: Uint8Array | null; timeoutMs?: number }): Promise<{ raw: unknown; usage: { inputTokens: number; outputTokens: number } }>;
 }
 
 /** The model declined to answer (its own safety rules). Carries no detail on purpose. */

@@ -28,7 +28,7 @@ const raw = (change: (r: any) => void = () => {}) => { // eslint-disable-line @t
 
 /** A model that answers from a script and remembers what it was asked. */
 function fakeModel(reply: () => Promise<{ raw: unknown; usage: { inputTokens: number; outputTokens: number } }> = async () => ({ raw: raw(), usage: { inputTokens: 3000, outputTokens: 300 } })) {
-  const asked: { prompt: string; picture: Uint8Array | null }[] = [];
+  const asked: { prompt: string; picture: Uint8Array | null; timeoutMs?: number }[] = [];
   const model: DescribeGameModel = {
     async ask(request) {
       asked.push(request);
@@ -251,5 +251,35 @@ describe("what is logged", () => {
       { step: "describe-game", outcome: "answered", inputTokens: 3000, outputTokens: 300 },
       { step: "describe-game", outcome: "reused" },
     ]);
+  });
+});
+
+describe("Play's deadline", () => {
+  const OUT_OF_TIME = "Describe Game: Play ran out of time. Press Play again; finished steps are kept, so it carries on.";
+
+  it("still answers a cache hit when no time is left", async () => {
+    const { service, clock } = setup();
+    await service.describe(ALICE, noPicture);
+    const again = await service.describe(ALICE, { ...noPicture, deadline: clock.ms });
+    expect(again.reused).toBe(true);
+  });
+
+  it("says Play ran out of time, asks no model and takes no count, when a miss has less than 10 seconds left", async () => {
+    const { service, clock, scripted, limits, logs } = setup();
+    const error = await failure(service.describe(ALICE, { ...noPicture, deadline: clock.ms + 9_999 }));
+
+    expect(error).toBeInstanceOf(NodeError);
+    expect((error as Error).message).toBe(OUT_OF_TIME);
+    expect(scripted.asked).toHaveLength(0);
+    expect(limits.counts.size).toBe(0);
+    expect(logs).toEqual([{ step: "describe-game", outcome: "no-time" }]);
+  });
+
+  it("gives the model 60 seconds, or half the time left (the SDK retries once), and no limit of its own without a deadline", async () => {
+    const { service, clock, scripted } = setup();
+    await service.describe(ALICE, { prompt: "one", picture: null, deadline: clock.ms + 200_000 });
+    await service.describe(ALICE, { prompt: "two", picture: null, deadline: clock.ms + 20_000 });
+    await service.describe(ALICE, { prompt: "three", picture: null });
+    expect(scripted.asked.map((a) => a.timeoutMs)).toEqual([60_000, 10_000, undefined]);
   });
 });

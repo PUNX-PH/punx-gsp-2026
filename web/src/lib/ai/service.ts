@@ -3,10 +3,12 @@
 // comes back, stores it, and says in plain words (as a NodeError) when it cannot. It knows nothing about Firestore or the
 // model's vendor: those are the ports it is given, so every rule here is tested with fakes.
 import { cleanPrompt, parseAnswer } from "@/lib/ai/answer";
+import { DEFAULT_TIMEOUT_MS, MAX_RETRIES } from "@/lib/ai/anthropic";
 import { answerKey, dayOf } from "@/lib/ai/key";
 import type { AnswerCache, UsageLimits } from "@/lib/ai/ports";
 import { AiRefusedError, AiUnavailableError, type DescribeGameModel, type DescribeGameService } from "@/lib/ai/types";
 import { pictureForModel } from "@/lib/graph/image";
+import { MIN_START_MS, RAN_OUT_OF_TIME, timeLeft } from "@/lib/graph/playTime";
 import { NodeError } from "@/lib/graph/types";
 
 export interface DescribeGameDeps {
@@ -40,6 +42,17 @@ export function makeDescribeGameService(deps: DescribeGameDeps): DescribeGameSer
         return { answer: found.answer, reused: true };
       }
 
+      // Play's clock: no call is started that could not finish, and the model gets what fits (the SDK retries once, so both tries).
+      let timeoutMs: number | undefined;
+      if (input.deadline !== undefined) {
+        const left = timeLeft(input.deadline, deps.now());
+        if (left < MIN_START_MS) {
+          log({ step: STEP, outcome: "no-time" });
+          throw say(RAN_OUT_OF_TIME);
+        }
+        timeoutMs = Math.min(DEFAULT_TIMEOUT_MS, Math.floor(left / (MAX_RETRIES + 1)));
+      }
+
       // Counted before the call, so simultaneous requests cannot all slip under the limit.
       const day = dayOf(deps.now());
       const taken = await deps.limits.take(user.uid, day, { perPerson: deps.perPerson, total: deps.total });
@@ -61,7 +74,7 @@ export function makeDescribeGameService(deps: DescribeGameDeps): DescribeGameSer
 
       let reply: Awaited<ReturnType<DescribeGameModel["ask"]>>;
       try {
-        reply = await deps.model.ask({ prompt, picture: jpeg });
+        reply = await deps.model.ask({ prompt, picture: jpeg, ...(timeoutMs === undefined ? {} : { timeoutMs }) });
       } catch (error) {
         // A refusal still used the model, so it stays counted; anything else was not the person's doing, so the place is given back.
         if (error instanceof AiRefusedError) {

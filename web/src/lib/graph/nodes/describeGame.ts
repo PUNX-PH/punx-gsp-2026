@@ -12,7 +12,7 @@ export const describeGame: Executor = async (inputs, params, ctx) => {
     picture = { sha256: inputs.image.sha256, bytes };
   }
 
-  const { answer, reused } = await ctx.ai.describe(ctx.user, { prompt, picture });
+  const { answer, reused } = await ctx.ai.describe(ctx.user, { prompt, picture, deadline: ctx.deadline });
   return {
     outputs: {
       palette: { type: "palette", colors: answer.palette },

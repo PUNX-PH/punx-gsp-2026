@@ -31,7 +31,7 @@ export function makeClaudeModel(options: { client: ClaudeClient; model: string; 
   const { client, model, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
 
   return {
-    async ask({ prompt, picture }) {
+    async ask({ prompt, picture, timeoutMs: requested }) {
       // The picture goes first, then the person's words, marked as material to interpret. They are never part of the system prompt.
       const content: Anthropic.Beta.Messages.BetaContentBlockParam[] = [];
       if (picture) content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: Buffer.from(picture).toString("base64") } });
@@ -49,7 +49,7 @@ export function makeClaudeModel(options: { client: ClaudeClient; model: string; 
 
       let message: Awaited<ReturnType<ClaudeClient["beta"]["messages"]["create"]>>;
       try {
-        message = await client.beta.messages.create(request, { timeout: timeoutMs });
+        message = await client.beta.messages.create(request, { timeout: requested ?? timeoutMs });
       } catch (error) {
         // Only the HTTP status survives (a plain number, safe to log); nothing the error says does.
         const status = (error as { status?: unknown } | null)?.status;

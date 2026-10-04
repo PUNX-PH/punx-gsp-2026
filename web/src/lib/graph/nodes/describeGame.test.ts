@@ -73,3 +73,20 @@ describe("the Describe Game node", () => {
     await expect(describeGame({}, { prompt: "a run" }, ctx)).rejects.toEqual(new NodeError("Describe Game: The AI service did not answer. Try again."));
   });
 });
+
+describe("the Describe Game node and Play's deadline", () => {
+  it("passes the context's deadline on to the AI service", async () => {
+    const seen: unknown[] = [];
+    const ai: DescribeGameService = {
+      async describe(_user, input) {
+        seen.push(input);
+        return { answer, reused: false };
+      },
+    };
+    const ctx = { user, ai, deadline: 123_456, readAsset: async () => null } as unknown as ExecutorContext;
+
+    await describeGame({}, { prompt: "a run" }, ctx);
+
+    expect(seen).toEqual([{ prompt: "a run", picture: null, deadline: 123_456 }]);
+  });
+});

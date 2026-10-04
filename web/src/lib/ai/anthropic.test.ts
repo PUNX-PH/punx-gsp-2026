@@ -68,6 +68,12 @@ describe("the request", () => {
     expect(second.calls[0].options).toEqual({ timeout: 5_000 });
   });
 
+  it("uses the timeout a request carries (Play's clock) over the default", async () => {
+    const stub = stubClient();
+    await makeClaudeModel({ client: stub.client, model: "m" }).ask({ prompt: "x", picture: null, timeoutMs: 7_000 });
+    expect(stub.calls[0].options).toEqual({ timeout: 7_000 });
+  });
+
   it("puts only the person's words in the user turn, never in the system prompt (a hostile prompt changes nothing)", async () => {
     const { client, calls } = stubClient();
     const model = makeClaudeModel({ client, model: "m" });
