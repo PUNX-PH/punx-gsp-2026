@@ -1,6 +1,7 @@
 // A stand-in for Blender, for the wrapper's tests. It is started the way the wrapper starts Blender (node fake-blender.mjs [test
 // options] -b ... -P script -- --in .. --out .. --stats ..), and what it does depends on markers in its input file:
-//   EMPTY exits 3 (no 3D shape), BROKEN exits 4 (unreadable), CRASH exits 1, SLEEP hangs, NOOUT exits 0 without an output file.
+//   EMPTY exits 3 (no 3D shape), BROKEN exits 4 (unreadable), CRASH exits 1, LIBMISSING exits 127 (the loader could not start it),
+//   SLEEP hangs, NOOUT exits 0 without an output file.
 // It also exits 7 if it can see an environment variable with SECRET in its name (the wrapper must not pass its own environment on).
 import fs from "node:fs";
 
@@ -26,6 +27,7 @@ if (text.includes("EMPTY")) process.exit(3);
 if (option(after, "--format") === "obj" && !/^v /m.test(text)) process.exit(3); // an OBJ with no vertices: the real Blender finds no mesh
 if (text.includes("BROKEN")) process.exit(4);
 if (text.includes("CRASH")) process.exit(1);
+if (text.includes("LIBMISSING")) process.exit(127);
 if (text.includes("SLEEP")) {
   setTimeout(() => {}, 60_000); // hang until killed
 } else {

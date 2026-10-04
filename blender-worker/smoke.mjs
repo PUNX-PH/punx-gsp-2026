@@ -31,8 +31,8 @@ function expect(condition, message) {
 }
 const isGlb = (bytes) => Buffer.from(bytes).subarray(0, 4).toString("latin1") === "glTF";
 
-await check("GET /healthz", async () => {
-  const response = await fetch(`${base}/healthz`, { headers: authorised });
+await check("GET /health", async () => {
+  const response = await fetch(`${base}/health`, { headers: authorised });
   expect(response.status === 200, `status ${response.status}`);
 });
 
@@ -59,7 +59,7 @@ await check("POST /shape, a sphere", async () => {
 
 if (token) {
   await check("a call with no token is refused (Cloud Run answers 401 or 403)", async () => {
-    const response = await fetch(`${base}/healthz`);
+    const response = await fetch(`${base}/shape`, { method: "POST", body: JSON.stringify({ shape: "cube", color: "#06d6a0" }) });
     expect(response.status === 401 || response.status === 403, `status ${response.status}`);
   });
 }

@@ -3,10 +3,12 @@
 //
 //   POST /prepare?format=glb|fbx|obj&triangles=100..5000&color=original|#rrggbb   body: the model file
 //   POST /shape                                                                    body: {"shape": "...", "color": "#rrggbb"}
-//   GET  /healthz
+//   GET  /health        (not /healthz: Cloud Run reserves some paths that end in "z" and answers them itself)
 //
 // A good answer is 200 with the GLB as the body and the triangle counts in X-Triangles-Before and X-Triangles-After. Every
-// failure is a status and a JSON body with a code and nothing else: nothing Blender or the system said is ever sent or logged.
+// failure is a status and a JSON body with a code and nothing else: nothing Blender or the system said is ever sent or logged. A code
+// of 413, 415, 422, 500 or 504 means Blender ran and said no to the file; 503 "unavailable" means the service itself is broken (Blender
+// could not be started, a missing library, no room for a job folder), which is never the person's file to blame.
 // Nothing here trusts its input (the query, the body, the claimed format), and Blender is given only the one input file, with no
 // secrets in its environment. Node built-ins only, so the image needs no `npm install`.
 import { spawn } from "node:child_process";
@@ -31,6 +33,7 @@ const OBJ_HEAD_BYTES = 64 * 1024;
 // How the Blender scripts say why they stopped (anything else non-zero is a plain failure).
 const EXIT_EMPTY = 3;
 const EXIT_BAD_FORMAT = 4;
+const EXIT_COULD_NOT_START = 127; // what the loader exits with when Blender cannot start (a missing library): not about the file
 
 /** A refusal: an HTTP status and one of the codes the client knows. */
 class Refusal extends Error {
@@ -155,7 +158,7 @@ export function createWorker(options) {
       }, jobLimitMs);
       child.on("error", () => {
         clearTimeout(timer);
-        resolve({ code: -1, timedOut: false });
+        resolve({ code: -1, timedOut: false, notStarted: true }); // Blender is missing or cannot be run
       });
       child.on("close", (code) => {
         clearTimeout(timer);
@@ -178,7 +181,8 @@ export function createWorker(options) {
       }
       args.push(...scriptArgs, "--out", out, "--stats", stats);
 
-      const { code, timedOut } = await runBlender(dir, path.join(scriptsDir, script), args);
+      const { code, timedOut, notStarted } = await runBlender(dir, path.join(scriptsDir, script), args);
+      if (notStarted || code === EXIT_COULD_NOT_START) throw new Refusal(503, "unavailable");
       if (timedOut) throw new Refusal(504, "timeout");
       if (code === EXIT_EMPTY) throw new Refusal(422, "empty");
       if (code === EXIT_BAD_FORMAT) throw new Refusal(415, "bad-format");
@@ -213,11 +217,11 @@ export function createWorker(options) {
 
   async function handle(req, res) {
     const url = new URL(req.url ?? "/", "http://localhost");
-    const wanted = { "/healthz": "GET", "/prepare": "POST", "/shape": "POST" }[url.pathname];
+    const wanted = { "/health": "GET", "/prepare": "POST", "/shape": "POST" }[url.pathname];
     if (!wanted) throw new Refusal(404, "bad-request");
     if (req.method !== wanted) throw new Refusal(405, "bad-request");
 
-    if (url.pathname === "/healthz") {
+    if (url.pathname === "/health") {
       res.writeHead(200, { "content-type": "text/plain" });
       res.end("ok");
       return;
@@ -240,7 +244,8 @@ export function createWorker(options) {
     const started = Date.now();
     handle(req, res)
       .catch((error) => {
-        const refusal = error instanceof Refusal ? error : new Refusal(500, "failed");
+        // Anything the wrapper did not expect is the service's trouble, not a verdict on the file.
+        const refusal = error instanceof Refusal ? error : new Refusal(503, "unavailable");
         if (res.headersSent) res.destroy();
         else {
           req.resume(); // a body nobody will read is thrown away, not buffered

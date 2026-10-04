@@ -46,11 +46,13 @@ const prepare = (t, body = obj(), query = "format=obj&triangles=2000&color=origi
 const errorBody = async (response) => JSON.parse(await response.text());
 
 describe("the routes", () => {
-  it("answers /healthz without running Blender", async () => {
+  // Cloud Run reserves some paths that end in "z" (it answers them itself, before the container), so the health route is /health.
+  it("answers /health without running Blender, and has no /healthz", async () => {
     const t = await start();
-    const response = await fetch(`${t.base}/healthz`);
+    const response = await fetch(`${t.base}/health`);
     assert.equal(response.status, 200);
     assert.equal(t.started(), false);
+    assert.equal((await fetch(`${t.base}/healthz`)).status, 404);
   });
 
   it("refuses other paths (404) and other methods (405), with only an error code", async () => {
@@ -62,7 +64,7 @@ describe("the routes", () => {
     assert.equal(wrong.status, 405);
     assert.deepEqual(await errorBody(wrong), { error: "bad-request" });
     assert.equal((await fetch(`${t.base}/shape`)).status, 405);
-    assert.equal((await fetch(`${t.base}/healthz`, { method: "POST" })).status, 405);
+    assert.equal((await fetch(`${t.base}/health`, { method: "POST" })).status, 405);
   });
 });
 
@@ -191,6 +193,36 @@ describe("POST /prepare", () => {
   it("answers errors with only the code, nothing Blender or the system said", async () => {
     const t = await start();
     const response = await prepare(t, obj("CRASH"));
+    assert.equal(await response.text(), '{"error":"failed"}');
+  });
+});
+
+describe("when it is the service that is broken, not the file", () => {
+  const unavailable = async (response) => {
+    assert.equal(response.status, 503);
+    assert.equal(await response.text(), '{"error":"unavailable"}');
+  };
+
+  it("answers 503 unavailable, not a failure of the file, when Blender cannot be started", async () => {
+    const t = await start({ blenderBin: path.join(tmpdir(), "no-such-blender-binary"), extraArgs: [] });
+    await unavailable(await prepare(t));
+    await unavailable(await fetch(`${t.base}/shape`, { method: "POST", body: JSON.stringify({ shape: "cube", color: "#06d6a0" }) }));
+  });
+
+  it("answers 503 unavailable when Blender dies before it can load (exit 127: a missing library, a missing program)", async () => {
+    const t = await start();
+    await unavailable(await prepare(t, obj("LIBMISSING")));
+  });
+
+  it("answers 503 unavailable when the worker cannot make its job folder", async () => {
+    const t = await start({ workRoot: path.join(tmpdir(), "no", "such", "folder") });
+    await unavailable(await prepare(t));
+  });
+
+  it("still answers a real failure of the file (Blender ran and crashed) as 500 failed", async () => {
+    const t = await start();
+    const response = await prepare(t, obj("CRASH"));
+    assert.equal(response.status, 500);
     assert.equal(await response.text(), '{"error":"failed"}');
   });
 });
