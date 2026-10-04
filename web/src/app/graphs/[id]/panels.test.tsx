@@ -128,9 +128,9 @@ describe("AddMenu", () => {
 
   it("has a button for every choice with its name and help", () => {
     const html = renderToString(<AddMenu choices={addChoices(starterGraph())} onPick={noop} onClose={noop} />);
-    for (const name of ["Reference Image", "3D Model", "Palette from Image", "Describe Game", "Game Template", "Preview"]) expect(html).toContain(name);
+    for (const name of ["Reference Image", "3D Model", "Prepare Model", "Make Shape", "Palette from Image", "Describe Game", "Game Template", "Preview"]) expect(html).toContain(name);
     expect(html).toContain("A model of your own, as a GLB, FBX or OBJ file.");
-    expect(html.match(/role="menuitem"/g)).toHaveLength(6);
+    expect(html.match(/role="menuitem"/g)).toHaveLength(8);
   });
 
   it("shows why a choice is greyed, and does not let it be clicked", () => {

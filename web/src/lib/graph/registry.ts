@@ -1,6 +1,7 @@
 // The closed list of node types: what each is called, what its ports carry, and how its settings are checked. Graphs
 // name node types by id only, so nothing in a graph can add behavior. The plain names and one-line help are here so
 // that every screen (and every error message) uses the same words.
+import { SHAPES, TRIANGLES } from "@/lib/blender/types";
 import type { WireType } from "@/lib/graph/types";
 
 export interface PortSpec {
@@ -62,6 +63,26 @@ function tuningParam(params: Record<string, unknown>): string | null {
   return ["speed", "jumpHeight", "obstacleSpacing"].every((k) => typeof t[k] === "number" && Number.isFinite(t[k])) ? null : bad;
 }
 
+const isSwatch = (value: unknown) => typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 5;
+
+function prepareParams(params: Record<string, unknown>): string | null {
+  if (!hasExactly(params, ["triangles", "color"])) return "triangles and color are the only settings a Prepare Model step has.";
+  const { triangles, color } = params;
+  if (typeof triangles !== "number" || !Number.isInteger(triangles) || triangles < TRIANGLES.min || triangles > TRIANGLES.max) {
+    return `triangles must be a whole number from ${TRIANGLES.min} to ${TRIANGLES.max}.`;
+  }
+  return color === "original" || isSwatch(color) ? null : "color must be \"original\" or a swatch from 1 to 5.";
+}
+
+function shapeParams(params: Record<string, unknown>): string | null {
+  if (!hasExactly(params, ["shape", "color"])) return "shape and color are the only settings a Make Shape step has.";
+  const { shape, color } = params;
+  if (typeof shape !== "string" || !(SHAPES as readonly string[]).includes(shape)) {
+    return `shape must be one of ${SHAPES.slice(0, -1).join(", ")} or ${SHAPES[SHAPES.length - 1]}.`;
+  }
+  return isSwatch(color) ? null : "color must be a swatch from 1 to 5.";
+}
+
 const port = (name: string, label: string, help: string, type: WireType, required = false, missing?: string): PortSpec => ({
   name,
   label,
@@ -93,6 +114,31 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     defaultParams: () => ({ asset: null }),
     shapeProblem: fileParam,
     incompleteProblem: (params) => (params.asset === null ? "choose a model." : null),
+  },
+  "prepare-model": {
+    type: "prepare-model",
+    label: "Prepare Model",
+    help: "Makes a model of yours game-ready: small, in flat colors.",
+    final: false,
+    inputs: [
+      port("model", "3D model", "The model to prepare: a GLB, FBX or OBJ.", "model", true, "Prepare Model needs a model. Connect a 3D Model."),
+      port("palette", "palette", "Colors to paint the model with. Without one, a sample palette is used.", "palette"),
+    ],
+    outputs: [port("model", "3D model", "The prepared model.", "model")],
+    defaultParams: () => ({ triangles: TRIANGLES.default, color: "original" }),
+    shapeProblem: prepareParams,
+    incompleteProblem: () => null,
+  },
+  "make-shape": {
+    type: "make-shape",
+    label: "Make Shape",
+    help: "Builds a simple low-poly shape.",
+    final: false,
+    inputs: [port("palette", "palette", "Colors to paint the shape with. Without one, a sample palette is used.", "palette")],
+    outputs: [port("model", "3D model", "The shape.", "model")],
+    defaultParams: () => ({ shape: "cube", color: 4 }),
+    shapeProblem: shapeParams,
+    incompleteProblem: () => null,
   },
   "palette-from-image": {
     type: "palette-from-image",

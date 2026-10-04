@@ -16,6 +16,10 @@ export const gameTemplate: Executor = async (inputs, params) => {
   const models = Object.fromEntries(
     ROLES.map((role): [Role, ModelSource] => {
       const given = inputs[role];
+      // Only a GLB can go into a game as it is: an FBX or an OBJ has to be prepared first.
+      if (given?.type === "model" && given.format !== "glb") {
+        throw new NodeError(`Game Template: the ${role} model is an ${given.format.toUpperCase()} file. Put a Prepare Model step after it.`);
+      }
       return [role, given?.type === "model" ? { kind: "asset", sha256: given.sha256 } : { kind: "builtin", role }];
     }),
   ) as Record<Role, ModelSource>;

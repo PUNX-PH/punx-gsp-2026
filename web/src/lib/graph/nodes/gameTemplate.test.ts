@@ -86,3 +86,24 @@ describe("the Game Template node", () => {
     expect(output?.type).toBe("settings");
   });
 });
+
+describe("the Game Template node and model files that are not GLBs", () => {
+  const raw = (format: "fbx" | "obj") => ({ type: "model" as const, sha256: SHA, name: `thing.${format}`, size: 100, format });
+  const failure = (run: Promise<unknown>) => run.then(() => null, (e: unknown) => e);
+
+  it.each([
+    ["hero", "fbx", "FBX"],
+    ["obstacle", "obj", "OBJ"],
+    ["collectible", "fbx", "FBX"],
+  ] as const)("refuses a raw %s model that is a %s file, and says what to do", async (role, format, shown) => {
+    const error = await failure(gameTemplate({ [role]: raw(format) }, { tuning }, ctx));
+    expect(error).toBeInstanceOf(NodeError);
+    expect((error as Error).message).toBe(`Game Template: the ${role} model is an ${shown} file. Put a Prepare Model step after it.`);
+  });
+
+  it("still takes a GLB in every role", async () => {
+    const glb = { type: "model" as const, sha256: SHA, name: "thing.glb", size: 100, format: "glb" as const };
+    const { output } = await gameTemplate({ hero: glb, obstacle: glb, collectible: glb }, { tuning }, ctx);
+    expect(output).toMatchObject({ type: "settings", models: { hero: { kind: "asset", sha256: SHA }, obstacle: { kind: "asset", sha256: SHA }, collectible: { kind: "asset", sha256: SHA } } });
+  });
+});
