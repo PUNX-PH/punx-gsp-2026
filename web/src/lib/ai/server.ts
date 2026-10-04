@@ -5,21 +5,19 @@ import { getClaudeClient, makeClaudeModel } from "@/lib/ai/anthropic";
 import { FirestoreAnswerCache, FirestoreUsageLimits } from "@/lib/ai/firebase";
 import type { AnswerCache, UsageLimits } from "@/lib/ai/ports";
 import { makeDescribeGameService } from "@/lib/ai/service";
+import { dailyLimit } from "@/lib/dailyLimit";
 import type { DescribeGameModel, DescribeGameService } from "@/lib/ai/types";
 
 const DEFAULT_MODEL = "claude-sonnet-5-5";
 const DEFAULT_PER_PERSON = 30;
 const DEFAULT_TOTAL = 300;
 
-// A whole number of 0 or more, nothing else (no spaces, signs, decimals or exponents); anything else is the default.
-const limit = (value: string | undefined, fallback: number): number => (value !== undefined && /^\d+$/.test(value) ? Number(value) : fallback);
-
 /** The model's name and the two daily limits, from the environment (none of them is a secret). */
 export function aiConfigFromEnv(env: Record<string, string | undefined>): { modelId: string; perPerson: number; total: number } {
   return {
     modelId: env.AI_MODEL?.trim() ? env.AI_MODEL.trim() : DEFAULT_MODEL,
-    perPerson: limit(env.AI_DAILY_LIMIT_PER_PERSON, DEFAULT_PER_PERSON),
-    total: limit(env.AI_DAILY_LIMIT_TOTAL, DEFAULT_TOTAL),
+    perPerson: dailyLimit(env.AI_DAILY_LIMIT_PER_PERSON, DEFAULT_PER_PERSON),
+    total: dailyLimit(env.AI_DAILY_LIMIT_TOTAL, DEFAULT_TOTAL),
   };
 }
 
