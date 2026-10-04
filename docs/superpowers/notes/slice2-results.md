@@ -1,8 +1,9 @@
 # Slice 2 results: web foundation, on the deployment (2026-10-04)
 
 The web app runs at **https://punx-gsp.vercel.app** (Vercel project `punx-gsp-2026`; `punx-gsp-2026.vercel.app` redirects to it).
-Its Production Branch is `slice-3b-node-canvas`, which contains slices 2, 3a and 3b, so one deployment carried the deployed checks
-of all three (their results are in `slice3a-results.md` and `slice3b-results.md`). Checked at commit `d324083`.
+Its Production Branch was `slice-3b-node-canvas` while these checks ran (**since the merge it is `main`**: the branch was
+fast-forwarded into `main` on 2026-10-04 and Branch Tracking changed to `main`). That branch contained slices 2, 3a and 3b, so one
+deployment carried the deployed checks of all three (their results are in `slice3a-results.md` and `slice3b-results.md`). Checked at commit `d324083`.
 
 Who checked what: **me** means I ran it from outside with `curl` or read the repository; **the user** means they did it in a real
 browser and reported "all checks passed" without a per-step transcript, so nothing below names an exact message they saw.
