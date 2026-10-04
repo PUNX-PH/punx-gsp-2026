@@ -1,14 +1,14 @@
 # The Blender worker: Node (the HTTP wrapper) plus Blender (headless) in one image, for Cloud Run.
 #
-# Blender 4.5 LTS, pinned. The version and its SHA-256 come from download.blender.org (the LTS page lists 4.5.14 and 5.2.2 as the
-# maintained releases; checksum read from https://download.blender.org/release/Blender4.5/blender-4.5.14.sha256 on 2026-10-05).
+# Blender 5.2 LTS, pinned (the same release the scripts are tested on here). The version and its SHA-256 come from download.blender.org (the LTS page lists 5.2.2 and 4.5.14 as the
+# maintained releases; checksum read from https://download.blender.org/release/Blender5.2/blender-5.2.2.sha256 on 2026-10-05).
 # To move to another release: change the three ARGs, rerun tests/test_blender.py with that Blender, and bump JOB_VERSION in
 # web/src/lib/blender/key.ts so old cached results are not reused.
 FROM node:24-bookworm-slim
 
-ARG BLENDER_SERIES=4.5
-ARG BLENDER_VERSION=4.5.14
-ARG BLENDER_SHA256=9ba871ff2ecd36526b77432745980b7e6664ecd0c7ca11c48849073dcfe06da3
+ARG BLENDER_SERIES=5.2
+ARG BLENDER_VERSION=5.2.2
+ARG BLENDER_SHA256=84098912789dc450e95697c4184fb8a90acbe5111c2ba4aede3fecb57806a168
 
 # The libraries headless Blender needs to start (no window is ever opened). If Blender reports a missing .so, add its package here;
 # `ldd /opt/blender/blender | grep "not found"` lists them.

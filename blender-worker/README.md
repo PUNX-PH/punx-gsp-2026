@@ -13,7 +13,7 @@ tests/test_blender.py the Blender scripts' tests (run inside Blender)
 server.test.mjs       the wrapper's tests (run with a fake Blender)
 fixtures/             the fake Blender, a cube and an empty OBJ, and serve-fake.mjs
 smoke.mjs             a quick end-to-end check of a running worker
-Dockerfile            Node 24 + Blender 4.5 LTS (pinned, checksum-verified)
+Dockerfile            Node 24 + Blender 5.2 LTS (pinned, checksum-verified)
 ```
 
 ## The API
@@ -36,7 +36,7 @@ The wrapper (needs only Node 24, no Blender):
 npm --prefix blender-worker test
 ```
 
-The Blender scripts (needs Blender 4.5 on this machine; `blender` below is wherever it is installed):
+The Blender scripts (needs Blender 5.2 on this machine; `blender` below is wherever it is installed):
 
 ```bash
 blender -b --factory-startup --python-exit-code 1 -P blender-worker/tests/test_blender.py
@@ -93,3 +93,15 @@ node blender-worker/smoke.mjs https://blender-worker-xxxx.a.run.app "$(gcloud au
 
 Edit the three `ARG`s in the Dockerfile (the checksum is on `download.blender.org/release/Blender<series>/`), run
 `tests/test_blender.py` with that Blender, and bump `JOB_VERSION` in `web/src/lib/blender/key.ts` so earlier results are not reused.
+
+## The web app's fixtures
+
+`web/src/lib/blender/fixtures/*.glb` are real output of these scripts (a prepared cube and a ring); `blenderOutput.test.ts` checks that
+the app accepts them. After changing a script, regenerate them (Blender 5.2, from the repository root):
+
+```bash
+blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/prepare.py -- --in blender-worker/fixtures/cube.obj \
+  --format obj --triangles 2000 --color "#ff6f59" --out web/src/lib/blender/fixtures/prepared-cube.glb --stats stats.json
+blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/shape.py -- --shape ring --color "#06d6a0" \
+  --out web/src/lib/blender/fixtures/ring.glb --stats stats.json
+```
