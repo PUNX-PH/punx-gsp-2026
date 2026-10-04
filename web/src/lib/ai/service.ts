@@ -69,7 +69,7 @@ export function makeDescribeGameService(deps: DescribeGameDeps): DescribeGameSer
           throw say("The AI declined this request. Try different words.");
         }
         await deps.limits.give(user.uid, day);
-        if (error instanceof AiUnavailableError) log({ step: STEP, outcome: "unavailable" });
+        if (error instanceof AiUnavailableError) log({ step: STEP, outcome: "unavailable", ...(error.status === undefined ? {} : { status: error.status }) });
         else log({ step: STEP, outcome: "unexpected", kind: error instanceof Error ? error.name : typeof error });
         throw say("The AI service did not answer. Try again.");
       }

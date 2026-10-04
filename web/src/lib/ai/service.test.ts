@@ -172,6 +172,26 @@ describe("when the model cannot or will not answer", () => {
     expect((await service.describe(ALICE, noPicture)).reused).toBe(false); // the place was given back, so this one is allowed
   });
 
+  it("logs the HTTP status of an unavailable model (a plain number: it tells a rejected key from an overloaded service)", async () => {
+    const { service, logs } = setup({
+      model: fakeModel(async () => {
+        throw new AiUnavailableError(401);
+      }),
+    });
+    await failure(service.describe(ALICE, noPicture));
+    expect(logs).toEqual([{ step: "describe-game", outcome: "unavailable", status: 401 }]);
+  });
+
+  it("logs no status when there was none", async () => {
+    const { service, logs } = setup({
+      model: fakeModel(async () => {
+        throw new AiUnavailableError();
+      }),
+    });
+    await failure(service.describe(ALICE, noPicture));
+    expect(logs).toEqual([{ step: "describe-game", outcome: "unavailable" }]);
+  });
+
   it("says the same for a failure nobody expected, gives the count back, and logs only its kind", async () => {
     const { service, logs } = setup({
       model: fakeModel(async () => {

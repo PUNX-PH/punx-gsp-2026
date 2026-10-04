@@ -32,9 +32,12 @@ export class AiRefusedError extends Error {
   }
 }
 
-/** The model could not be reached or did not answer in time, or the key is missing or refused. Carries no detail on purpose. */
+/**
+ * The model could not be reached or did not answer in time, or the key is missing or refused. Carries no detail on purpose, except
+ * the HTTP status when there was one: a plain number that is safe to log, and what tells a rejected key from an overloaded service.
+ */
 export class AiUnavailableError extends Error {
-  constructor() {
+  constructor(readonly status?: number) {
     super("The model is not available");
     this.name = "AiUnavailableError";
   }
