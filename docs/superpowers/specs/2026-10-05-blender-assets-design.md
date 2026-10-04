@@ -45,8 +45,8 @@ Claude: inline, with a cache and daily limits. The step that lets the AI choose 
 | Where Blender runs | A container on Cloud Run in the existing Firebase/Google Cloud project, private, scale to zero | Always available, no machine to keep on, and pay-per-use (expected inside the free tier at studio volumes; the figures are to be confirmed in the plan). Rejected: a worker on a studio PC (only works while the PC is on); Node-only clean-up on Vercel (weak FBX/OBJ conversion, and it drops the project's "Blender prepares the assets" decision). |
 | How Play uses it | Inline and cached, no queue | Jobs are capped at 60 s, so Play can wait for them (Vercel runs functions for up to 300 s). The queue slice 4's spec expected for Blender is not needed: a re-Play resumes from the cache. |
 | Normalising scale | Not done in Blender | The Unity template already fits every model to a target height and stands it on its base centre (`ModelFit.cs`). Blender fixes the axes, not the size. |
-| Upload size | Stays 4 MB | Vercel's request-body limit is about 4.5 MB. The v1 spec's 50 MB would need direct-to-storage uploads, a separate feature. The worker's own cap is 50 MB so a later upload route needs no worker change. |
-| Animations | Not supported in v1 | Models are static; rigs and animations are dropped with a note on the card. |
+| Upload size | Stays 4 MB | Vercel's request-body limit is about 4.5 MB. The v1 spec's 50 MB would need direct-to-storage uploads, a separate feature. The worker's own cap is 32 MiB (Cloud Run's HTTP/1 request limit, to be confirmed in the plan) so a later upload route needs no worker change. |
+| Animations | Not supported in v1 | Models are static; rigs and animations are dropped (the card does not say so in v1). |
 
 ## Out of scope for this slice
 
@@ -86,7 +86,7 @@ A small Node HTTP wrapper in a container with Blender and the libraries headless
 
 | Endpoint | In | Out |
 |---|---|---|
-| `POST /prepare?format=glb\|fbx\|obj&triangles=N&color=original\|#rrggbb` | the raw file as the body (up to 50 MB) | 200 and the GLB, with `X-Triangles-Before` and `X-Triangles-After`; or an error `{ "error": "<code>" }` |
+| `POST /prepare?format=glb\|fbx\|obj&triangles=N&color=original\|#rrggbb` | the raw file as the body (up to 32 MiB) | 200 and the GLB, with `X-Triangles-Before` and `X-Triangles-After`; or an error `{ "error": "<code>" }` |
 | `POST /shape` | `{ "shape": "...", "color": "#rrggbb" }` | 200 and the GLB; or an error |
 | `GET /healthz` | nothing | 200 (no Blender run) |
 
@@ -122,7 +122,7 @@ user with no secrets in its environment and a 60 s kill timer, reads the result 
   graph's whole folder is already deleted with it). The execution context's `readAsset` reads a graph's uploads and then its derived
   files, so Game Template and Preview do not change. A cache record whose file is gone counts as a miss.
 - The `model` wire value gains `format: "glb" | "fbx" | "obj"`, `AssetInfo` gains an optional `format` (missing means GLB, as today), and the
-  uploads route accepts FBX and OBJ, decided from the first bytes. Game Template and Preview refuse a non-GLB.
+  uploads route accepts FBX and OBJ, decided from the first bytes. Game Template refuses a non-GLB (Preview only receives GLB sources from it).
 
 ### The rules the service keeps
 
@@ -168,7 +168,7 @@ Every failure names the step and the cause in plain words, never Blender's log:
 | FBX/OBJ wired straight into a game | "Game Template: the hero model is an FBX file. Put a Prepare Model step after it." |
 | `empty` | "Prepare Model: this file has no 3D shape in it." |
 | `bad-format` or unreadable | "Prepare Model: this file could not be read as a GLB, FBX or OBJ." |
-| `too-big` | "Prepare Model: larger than 50 MB." (uploads stop at 4 MB first) |
+| `too-big` | "Prepare Model: larger than 32 MB." (uploads stop at 4 MB first) |
 | `timeout` | "Prepare Model: this model took longer than 60 seconds. Try a simpler one." |
 | worker down, auth, 5xx | "Prepare Model: The Blender service did not answer. Try again." |
 | limit | "Prepare Model: you have used today's 60 Blender jobs. Try again tomorrow." |
@@ -178,7 +178,7 @@ Every failure names the step and the cause in plain words, never Blender's log:
 
 - **Node side, test-first with fakes** (no Blender needed): the file-kind reader for FBX and OBJ (and hostile near-misses), the client
   against a fake `fetch` (token, timeout, each error code), the service (cache hit, limits taken and given back, the error table), the
-  two executors, the Game Template and Preview refusal, the cache key, the deadline arithmetic and the constants test.
+  two executors, the Game Template refusal, the cache key, the deadline arithmetic and the constants test.
 - **Blender scripts, on fixtures** (`blender-worker/fixtures/`): a cube OBJ, a Z-up FBX, a GLB, an empty scene, a broken file and a
   huge-triangle OBJ. They assert triangle count within budget, bounds, Y-up, flat materials and a GLB that re-imports. They need Blender
   installed on this machine (or the image).
@@ -190,7 +190,7 @@ Every failure names the step and the cause in plain words, never Blender's log:
 ## Risks
 
 - **Unproven until the worker exists:** the real Cloud Run call and its auth, cold-start time (expected 10 to 20 s), Blender's memory on
-  real FBX files, FBX variants (binary and ASCII, different versions) and the Firestore and Storage adapters.
+  real FBX files, FBX versions (binary only: an ASCII FBX is refused at upload) and the Firestore and Storage adapters.
 - **FBX is the weak format.** Blender's importer is good but not perfect; some files will fail. The spec's answer is the plain sentence
   above and, for those, GLB or OBJ.
 - **A very large input can still fill memory inside 60 s.** The 4 MB upload cap makes this unlikely; a decompression-style OBJ is the
@@ -221,7 +221,7 @@ web/src/app/graphs/[id]/   settings panels and cards for the two steps
 ## Changes to earlier specs
 
 - v1 spec: Prepare Asset is named Prepare Model; "normalizes scale and pivot" becomes "fixes the axes" (the template fits the size);
-  the 50 MB input limit stays on the worker but uploads stop at 4 MB; Blender's "no network" is optional hardening on Cloud Run; shapes
+  the input limit becomes 32 MiB on the worker but uploads stop at 4 MB; Blender's "no network" is optional hardening on Cloud Run; shapes
   from a fixed list are added (the v1 spec allowed "low-poly shapes the Blender step can make").
 - Slice 4 spec: the queue it expected for Blender is not needed (inline and cached); Describe Game's timeout is capped by Play's
   deadline.
