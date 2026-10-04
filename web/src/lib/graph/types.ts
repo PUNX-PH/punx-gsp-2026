@@ -2,6 +2,7 @@
 // given. The runner's own result types live in runner.ts; the node catalog (labels, ports) is in registry.ts.
 import type { DescribeGameService } from "@/lib/ai/types";
 import type { User } from "@/lib/auth/ports";
+import type { BlenderService, ModelFormat } from "@/lib/blender/types";
 import type { RunService } from "@/lib/runs/types";
 
 /** What a wire carries. A `feel` is the three tuning numbers (how fast, how high, how far apart). */
@@ -45,6 +46,8 @@ export interface AssetInfo {
   name: string; // for people to read; never used in a path
   size: number;
   kind: "image" | "model";
+  /** For a model: what kind of file it is. Missing means a GLB (the only kind before FBX and OBJ were accepted). */
+  format?: ModelFormat;
   contentType: string;
   width?: number;
   height?: number;
@@ -95,18 +98,37 @@ export type ModelSource = { kind: "asset"; sha256: string } | { kind: "builtin";
 
 export type WireValue =
   | { type: "image"; sha256: string; name: string; width: number; height: number }
-  | { type: "model"; sha256: string; name: string; size: number }
+  | { type: "model"; sha256: string; name: string; size: number; format: ModelFormat }
   | { type: "palette"; colors: string[] }
   | { type: "feel"; tuning: Tuning }
   | { type: "settings"; settingsText: string; tuning: Tuning; models: Record<Role, ModelSource> };
 
 // ---- what a node's code is given ----
 
+/**
+ * Files a step makes (Blender's results). They are kept in the graph's own folder under their SHA-256, like its uploads, and go
+ * with the graph; `readAsset` reads one once this Play has stored or recalled it.
+ */
+export interface DerivedFiles {
+  /** Stores a GLB a step made and returns its SHA-256. */
+  put(bytes: Uint8Array): Promise<string>;
+  /** Makes an earlier stored file readable again (true), or says it is gone (false). */
+  recall(sha256: string): Promise<boolean>;
+}
+
 export interface ExecutorContext {
   user: User;
+  /** The graph being played: its folder keeps what steps make, and it is part of every Blender cache key. */
+  graphId: string;
   assets: Assets;
-  /** The bytes of a file uploaded to this graph, or null if it is gone. */
+  /** The bytes of a file uploaded to this graph or made by one of its steps in this Play, or null if it is gone. */
   readAsset(sha256: string): Promise<Uint8Array | null>;
+  /** Where a step keeps the files it makes. */
+  derived: DerivedFiles;
+  /** When Play must be finished (epoch milliseconds): slow steps shape their calls to the time that is left. */
+  deadline: number;
+  /** Prepare Model and Make Shape get their GLBs from this (cache, limits, the clock and the worker). */
+  blender: BlenderService;
   /** Preview stores the game as an ordinary run through these. */
   runs: Pick<RunService, "createRun" | "putFile" | "deleteRun">;
   /** The run this graph's Preview last stored; Preview replaces it. */

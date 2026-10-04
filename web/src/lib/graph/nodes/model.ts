@@ -1,4 +1,4 @@
-// The 3D Model node: hands on the GLB the person chose. The file was checked when it was uploaded.
+// The 3D Model node: hands on the model the person chose (a GLB, FBX or OBJ file). The file was checked when it was uploaded.
 import { type Executor, NodeError } from "@/lib/graph/types";
 
 export const model: Executor = async (_inputs, params, ctx) => {
@@ -6,5 +6,6 @@ export const model: Executor = async (_inputs, params, ctx) => {
   const info = Object.hasOwn(ctx.assets, sha256) ? ctx.assets[sha256] : undefined;
   if (!info || info.kind !== "model") throw new NodeError("3D Model: the file is missing. Choose it again.");
 
-  return { output: { type: "model", sha256, name: info.name, size: info.size }, result: { name: info.name, size: info.size } };
+  const format = info.format ?? "glb"; // a file stored before FBX and OBJ were accepted has no format: it is a GLB
+  return { output: { type: "model", sha256, name: info.name, size: info.size, format }, result: { name: info.name, size: info.size, format } };
 };

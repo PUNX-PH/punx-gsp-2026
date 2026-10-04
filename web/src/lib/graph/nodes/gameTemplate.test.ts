@@ -61,7 +61,7 @@ describe("the Game Template node", () => {
   });
 
   it("uses a connected model for its role and the built-in shapes for the others", async () => {
-    const hero = { type: "model" as const, sha256: SHA, name: "hero.glb", size: 100 };
+    const hero = { type: "model" as const, sha256: SHA, name: "hero.glb", size: 100, format: "glb" as const };
     const { output } = await gameTemplate({ hero }, { tuning }, ctx);
     expect(output?.type === "settings" && output.models).toEqual({
       hero: { kind: "asset", sha256: SHA },

@@ -43,8 +43,8 @@ describe("the Reference Image node", () => {
 describe("the 3D Model node", () => {
   it("hands on the chosen model and says what it is", async () => {
     expect(await model({}, { asset: MODEL_SHA }, context())).toEqual({
-      output: { type: "model", sha256: MODEL_SHA, name: "hero.glb", size: 1500 },
-      result: { name: "hero.glb", size: 1500 },
+      output: { type: "model", sha256: MODEL_SHA, name: "hero.glb", size: 1500, format: "glb" },
+      result: { name: "hero.glb", size: 1500, format: "glb" },
     });
   });
 

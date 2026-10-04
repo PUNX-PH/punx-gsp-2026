@@ -37,7 +37,7 @@ function setup(wrap: (runs: RunService) => Pick<RunService, "createRun" | "putFi
 }
 
 async function game(ctx: ExecutorContext, hero?: string): Promise<WireValue> {
-  const inputs = hero ? { hero: { type: "model" as const, sha256: hero, name: "hero.glb", size: heroGlb.length } } : {};
+  const inputs = hero ? { hero: { type: "model" as const, sha256: hero, name: "hero.glb", size: heroGlb.length, format: "glb" as const } } : {};
   const { output } = await gameTemplate(inputs, { tuning }, ctx);
   return output!;
 }
