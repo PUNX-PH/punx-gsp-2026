@@ -116,4 +116,10 @@ export type Executor = (
   inputs: Partial<Record<string, WireValue>>,
   params: Record<string, unknown>,
   ctx: ExecutorContext,
-) => Promise<{ output?: WireValue; result: unknown }>;
+) => Promise<{
+  /** The value of a step with one output port (it is kept under that port's name). */
+  output?: WireValue;
+  /** The values of a step with several output ports, by port name. When given, it is used instead of `output`. */
+  outputs?: Record<string, WireValue>;
+  result: unknown;
+}>;

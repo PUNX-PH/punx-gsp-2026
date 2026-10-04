@@ -56,7 +56,7 @@ export async function runGraph(graph: Graph, deps: RunDeps, onEvent: (event: Run
   };
 
   const outcomes = new Map<string, NodeOutcome>();
-  const outputs = new Map<string, WireValue | undefined>();
+  const outputs = new Map<string, Partial<Record<string, WireValue>>>();
 
   for (const id of planned.order) {
     const node = nodes.get(id)!;
@@ -75,7 +75,7 @@ export async function runGraph(graph: Graph, deps: RunDeps, onEvent: (event: Run
 
     const inputs = Object.fromEntries(
       incoming.flatMap((e) => {
-        const value = outputs.get(e.from.node);
+        const value = outputs.get(e.from.node)?.[e.from.port];
         return value === undefined ? [] : [[e.to.port, value] as const];
       }),
     ) as Partial<Record<string, WireValue>>;
@@ -83,8 +83,10 @@ export async function runGraph(graph: Graph, deps: RunDeps, onEvent: (event: Run
     if (!Object.hasOwn(deps.executors, node.type)) throw new Error(`no executor for node type ${node.type}`);
     emit({ type: "node-started", node: id });
     try {
-      const { output, result } = await deps.executors[node.type](inputs, node.params, deps.ctx);
-      outputs.set(id, output);
+      const { output, outputs: byPort, result } = await deps.executors[node.type](inputs, node.params, deps.ctx);
+      // A step with one output port may hand over just the value; the wire still leaves from that port's name.
+      const onlyPort = specs[node.type].outputs[0]?.name;
+      outputs.set(id, byPort ?? (output !== undefined && onlyPort !== undefined ? { [onlyPort]: output } : {}));
       outcomes.set(id, { state: "done", result });
       emit({ type: "node-done", node: id, result });
     } catch (error) {

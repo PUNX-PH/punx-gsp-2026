@@ -186,3 +186,60 @@ describe("what a skipped node says", () => {
     expect(result.nodes.c.because).toBe("Skipped because Source failed.");
   });
 });
+
+describe("steps with several outputs", () => {
+  const feel: WireValue = { type: "feel", tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } };
+  const multiSpecs: Record<string, NodeSpec> = {
+    multi: spec("multi", "Multi", [], ["p", "q"]),
+    takeX: spec("takeX", "TakeX", ["x"], [], true),
+    takeY: spec("takeY", "TakeY", ["y"], [], true),
+  };
+  // Multi's two output ports feed two different steps, one wire each.
+  const split: Graph = {
+    schemaVersion: 1,
+    nodes: ["multi", "takeX", "takeY"].map((type, i) => ({ id: `n${i + 1}`, type, params: { tag: type }, position: { x: 0, y: 0 } })),
+    edges: [
+      { from: { node: "n1", port: "p" }, to: { node: "n2", port: "x" } },
+      { from: { node: "n1", port: "q" }, to: { node: "n3", port: "y" } },
+    ],
+  };
+
+  function play(multi: Executor) {
+    const seen = new Map<string, Partial<Record<string, WireValue>>>();
+    const take: Executor = async (inputs, params) => {
+      seen.set(params.tag as string, inputs);
+      return { result: params.tag };
+    };
+    return { seen, run: runGraph(split, { executors: { multi, takeX: take, takeY: take }, ctx, specs: multiSpecs, log: () => {} }) };
+  }
+
+  it("hands each wire the value of the port it leaves from", async () => {
+    const { seen, run } = play(async () => ({ outputs: { p: palette("red"), q: feel }, result: "ok" }));
+    expect((await run).state).toBe("done");
+    expect(seen.get("takeX")).toEqual({ x: palette("red") });
+    expect(seen.get("takeY")).toEqual({ y: feel });
+  });
+
+  it("leaves an input out when the step did not give that port, as if it were unconnected", async () => {
+    const { seen, run } = play(async () => ({ outputs: { p: palette("red") }, result: "ok" }));
+    await run;
+    expect(seen.get("takeX")).toEqual({ x: palette("red") });
+    expect(seen.get("takeY")).toEqual({});
+  });
+
+  it("lets outputs win when a step gives both outputs and the one-output shorthand", async () => {
+    const { seen, run } = play(async () => ({ output: palette("shorthand"), outputs: { p: palette("named"), q: feel }, result: "ok" }));
+    await run;
+    expect(seen.get("takeX")).toEqual({ x: palette("named") });
+  });
+
+  it("skips everything that depends on a failed step, with the existing sentence", async () => {
+    const { run } = play(async () => {
+      throw new NodeError("Multi: it broke");
+    });
+    const result = await run;
+    expect(result.nodes.n1).toEqual({ state: "failed", error: "Multi: it broke" });
+    expect(result.nodes.n2).toEqual({ state: "skipped", because: "Skipped because Multi failed." });
+    expect(result.nodes.n3).toEqual({ state: "skipped", because: "Skipped because Multi failed." });
+  });
+});
