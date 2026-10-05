@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { minPlayableSpacing, rolesNeeded, validateSettings, winnabilityError } from "@/lib/settings";
+import { filesNeeded, minPlayableSpacing, rolesNeeded, validateSettings, winnabilityError } from "@/lib/settings";
 
 // web/src/lib -> repo root is three levels up.
 const FIXTURES = fileURLToPath(new URL("../../../fixtures/settings/", import.meta.url));
@@ -10,6 +10,11 @@ const fixture = (name: string) => readFileSync(FIXTURES + name, "utf8");
 
 // What each invalid fixture's error must contain: the same table as the Unity template's SettingsParserTests.
 const EXPECTED_ERROR: Record<string, string> = {
+  "invalid-environment-bad-index.json": "environment.sky",
+  "invalid-environment-density.json": "environment.density",
+  "invalid-environment-four-files.json": "environment.scenery",
+  "invalid-environment-not-glb.json": "environment.scenery",
+  "invalid-environment-path.json": "environment.scenery",
   "invalid-jump-height-1.json": "jumpHeight",
   "invalid-malformed-json.json": "not valid JSON",
   "invalid-palette-bad-hex.json": "palette",
@@ -144,6 +149,103 @@ describe("text handling", () => {
     const result = validateSettings(JSON.stringify(base));
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("speed");
+  });
+});
+
+describe("the environment", () => {
+  const withEnvironment = (change: (environment: Record<string, unknown>) => void) => {
+    const base = JSON.parse(fixture("valid-environment.json"));
+    change(base.environment);
+    return JSON.stringify(base);
+  };
+
+  it("says what is wrong, in the words the Unity template uses", () => {
+    expect(validateSettings(fixture("invalid-environment-bad-index.json"))).toEqual({
+      ok: false,
+      error: "settings.environment.sky: 5 is not a palette index (0 to 4)",
+    });
+    expect(validateSettings(fixture("invalid-environment-density.json"))).toEqual({
+      ok: false,
+      error: 'settings.environment.density: "many" must be few, some or lots',
+    });
+    expect(validateSettings(fixture("invalid-environment-four-files.json"))).toEqual({
+      ok: false,
+      error: "settings.environment.scenery: at most 3 files, found 4",
+    });
+    expect(validateSettings(fixture("invalid-environment-path.json"))).toEqual({
+      ok: false,
+      error: 'settings.environment.scenery[0]: "../scenery1.glb" must be a plain file name like scenery1.glb (letters, digits, - and _ only)',
+    });
+  });
+
+  it("checks field and stripe like sky, in that order", () => {
+    const both = withEnvironment((e) => {
+      e.field = -1;
+      e.stripe = 9;
+    });
+    expect(validateSettings(both)).toEqual({ ok: false, error: "settings.environment.field: -1 is not a palette index (0 to 4)" });
+    const stripe = withEnvironment((e) => {
+      e.stripe = 9;
+    });
+    expect(validateSettings(stripe)).toEqual({ ok: false, error: "settings.environment.stripe: 9 is not a palette index (0 to 4)" });
+  });
+
+  it("refuses what is not a whole palette index, and an environment that is not an object (web only)", () => {
+    for (const sky of [2.5, "2", null, Number.NaN]) {
+      const result = validateSettings(
+        withEnvironment((e) => {
+          e.sky = sky;
+        }),
+      );
+      expect(result.ok, String(sky)).toBe(false);
+      if (!result.ok) expect(result.error).toContain("settings.environment.sky");
+    }
+    for (const environment of [null, 3, "sky", [], true]) {
+      const base = JSON.parse(fixture("valid.json"));
+      base.environment = environment;
+      expect(validateSettings(JSON.stringify(base))).toEqual({ ok: false, error: "settings.environment: must be an object" });
+    }
+  });
+
+  it("refuses scenery that is not a list of file names", () => {
+    for (const scenery of ["scenery1.glb", null, [1], [null]]) {
+      const result = validateSettings(
+        withEnvironment((e) => {
+          e.scenery = scenery;
+        }),
+      );
+      expect(result.ok, JSON.stringify(scenery)).toBe(false);
+      if (!result.ok) expect(result.error).toContain("settings.environment.scenery");
+    }
+  });
+
+  it("is checked after the tuning, and only when the key is there", () => {
+    const base = JSON.parse(fixture("valid-environment.json"));
+    base.tuning.speed = 0;
+    base.environment.sky = 5;
+    const result = validateSettings(JSON.stringify(base));
+    expect(!result.ok && result.error).toContain("settings.tuning.speed");
+    expect(validateSettings(fixture("valid.json")).ok).toBe(true);
+  });
+});
+
+describe("filesNeeded", () => {
+  const needed = (text: string) => {
+    const result = validateSettings(text);
+    if (!result.ok) throw new Error(result.error);
+    return filesNeeded(result.settings);
+  };
+
+  it("lists the role files and then the scenery files, each once", () => {
+    expect(needed(fixture("valid-environment.json"))).toEqual(["hero.glb", "obstacle.glb", "coin.glb", "scenery1.glb", "scenery2.glb", "scenery3.glb"]);
+    expect(needed(fixture("valid-environment-no-scenery.json"))).toEqual(["hero.glb", "obstacle.glb", "coin.glb"]);
+    const repeated = JSON.parse(fixture("valid-environment.json"));
+    repeated.environment.scenery = ["hero.glb", "scenery1.glb", "scenery1.glb"];
+    expect(needed(JSON.stringify(repeated))).toEqual(["hero.glb", "obstacle.glb", "coin.glb", "scenery1.glb"]);
+  });
+
+  it("is rolesNeeded for settings from before the environment existed", () => {
+    expect(needed(fixture("valid.json"))).toEqual(rolesNeeded(JSON.parse(fixture("valid.json"))));
   });
 });
 

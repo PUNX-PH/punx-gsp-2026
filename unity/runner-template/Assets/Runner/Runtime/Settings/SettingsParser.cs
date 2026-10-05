@@ -16,6 +16,8 @@ namespace Runner.Settings
     public static class SettingsParser
     {
         const int SupportedVersion = 1;
+        const int MaxScenery = 3;
+        static readonly string[] Densities = { "few", "some", "lots" };
         static readonly Regex HexColor = new Regex("^#[0-9a-fA-F]{6}$");
         static readonly Regex GlbFileName = new Regex("^[A-Za-z0-9_-]+\\.[Gg][Ll][Bb]$");
 
@@ -59,10 +61,43 @@ namespace Runner.Settings
             if (roleError != null) return roleError;
 
             if (s.tuning == null) return "settings.tuning: missing";
-            return CheckRange("speed", s.tuning.speed, 1f, 20f)
-                   ?? CheckRange("jumpHeight", s.tuning.jumpHeight, 1.5f, 5f)
-                   ?? CheckRange("obstacleSpacing", s.tuning.obstacleSpacing, 4f, 40f)
-                   ?? Winnability.Check(s.tuning); // the three values together, once each is in range
+            var tuningError = CheckRange("speed", s.tuning.speed, 1f, 20f)
+                              ?? CheckRange("jumpHeight", s.tuning.jumpHeight, 1.5f, 5f)
+                              ?? CheckRange("obstacleSpacing", s.tuning.obstacleSpacing, 4f, 40f)
+                              ?? Winnability.Check(s.tuning); // the three values together, once each is in range
+            if (tuningError != null || !HasEnvironment(s)) return tuningError;
+            return CheckEnvironment(s.environment);
+        }
+
+        /// <summary>
+        /// Whether the file carried an environment. JsonUtility gives every nested object a default instance, so "absent" is an
+        /// environment whose density was never set (a file that has one always names its density).
+        /// </summary>
+        public static bool HasEnvironment(GameSettings s)
+        {
+            return s.environment != null && !string.IsNullOrEmpty(s.environment.density);
+        }
+
+        static string CheckEnvironment(EnvironmentSettings e)
+        {
+            var error = CheckPaletteIndex("sky", e.sky) ?? CheckPaletteIndex("field", e.field) ?? CheckPaletteIndex("stripe", e.stripe);
+            if (error != null) return error;
+            if (Array.IndexOf(Densities, e.density) < 0)
+                return $"settings.environment.density: \"{e.density}\" must be few, some or lots";
+
+            var scenery = e.scenery ?? new string[0]; // a missing list counts as no scenery
+            if (scenery.Length > MaxScenery)
+                return $"settings.environment.scenery: at most {MaxScenery} files, found {scenery.Length}";
+            for (var i = 0; i < scenery.Length; i++)
+                if (scenery[i] == null || !GlbFileName.IsMatch(scenery[i]))
+                    return $"settings.environment.scenery[{i}]: \"{scenery[i]}\" must be a plain file name like scenery1.glb (letters, digits, - and _ only)";
+            return null;
+        }
+
+        static string CheckPaletteIndex(string name, int value)
+        {
+            if (value >= 0 && value <= 4) return null;
+            return $"settings.environment.{name}: {value} is not a palette index (0 to 4)";
         }
 
         static string CheckRole(string role, string file)

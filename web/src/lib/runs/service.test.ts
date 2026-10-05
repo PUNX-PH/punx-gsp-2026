@@ -96,6 +96,27 @@ describe("createRun", () => {
   });
 });
 
+describe("a run with an environment", () => {
+  const environmentSettings = readFileSync(FIXTURES + "valid-environment.json", "utf8");
+  const ALL = ["hero.glb", "obstacle.glb", "coin.glb", "scenery1.glb", "scenery2.glb", "scenery3.glb"];
+
+  it("needs the scenery files too, and is ready only when all of them are stored", async () => {
+    const { id, needed } = await service.createRun(alice, environmentSettings);
+    expect(needed).toEqual(ALL);
+    for (const name of ALL.slice(0, -1)) expect((await service.putFile(alice, id, name, glb())).status).toBe("pending");
+    expect((await service.putFile(alice, id, "scenery3.glb", glb())).status).toBe("ready");
+  });
+
+  it("accepts scenery1.glb and refuses a scenery file the settings did not name", async () => {
+    const { id } = await service.createRun(alice, environmentSettings);
+    await service.putFile(alice, id, "scenery1.glb", glb());
+    expect(await failure(service.putFile(alice, id, "scenery4.glb", glb()))).toMatchObject({
+      status: 400,
+      message: "scenery4.glb is not one of this run's files",
+    });
+  });
+});
+
 describe("listRuns", () => {
   it("returns only the caller's runs, newest first, and removes stale pending ones", async () => {
     const a1 = await readyRun();

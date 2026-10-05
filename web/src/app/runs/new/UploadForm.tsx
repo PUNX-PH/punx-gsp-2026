@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { checkGlb } from "@/lib/glb";
-import { rolesNeeded, validateSettings } from "@/lib/settings";
+import { filesNeeded, validateSettings } from "@/lib/settings";
 import { planUploads } from "@/lib/uploadPlan";
 
 const MAX_GLB_BYTES = 4 * 1024 * 1024;
@@ -34,7 +34,7 @@ export function UploadForm() {
     // The same rules the server applies, so a mistake shows before anything is created or sent.
     const checked = validateSettings(text);
     if (!checked.ok) return setError(checked.error);
-    const plan = planUploads(rolesNeeded(checked.settings), models, MAX_GLB_BYTES);
+    const plan = planUploads(filesNeeded(checked.settings), models, MAX_GLB_BYTES);
     if (!plan.ok) return setError(plan.error);
 
     // Each file is read once and given the same GLB check the server runs, so a bad file is reported now, before a

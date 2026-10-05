@@ -3,12 +3,25 @@
 // fixtures/settings/ are accepted and rejected the same way by both. This validator may be stricter than Unity on a
 // wrongly typed value, never looser. The 16 KB size limit is the caller's job.
 
+export const DENSITIES = ["few", "some", "lots"] as const;
+export type Density = (typeof DENSITIES)[number];
+
+/** Optional: settings from before it existed have none. The three indexes are into the palette; the scenery files are GLBs next to settings.json. */
+export interface Environment {
+  sky: number;
+  field: number;
+  stripe: number;
+  density: Density;
+  scenery: string[];
+}
+
 export interface GameSettings {
   schemaVersion: number;
   template: string;
   palette: string[];
   roles: { hero: string; obstacle: string; collectible: string };
   tuning: { speed: number; jumpHeight: number; obstacleSpacing: number };
+  environment?: Environment;
 }
 
 export type SettingsResult = { ok: true; settings: GameSettings; text: string } | { ok: false; error: string };
@@ -17,6 +30,7 @@ const SUPPORTED_VERSION = 1;
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const GLB_FILE_NAME = /^[A-Za-z0-9_-]+\.[Gg][Ll][Bb]$/;
 const ROLES = ["hero", "obstacle", "collectible"] as const;
+const MAX_SCENERY = 3;
 
 // From RunnerSim.cs and Winnability.cs. The Unity template reads each number from the settings file as a single-precision
 // float and then does the winnability arithmetic in double precision, which is identical in the Editor and in the
@@ -50,6 +64,11 @@ export function rolesNeeded(s: GameSettings): string[] {
   return [...new Set(ROLES.map((role) => s.roles[role]))];
 }
 
+/** Every file a run must have besides settings.json: the role files, then the scenery files, each name once. */
+export function filesNeeded(s: GameSettings): string[] {
+  return [...new Set([...rolesNeeded(s), ...(s.environment?.scenery ?? [])])];
+}
+
 function fail(error: string): SettingsResult {
   return { ok: false, error };
 }
@@ -76,12 +95,51 @@ function validate(s: Record<string, unknown>): string | null {
 
   if (!isObject(s.tuning)) return "settings.tuning: missing";
   const t = s.tuning;
-  return (
+  const tuningError =
     checkRange("speed", t.speed, 1, 20) ??
     checkRange("jumpHeight", t.jumpHeight, 1.5, 5) ??
     checkRange("obstacleSpacing", t.obstacleSpacing, 4, 40) ??
-    winnabilityError(t.speed as number, t.jumpHeight as number, t.obstacleSpacing as number)
+    winnabilityError(t.speed as number, t.jumpHeight as number, t.obstacleSpacing as number);
+  if (tuningError) return tuningError;
+
+  return Object.hasOwn(s, "environment") ? checkEnvironment(s.environment) : null;
+}
+
+// A value in a message: as JSON, cut short, so a long or odd value cannot flood it.
+function shown(value: unknown): string {
+  return JSON.stringify(value)?.slice(0, 40) ?? "missing";
+}
+
+function checkEnvironment(e: unknown): string | null {
+  if (!isObject(e)) return "settings.environment: must be an object";
+  return (
+    checkPaletteIndex("sky", e.sky) ??
+    checkPaletteIndex("field", e.field) ??
+    checkPaletteIndex("stripe", e.stripe) ??
+    checkDensity(e.density) ??
+    checkScenery(e.scenery)
   );
+}
+
+function checkPaletteIndex(name: string, value: unknown): string | null {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 4) return null;
+  return `settings.environment.${name}: ${shown(value)} is not a palette index (0 to 4)`;
+}
+
+function checkDensity(value: unknown): string | null {
+  if (typeof value === "string" && (DENSITIES as readonly string[]).includes(value)) return null;
+  return `settings.environment.density: ${shown(value)} must be ${DENSITIES.slice(0, -1).join(", ")} or ${DENSITIES[DENSITIES.length - 1]}`;
+}
+
+function checkScenery(files: unknown): string | null {
+  if (!Array.isArray(files)) return "settings.environment.scenery: must be a list of file names";
+  if (files.length > MAX_SCENERY) return `settings.environment.scenery: at most ${MAX_SCENERY} files, found ${files.length}`;
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (typeof file !== "string" || !GLB_FILE_NAME.test(file))
+      return `settings.environment.scenery[${i}]: ${shown(file)} must be a plain file name like scenery1.glb (letters, digits, - and _ only)`;
+  }
+  return null;
 }
 
 function checkPalette(palette: unknown): string | null {

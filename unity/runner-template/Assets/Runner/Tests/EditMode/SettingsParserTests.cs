@@ -93,5 +93,46 @@ namespace Runner.Tests
 
         [Test] public void Parse_rejects_a_jump_that_cannot_clear_an_obstacle() => AssertRejected("invalid-unwinnable-jump.json", "jumpHeight");
         [Test] public void Parse_rejects_spacing_too_short_to_land_and_jump_again() => AssertRejected("invalid-unwinnable-spacing.json", "obstacleSpacing");
+
+        // The environment: shared with the web validator, which has the same table of messages.
+        [Test]
+        public void Parse_reads_an_environment()
+        {
+            var result = SettingsParser.Parse(Fixture("valid-environment.json"));
+            Assert.IsTrue(result.Ok, result.Error);
+            var e = result.Settings.environment;
+            Assert.IsTrue(SettingsParser.HasEnvironment(result.Settings));
+            Assert.AreEqual(0, e.sky);
+            Assert.AreEqual(3, e.field);
+            Assert.AreEqual(4, e.stripe);
+            Assert.AreEqual("some", e.density);
+            Assert.AreEqual(new[] { "scenery1.glb", "scenery2.glb", "scenery3.glb" }, e.scenery);
+        }
+
+        [Test]
+        public void Parse_accepts_an_environment_without_scenery()
+        {
+            var result = SettingsParser.Parse(Fixture("valid-environment-no-scenery.json"));
+            Assert.IsTrue(result.Ok, result.Error);
+            Assert.IsTrue(SettingsParser.HasEnvironment(result.Settings));
+            Assert.AreEqual(0, result.Settings.environment.scenery.Length);
+        }
+
+        [Test]
+        public void Settings_from_before_have_no_environment()
+        {
+            foreach (var name in new[] { "valid.json", "valid-extra-fields.json" })
+            {
+                var result = SettingsParser.Parse(Fixture(name));
+                Assert.IsTrue(result.Ok, result.Error);
+                Assert.IsFalse(SettingsParser.HasEnvironment(result.Settings), name);
+            }
+        }
+
+        [Test] public void Parse_rejects_scenery_with_a_path() => AssertRejected("invalid-environment-path.json", "environment.scenery[0]");
+        [Test] public void Parse_rejects_four_scenery_files() => AssertRejected("invalid-environment-four-files.json", "at most 3 files, found 4");
+        [Test] public void Parse_rejects_a_sky_that_is_not_a_palette_index() => AssertRejected("invalid-environment-bad-index.json", "environment.sky: 5 is not a palette index (0 to 4)");
+        [Test] public void Parse_rejects_scenery_that_is_not_glb() => AssertRejected("invalid-environment-not-glb.json", "environment.scenery[0]");
+        [Test] public void Parse_rejects_an_unknown_density() => AssertRejected("invalid-environment-density.json", "environment.density: \"many\" must be few, some or lots");
     }
 }

@@ -4,7 +4,7 @@
 // exist, or has no such file all look the same ("Not found").
 import type { User } from "@/lib/auth/ports";
 import { checkGlb } from "@/lib/glb";
-import { rolesNeeded, validateSettings } from "@/lib/settings";
+import { filesNeeded, validateSettings } from "@/lib/settings";
 import { FileExistsError, type FileStore, type Run, RunError, type RunRecords, type RunService } from "@/lib/runs/types";
 
 const MAX_RUNS_PER_PERSON = 20;
@@ -57,7 +57,7 @@ export function makeRunService(deps: RunServiceDeps): RunService {
       if (existing.length >= MAX_RUNS_PER_PERSON) throw new RunError(409, `You have ${MAX_RUNS_PER_PERSON} runs. Delete one first.`);
 
       const id = newId();
-      const needed = rolesNeeded(result.settings);
+      const needed = filesNeeded(result.settings);
       const settingsBytes = new TextEncoder().encode(result.text);
       // The record goes first: if storing the file fails, a pending run is left that cleanup removes after an hour.
       await records.create({
