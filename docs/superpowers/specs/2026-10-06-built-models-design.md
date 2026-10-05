@@ -20,6 +20,12 @@ a world around the track:
 The v1 spec ruled out "AI 3D generation". This slice does not generate meshes with an AI: the AI chooses from a fixed kit and fills in
 bounded numbers, and Blender, which we run, builds the model. No paid 3D service is involved.
 
+**Amended 2026-10-06 (after the quality showcase): a High quality tier, optimized.** Everything above is the **Standard** tier (low-poly,
+flat-colored, phone-safe, the default). A creator can set **Quality: High** on Build Model and Build Environment and get lit, detailed models and
+a real world (sky, sun, dunes or hills, a road, distant mesas) while staying inside hard performance budgets. The showcase proved the look is
+reachable but also showed what *not* to ship: a 63,000-triangle hero and a 40 to 60 second load. The tier is defined by its budgets, not by
+how much detail can be added ("The quality tier" below).
+
 **Done for this slice** (each is a check on the live site unless it says otherwise):
 
 1. Signed out, nothing can reach Claude or the worker (every graph page and API call is still refused; the worker answers 403).
@@ -36,6 +42,11 @@ bounded numbers, and Blender, which we run, builds the model. No paid 3D service
 8. Plain refusals, each on the step (the table under Error handling).
 9. A finished game holds 30 frames per second or more on a real phone (a manual check, Unity's mobile build).
 10. No secret is in the repository, the worker is still private, and the Claude key exists only in Vercel.
+11. **High quality, optimized.** With Quality set to High on Build Model and Build Environment (kinds chosen, boxes empty: no AI needed), the game
+    looks lit (sky with a sun, metal and glow finishes, a soft contact shadow, fog, a road, dunes or hills, distant mesas) and every budget in
+    "The quality tier" holds: model triangles and vertices, visible triangles, active renderers, the run folder's size, and **ready in 15 seconds
+    or less** on a desktop browser at **60 frames per second or more**. On a phone the game steps its own detail down to keep **30 or more**.
+12. A Standard game is unchanged: flat look, the Standard budgets, and settings files from before this tier play exactly as before.
 
 Covered by tests, not on the live site: the recipe checks and repairs, the Blender builder for every kind, the motion baking, the Jump
 sync, the settings contract on both sides, the cache keys and the limits.
@@ -55,13 +66,20 @@ sync, the settings contract on both sides, the cache keys and the limits.
 | AI is optional | A chosen kind with an empty description builds the default for that kind | Lets the whole slice be checked live while the Anthropic key is still unfunded (slice 4 is parked for the same reason). |
 | Colors | Recipes use palette slots (0 to 4), never hex | A palette change re-colors without asking Claude again, and the readable-HUD guard from slice 4 keeps working. |
 | Where the model's role is chosen | A `role` setting on Build Model (hero, obstacle, collectible) | The step then knows which boxes to show and which clips to build, and the Unity template only plays what exists. |
+| Quality tier | A `quality` setting on Build Model and Build Environment: **Standard** (default) or **High** | The studio asked for the best quality we can make, and for it to be optimized. A setting keeps phones and cheap games on the Standard path. |
+| What defines High | Hard budgets (triangles, vertices, meshes, materials, visible triangles, renderers, run-folder size, load time, frame rate), checked by the recipe check, the worker and the tests | The showcase's brute-force detail loaded in 40 to 60 s; a budget makes quality something the pipeline can promise. |
+| How High stays small | Detail from finishes, bevels on large parts only, and baked vertex-color cavity shading; shared vertices; one mesh per joint group; a deterministic budget fit that drops detail in a fixed order | Looks rich without triangles; fewer vertices to decode and fewer draw calls. |
+| The lit look | Settings gain an optional `look` (`flat` or `lit`); the template ships both shaders, and GPU instancing for the pooled clones | The showcase shader, cleaned up; old games stay flat. |
+| Slow devices | The template measures its own frame time and steps detail down in fixed levels (never back up in a session) | Keeps 30 fps on a phone without a separate build, and without asking the person. |
+| Dependencies | None added: no Draco, no meshopt | Both need a new package; if the load budget cannot be met without one, that is a separate decision. |
 
 ## Out of scope for this slice
 
 Four-legged and flying kinds; skinned meshes and single-mesh imports; rigged uploads (Prepare Model still removes rigs and animations);
 realistic meshes from an open image-to-3D model with an automatic rigger (they can later sit behind Build Model's design call); a motion
 viewer on the card (the creator sees the motion by pressing Play); Idle, hit, collect and game-over animations; scenery beyond the kit;
-sound; shadows; a second template; a job queue or parallel steps in Play.
+sound; real-time shadow maps (the lit look has a soft contact shadow only); mesh compression and level-of-detail meshes; textures; a second
+template; a job queue or parallel steps in Play.
 
 ## What the person sees
 
@@ -77,6 +95,61 @@ sound; shadows; a second template; a job queue or parallel steps in Play.
   a Run clip, or an obstacle without a Loop clip, plays still, as today; a model whose role does not match its slot is refused in plain words.
 - **A third starter graph**, "Build a character": Build Model (hero, kind two-legged), Build Environment, Game Template, Preview, working
   with every box empty (no AI).
+- **Quality** on both new steps: **Standard** or **High** (default Standard), with one plain line: "High looks best on a computer. On a slow
+  device the game lowers its own detail." The card adds "High quality" and the real numbers ("11,820 triangles, 9,100 vertices, 387 KB").
+
+## The quality tier (High), optimized
+
+The tier is a **contract of budgets** plus the techniques that meet them. Standard keeps every number above. The recipe check, the worker's
+second check and the Blender tests all enforce the High budgets, so a recipe that would break one is repaired or refused before Blender runs.
+
+| Budget (High) | Biped | Vehicle | Blob | Prop | Scenery piece |
+|---|---|---|---|---|---|
+| Triangles | 12,000 | 6,000 | 5,000 | 3,500 | 1,500 |
+| Vertices (shared, welded) | 9,500 | 4,800 | 4,000 | 2,800 | 1,200 |
+| Parts | 80 | 50 | 30 | 24 | 24 |
+| Meshes (one per joint group) | 14 | 10 | 6 | 5 | 3 |
+| Materials | 7 | 7 | 7 | 7 | 7 |
+
+World pieces (High environment, three GLBs): terrain tile 8,000 triangles and 4,200 vertices, road 1,500 and 1,200, backdrop 1,200 and 700.
+
+**Game-level budgets, measured and recorded** (default recipes, every step High, desktop browser on the studio's machine): at most **100,000
+triangles visible** at once; at most **100 active renderers** (Standard keeps 120); the run folder's GLBs at most **1.5 MB** and **60,000
+vertices** together; **ready within 15 seconds** from the start of loading (the template logs it); **60 frames per second or more**; on a phone,
+**30 or more**, kept by the governor below. Each budget has a test or a recorded measurement in the plan.
+
+**How the builder meets them** (all in `build.py`, all driven by fixed tables, never by a field used as code):
+1. **Finishes, not geometry.** Each color slot gets one finish from a fixed list: `matte`, `painted`, `metal`, `rubber`, `glow`. A finish is a
+   metallic, roughness and emission setting, so metal and glow cost nothing in triangles.
+2. **Bevels where they show.** Rounded edges only on parts above an area threshold, with segment counts fixed by the tier; small parts stay hard.
+3. **Details from a fixed list**, each priced in triangles: `seams`, `bolts`, `cables`, `lights`. A deterministic **budget fit** adds details in
+   priority order while the budget holds and drops the lowest-priority ones when it does not (cables, then bolts, then seams, then lights,
+   then extras, then bevel segments), so the builder never exceeds a budget and the same recipe always gives the same model.
+4. **Baked cavity shading.** A cheap per-vertex multiplier (0.55 to 1.0) from how concave the surface is and how low it sits, stored as vertex
+   color. It gives contact depth for free; the lit shader multiplies it in.
+5. **Shared vertices and one mesh per joint group.** Vertices are welded, normals smoothed by angle, parts joined, so there are fewer vertices
+   to decode and fewer draw calls.
+6. **A real world, small.** Terrain is a 2 m grid with shared vertices that repeats seamlessly every 100 m; the road and its markings are one
+   mesh; the backdrop is one ring mesh. Two styles in this slice: `desert` (dunes, asphalt, mesas, sunset) and `meadow` (rolling hills, a
+   dirt road, distant hills, daylight). Colors come from the palette slots, so a palette change recolors it.
+
+**How the template stays fast** (Unity):
+- **Lit look.** `settings.look` is `flat` (the default, today's shader) or `lit` (the showcase shader, cleaned up: sun, sky and ground light,
+  metal and rim light, emission, vertex-color shading, fog, a filmic curve). A game is `lit` when any wired model or the environment is High.
+- **GPU instancing** for the pooled clones (they share a mesh and a material), so ten crates cost about one draw call.
+- **No per-frame allocation**; pooled scenery and tiles are repositioned by slot, as today.
+- **The quality governor.** A small pure class watches the average frame time over 3 seconds. Above 34 ms it steps down one level (at most one
+  step every 5 seconds, never back up in a session): level 1 hides every other scenery item; level 2 drops scenery, the backdrop and the contact
+  shadow; level 3 switches the lit shader to its simple branch (half-Lambert and fog only). `debug=1` shows the level.
+- **Load.** The template logs `RUNNER ready in N ms`; the budgets above are what keep it low (glTFast decodes on one thread, so decode time
+  follows vertex count).
+
+**Settings contract.** `settings.json` gains an optional `look` (`flat` or `lit`) and the `environment` object gains an optional `world` (`style`
+`desert` or `meadow`; the three world files have fixed names `terrain.glb`, `road.glb` and `backdrop.glb`). Both are additive under schema
+version 1 and checked on both sides with shared fixtures.
+
+**Cost and limits.** A High build counts as one Blender job (they take a few seconds, well inside the 60 s kill); Claude's calls are unchanged
+except that the prompts carry the tier's kit (finishes, details, world styles). The tier is part of every cache key.
 
 ## Architecture
 
@@ -225,6 +298,13 @@ Build Environment uses the same sentences with its own name. A failed step skips
   clips loads, its probe joints move while running and the clip switches with the jump (the spike's probes as real tests), pooled
   collectibles keep animating, scenery recycles without a change in position or model, and the active renderer count stays within budget.
 - **Editor:** `renderToString` tests for the two panels and cards, as in slices 3b to 5.
+- **The High budgets:** the recipe check and the worker's check refuse or repair a High recipe over a budget (a table over every budget and every
+  kind, shared fixtures accepted and refused the same way on both sides); the Blender tests build every kind's default High recipe and a stress
+  recipe and assert triangles, vertices, parts, meshes, materials, the file's size, the finishes' metallic, roughness and emission, that the
+  cavity multiplier is within 0.55 to 1.0, and that the same recipe gives the same counts twice; the terrain tile's first and last rows match
+  (seamless); a test adds up the default recipes' real output against the run-folder and vertex budgets. Unity: the governor against recorded
+  frame times (steps, spacing, never back up), the lit settings and world file checks, and a PlayMode renderer count of 100 or fewer with every
+  step High. A recorded measurement, not a pass or fail, covers the load time and the frame rates.
 - **Live acceptance:** the done-criteria above, in a real browser, then on a phone.
 
 ## Risks
@@ -241,6 +321,12 @@ Build Environment uses the same sentences with its own name. A failed step skips
 6. **A template rebuild is needed** on the studio's machine, which needs the Unity Hub sign-in to be active (a batch build fails without it),
    and the new template must be published and the live checks repeated.
 7. **A big slice.** The plan splits it into stages that can each be tested alone (below) so a problem in one cannot hide in the rest.
+8. **High is one design family.** The two-legged High model is the showcase's toy-robot character (visor, panels, antenna, parcel, scarf)
+   varied by proportions, finishes, colors and extras. A fox or a knight will be a toy-robot fox or knight. More families are later work.
+9. **The load budget may not be reachable without compression.** Decode time follows vertex count, so the budgets are the lever. If the
+   measured load is over 15 s on the studio's machine, the options are lower budgets or a mesh-compression package, which is a new
+   dependency and the studio's decision.
+10. **The governor is untested on real phones until the phone check.** Its thresholds are a first guess, kept in one table.
 
 ## Plan stages (for `writing-plans`)
 
@@ -252,6 +338,9 @@ Build Environment uses the same sentences with its own name. A failed step skips
 4. **Claude:** the three ports and adapters, the design and motion caches, the checking, against the fake; live once the key exists.
 5. **Environment:** the scenery builders, Build Environment, the `environment` wire and settings, the template's field, stripes and scenery,
    the renderer budget.
+6. **The High quality tier, optimized** (after stage 5, before the final review): the tier in the kit and the checks, the High builders for
+   every kind and the scenery, the world builders, the `quality` setting and keys, the lit look and the governor in Unity, the budget tests, and a
+   measured rebuild.
 
 ## Repository layout
 
@@ -275,7 +364,8 @@ docs/superpowers/notes/  slice6-results.md (after the live checks)
   animations). The cache, limits, deadline and error-code machinery are reused.
 - **Describe Game (slice 4):** unchanged; Build Model reuses its picture reader, its limits and its structured-output pattern, and Describe
   Game remains the step that sets the palette and feel.
-- **Settings contract (slice 1):** an optional `environment` object and scenery files are added under schema version 1.
+- **Settings contract (slice 1):** an optional `environment` object and scenery files, an optional `look` and an optional `environment.world`
+  are added under schema version 1.
 
 ## What only the studio can do (ask before each)
 
