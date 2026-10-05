@@ -83,6 +83,16 @@ function Result({ result, onOpenGame }: { result: ResultView; onOpenGame?: () =>
           {result.reused && <p className={styles.reusedNote}>Reused your earlier result</p>}
         </div>
       );
+    case "built":
+      return (
+        <div className={cx(styles.result, styles.described)}>
+          <span className={styles.chip}>{result.line}</span>
+          <p className={styles.hint}>{result.clips}</p>
+          <p className={styles.summary}>{result.summary}</p>
+          {result.skipped !== null && <p className={styles.hint}>{result.skipped}</p>}
+          {result.reused && <p className={styles.reusedNote}>Reused your earlier result</p>}
+        </div>
+      );
     case "open-game":
       return (
         <div className={styles.result}>

@@ -40,6 +40,13 @@ export function Icon({ type }: { type: string }) {
           <circle cx="12" cy="4.8" r="1.8" />
         </>,
       );
+    case "build-model":
+      return svg(
+        <>
+          <circle cx="8" cy="3.6" r="1.6" />
+          <path d="M8 5.4v4M4.5 7.2L8 6l3.5 1.2M8 9.4l-2.4 4M8 9.4l2.4 4" />
+        </>,
+      );
     case "palette-from-image":
       return svg(<path d="M8 2.5c2.5 3 4 4.7 4 6.7a4 4 0 0 1-8 0c0-2 1.5-3.7 4-6.7z" />);
     case "describe-game":

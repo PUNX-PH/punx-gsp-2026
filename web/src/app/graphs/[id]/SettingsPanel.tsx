@@ -8,10 +8,11 @@ import styles from "@/app/graphs/[id]/editor.module.css";
 import { Icon } from "@/app/graphs/[id]/icons";
 import type { ResultView, StepData } from "@/lib/canvas/cardView";
 import { SHAPES, SHAPE_NAMES, TRIANGLES } from "@/lib/blender/types";
+import { KIND_NAMES, MODEL_KINDS } from "@/lib/builder/kinds";
 import { TUNING_FIELDS, tuningProblem } from "@/lib/canvas/tuning";
 import { SAMPLE_PALETTE } from "@/lib/graph/palette";
-import { MAX_PROMPT_CHARACTERS } from "@/lib/graph/registry";
-import type { Assets, GraphNode, Tuning } from "@/lib/graph/types";
+import { MAX_DESCRIPTION_CHARACTERS, MAX_MOTION_CHARACTERS, MAX_PROMPT_CHARACTERS } from "@/lib/graph/registry";
+import { type Assets, type GraphNode, ROLE_FILES, type Role, type Tuning } from "@/lib/graph/types";
 
 export interface SettingsPanelProps {
   node: GraphNode | null;
@@ -200,6 +201,72 @@ function PromptBox({ nodeId, prompt, onPrompt }: { nodeId: string; prompt: strin
   );
 }
 
+const ROLE_NAMES: Record<Role, string> = { hero: "Hero", obstacle: "Obstacle", collectible: "Collectible" };
+const ROLES = Object.keys(ROLE_FILES) as Role[];
+
+// A group of buttons of which one is pressed; picking one changes one setting.
+function ChoiceGroup(props: { label: string; choices: { value: string; name: string }[]; current: unknown; onPick: (value: string) => void }) {
+  const id = useId();
+  return (
+    <div className={styles.field} role="group" aria-labelledby={id}>
+      <span id={id} className={styles.fieldLabel}>
+        {props.label}
+      </span>
+      <ul className={styles.choiceRow}>
+        {props.choices.map((choice) => (
+          <li key={choice.value}>
+            <button type="button" className={cx(styles.choice, props.current === choice.value && styles.choiceOn)} aria-pressed={props.current === choice.value} onClick={() => props.onPick(choice.value)}>
+              {choice.name}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function WordsBox(props: { label: string; value: string; max: number; rows: number; counter: boolean; onChange: (value: string) => void }) {
+  const id = useId();
+  return (
+    <div className={styles.field}>
+      <label htmlFor={id} className={styles.fieldLabel}>
+        {props.label}
+      </label>
+      <textarea id={id} className={styles.promptBox} rows={props.rows} maxLength={props.max} value={props.value} onChange={(event) => props.onChange(event.target.value)} />
+      {props.counter && <p className={styles.hint}>{`${props.max - Array.from(props.value).length} characters left`}</p>}
+    </div>
+  );
+}
+
+// Build Model: what it is for (role), what it is (kind, or Auto to let the AI choose), and the person's own words for the model and its
+// motions. A hero has a Run and a Jump box; an obstacle or a collectible has a Loop box.
+function BuildModelPanel({ node, onSettings }: { node: GraphNode; onSettings: SettingsPanelProps["onSettings"] }) {
+  const text = (key: string) => (typeof node.params[key] === "string" ? (node.params[key] as string) : "");
+  const hero = node.params.role === "hero";
+  return (
+    <>
+      <ChoiceGroup label="Role" choices={ROLES.map((value) => ({ value, name: ROLE_NAMES[value] }))} current={node.params.role} onPick={(role) => onSettings(node.id, { role })} />
+      <ChoiceGroup
+        label="Kind"
+        choices={[{ value: "auto", name: "Auto" }, ...MODEL_KINDS.map((value) => ({ value, name: KIND_NAMES[value] }))]}
+        current={node.params.kind}
+        onPick={(kind) => onSettings(node.id, { kind })}
+      />
+      <WordsBox label="What is it?" value={text("description")} max={MAX_DESCRIPTION_CHARACTERS} rows={4} counter onChange={(description) => onSettings(node.id, { description })} />
+      {hero ? (
+        <>
+          <WordsBox label="Run" value={text("run")} max={MAX_MOTION_CHARACTERS} rows={2} counter={false} onChange={(run) => onSettings(node.id, { run })} />
+          <WordsBox label="Jump" value={text("jump")} max={MAX_MOTION_CHARACTERS} rows={2} counter={false} onChange={(jump) => onSettings(node.id, { jump })} />
+        </>
+      ) : (
+        <WordsBox label="Loop" value={text("loop")} max={MAX_MOTION_CHARACTERS} rows={2} counter={false} onChange={(loop) => onSettings(node.id, { loop })} />
+      )}
+      <p className={styles.hint}>Leave a box empty for the usual motion.</p>
+      <p className={styles.hint}>{"Your words and picture are sent to Anthropic's Claude to design this; with every box empty, nothing is sent."}</p>
+    </>
+  );
+}
+
 function TuningSliders({ node, data, onTune }: { node: GraphNode; data: StepData; onTune: SettingsPanelProps["onTune"] }) {
   const id = useId();
   const tuning = node.params.tuning as Tuning;
@@ -304,6 +371,7 @@ export function SettingsPanel({ node, data, uploading, error, onChooseFile, onTu
           <ColorChoice nodeId={node.id} color={node.params.color} swatches={data.swatches} withOriginal={false} onSettings={onSettings} />
         </>
       )}
+      {node.type === "build-model" && <BuildModelPanel node={node} onSettings={onSettings} />}
       {node.type === "describe-game" && <PromptBox nodeId={node.id} prompt={typeof node.params.prompt === "string" ? node.params.prompt : ""} onPrompt={onPrompt} />}
       {node.type === "game-template" && <TuningSliders node={node} data={data} onTune={onTune} />}
       {node.type === "palette-from-image" && colors.length > 0 && (
