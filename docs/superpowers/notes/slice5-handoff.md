@@ -1,5 +1,9 @@
 # Slice 5 handoff: Blender assets, Prepare Model and Make Shape (written 2026-10-05)
 
+**Update 2026-10-05: the worker is deployed and passes its smoke test on Cloud Run** (private, as a no-roles account, in `us-east1`). What is
+left of the studio's setup (the invoker key, the Vercel variables, the budget alert) and the exact commands are in
+`slice5-setup-progress.md`; "Blocked on the studio" below is partly done.
+
 Read this after `slice4-handoff.md`. It says where slice 5 stands, what only the studio can do, and how to continue. The authorities are
 the spec `docs/superpowers/specs/2026-10-05-blender-assets-design.md` and the plan `docs/superpowers/plans/2026-10-05-slice5-blender-assets.md`
 (17 tasks, executed inline, as the user chose).
