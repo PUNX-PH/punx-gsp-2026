@@ -66,7 +66,8 @@ def extents(gltf):
 
 
 def base_colors(gltf):
-    return [material["pbrMetallicRoughness"]["baseColorFactor"][:3] for material in gltf.get("materials", [])]
+    # glTF leaves baseColorFactor out when it is the default, opaque white
+    return [material["pbrMetallicRoughness"].get("baseColorFactor", [1, 1, 1, 1])[:3] for material in gltf.get("materials", [])]
 
 
 def linear_to_srgb(value):
@@ -312,6 +313,210 @@ class BlenderScripts(unittest.TestCase):
         self.assertEqual(hex_of(base_colors(read_glb(self.out))[0]), "#ff6f59")
         self.assertNotIn(self.make_shape("cube", "orange").returncode, (0, 3, 4))
         self.assertNotEqual(self.make_shape("torus").returncode, 0)
+
+
+# ---- build.py: models with a skeleton and named clips, from a recipe ----
+
+RECIPES = os.path.join(HERE, "..", "fixtures", "recipes")
+EXIT_BAD_RECIPE = 5
+
+
+def recipe_fixture(name):
+    with open(os.path.join(RECIPES, name), encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def read_glb_with_binary(path):
+    """(the GLB's JSON, its binary part): accessor data lives in the binary part."""
+    with open(path, "rb") as handle:
+        data = handle.read()
+    json_length, _ = struct.unpack_from("<I4s", data, 12)
+    gltf = json.loads(data[20 : 20 + json_length])
+    offset = 20 + json_length
+    binary = b""
+    if offset < len(data):
+        bin_length, bin_type = struct.unpack_from("<I4s", data, offset)
+        assert bin_type == b"BIN\x00"
+        binary = data[offset + 8 : offset + 8 + bin_length]
+    return gltf, binary
+
+
+def accessor_values(gltf, binary, index):
+    """The accessor's elements as tuples of floats (float32 only: animation times and rotations)."""
+    accessor = gltf["accessors"][index]
+    assert accessor["componentType"] == 5126
+    width = {"SCALAR": 1, "VEC3": 3, "VEC4": 4}[accessor["type"]]
+    view = gltf["bufferViews"][accessor["bufferView"]]
+    start = view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
+    stride = view.get("byteStride", width * 4)
+    return [struct.unpack_from("<" + "f" * width, binary, start + i * stride) for i in range(accessor["count"])]
+
+
+def node_names(gltf):
+    return [node.get("name") for node in gltf["nodes"]]
+
+
+def parent_of(gltf):
+    parents = {}
+    for index, node in enumerate(gltf["nodes"]):
+        for child in node.get("children", []):
+            parents[child] = index
+    return parents
+
+
+def lowest_y(gltf):
+    return min(gltf["accessors"][p["attributes"]["POSITION"]]["min"][1] for mesh in gltf["meshes"] for p in mesh["primitives"])
+
+
+def animation_named(gltf, name):
+    return next(a for a in gltf["animations"] if a["name"] == name)
+
+
+def channels_of(gltf, animation, path):
+    """{node name: (times, values)} for the channels of one kind (translation, rotation, scale) of an animation."""
+    return {channel["target"]["node"]: channel for channel in animation["channels"] if channel["target"]["path"] == path}
+
+
+class BuildScript(unittest.TestCase):
+    def setUp(self):
+        self._folder = tempfile.TemporaryDirectory()
+        self.dir = self._folder.name
+        self.out = os.path.join(self.dir, "out.glb")
+        self.stats_path = os.path.join(self.dir, "stats.json")
+
+    def tearDown(self):
+        self._folder.cleanup()
+
+    def build(self, body):
+        """Writes the body as the wrapper does (a file of our own name) and runs build.py on it."""
+        recipe_path = os.path.join(self.dir, "recipe.json")
+        with open(recipe_path, "w", encoding="utf-8") as handle:
+            json.dump(body, handle)
+        return run_script("build.py", "--recipe", recipe_path, "--out", self.out, "--stats", self.stats_path)
+
+    def built(self, name):
+        body = recipe_fixture(name)
+        result = self.build(body)
+        self.assertEqual(result.returncode, 0, result.stderr[-1500:] + result.stdout[-500:])
+        with open(self.stats_path, encoding="utf-8") as handle:
+            self.stats = json.load(handle)
+        gltf, binary = read_glb_with_binary(self.out)
+        return body, gltf, binary
+
+    def node_index(self, gltf, name):
+        return node_names(gltf).index(name)
+
+    def test_the_default_biped_has_its_joints_clips_and_counts(self):
+        body, gltf, _ = self.built("biped-default.json")
+        names = node_names(gltf)
+        for joint, _parent in json.load(open(os.path.join(SCRIPTS, "kit.json")))["kinds"]["biped"]["joints"]:
+            self.assertIn(joint, names)
+        self.assertEqual(sorted(a["name"] for a in gltf["animations"]), ["Jump", "Run"])
+        expected = recipe_fixture("expected.json")["biped-default.json"]
+        self.assertEqual(self.stats, expected)
+        self.assertEqual(triangles(gltf), self.stats["triangles"])
+
+    def test_the_biped_stress_recipe_stays_within_the_caps(self):
+        body, gltf, _ = self.built("biped-stress.json")
+        self.assertLessEqual(self.stats["parts"], 24)
+        self.assertLessEqual(self.stats["triangles"], 2000)
+        self.assertEqual(self.stats, recipe_fixture("expected.json")["biped-stress.json"])
+        for extra_joint in ("ear_l", "ear_r", "antenna"):
+            self.assertIn(extra_joint, node_names(gltf))
+        self.assertEqual(sorted(a["name"] for a in gltf["animations"]), ["Jump", "Loop", "Run"])
+
+    def test_clip_lengths_follow_the_seconds(self):
+        body, gltf, binary = self.built("biped-default.json")
+        for key, name in (("run", "Run"), ("jump", "Jump")):
+            wanted = round(body["motions"]["motions"][key]["seconds"] * 24) / 24
+            longest = 0.0
+            for sampler in animation_named(gltf, name)["samplers"]:
+                longest = max(longest, max(v[0] for v in accessor_values(gltf, binary, sampler["input"])))
+            self.assertAlmostEqual(longest, wanted, delta=0.001, msg=name)
+
+    def test_only_joints_a_clip_moves_get_channels(self):
+        body, gltf, _ = self.built("biped-default.json")
+        for key, name in (("run", "Run"), ("jump", "Jump")):
+            moved = {track["joint"] for track in body["motions"]["motions"][key]["tracks"]}
+            targets = {gltf["nodes"][channel["target"]["node"]]["name"] for channel in animation_named(gltf, name)["channels"]}
+            self.assertEqual(targets, moved, name)
+
+    def test_one_mesh_per_joint(self):
+        _, gltf, _ = self.built("biped-default.json")
+        joints = {j for j, _p in json.load(open(os.path.join(SCRIPTS, "kit.json")))["kinds"]["biped"]["joints"]}
+        parents = parent_of(gltf)
+        seen = {}
+        for index, node in enumerate(gltf["nodes"]):
+            if "mesh" not in node:
+                continue
+            parent = gltf["nodes"][parents[index]]["name"]
+            self.assertIn(parent, joints, f"{node.get('name')} hangs from {parent}")
+            seen[parent] = seen.get(parent, 0) + 1
+        self.assertTrue(all(count == 1 for count in seen.values()), seen)
+        self.assertEqual(len(seen), 15)  # fifteen parts on fifteen different joints (the spine and the neck carry none)
+
+    def test_the_model_is_y_up_and_stands_on_the_origin(self):
+        _, gltf, _ = self.built("biped-default.json")
+        x, y, z = extents(gltf)
+        self.assertGreater(y, max(x, z))
+        self.assertAlmostEqual(lowest_y(gltf), 0.0, delta=0.01)
+
+    def test_flat_colors_come_from_the_palette(self):
+        body, gltf, _ = self.built("biped-default.json")
+        self.assertNotIn("images", gltf)
+        self.assertNotIn("textures", gltf)
+        used = {body["palette"][index].lower() for index in body["recipe"]["colors"].values()}
+        for color in base_colors(gltf):
+            self.assertIn(hex_of(color), used)
+
+    def test_the_arm_swings_about_the_side_axis(self):
+        _, gltf, binary = self.built("biped-default.json")
+        animation = animation_named(gltf, "Run")
+        channel = channels_of(gltf, animation, "rotation")[self.node_index(gltf, "upperarm_l")]
+        sampler = animation["samplers"][channel["sampler"]]
+        rotations = accessor_values(gltf, binary, sampler["output"])
+        self.assertTrue(all(abs(q[1]) < 0.01 and abs(q[2]) < 0.01 for q in rotations), "the arm twists or swings sideways")
+        self.assertGreaterEqual(max(abs(q[0]) for q in rotations), math.sin(math.radians(12.5)))
+
+    def test_the_thighs_swing_in_opposition(self):
+        _, gltf, binary = self.built("biped-default.json")
+        animation = animation_named(gltf, "Run")
+        signs = []
+        for joint in ("thigh_l", "thigh_r"):
+            channel = channels_of(gltf, animation, "rotation")[self.node_index(gltf, joint)]
+            sampler = animation["samplers"][channel["sampler"]]
+            times = [v[0] for v in accessor_values(gltf, binary, sampler["input"])]
+            quarter = min(range(len(times)), key=lambda i: abs(times[i] - times[-1] / 4))
+            signs.append(math.copysign(1, accessor_values(gltf, binary, sampler["output"])[quarter][0]))
+        self.assertEqual(signs[0], -signs[1])
+
+    def test_the_glb_reimports_with_its_animations(self):
+        self.built("biped-default.json")
+        fresh()
+        result = bpy.ops.import_scene.gltf(filepath=self.out)
+        self.assertIn("FINISHED", result)
+        self.assertGreater(len(bpy.data.actions), 0)
+
+    def test_a_clip_with_no_tracks_is_left_out(self):
+        body = recipe_fixture("biped-default.json")
+        body["motions"] = {"version": 1, "motions": {"loop": {"seconds": 1.0, "tracks": []}}}
+        self.assertEqual(self.build(body).returncode, 0)
+        with open(self.stats_path, encoding="utf-8") as handle:
+            self.assertEqual(json.load(handle)["clips"], [])
+        self.assertNotIn("animations", read_glb(self.out))
+
+    def test_a_body_the_worker_would_refuse_exits_5(self):
+        def mutated(change):
+            body = recipe_fixture("biped-default.json")
+            change(body)
+            return body
+
+        three_extras = mutated(lambda b: b["recipe"].update(extras=["tail", "ears", "hat"]))
+        thirteen = mutated(lambda b: b["motions"]["motions"]["run"].update(tracks=[b["motions"]["motions"]["run"]["tracks"][0]] * 13))
+        no_tail = mutated(lambda b: b["motions"]["motions"]["run"]["tracks"][0].update(joint="tail_1"))
+        path_joint = mutated(lambda b: b["motions"]["motions"]["run"]["tracks"][0].update(joint="../hips"))
+        for name, body in (("three extras", three_extras), ("13 tracks", thirteen), ("a joint that was not built", no_tail), ("a joint that is a path", path_joint)):
+            self.assertEqual(self.build(body).returncode, EXIT_BAD_RECIPE, name)
 
 
 if __name__ == "__main__":

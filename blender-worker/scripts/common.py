@@ -103,10 +103,11 @@ def flatten_materials(obj, color):
         mesh.materials[index] = flat_material(f"flat{index}", base_color(material))
 
 
-def export_glb(path):
-    """The scene as a GLB: Y up, modifiers applied, and nothing a game of this kind has no use for (no cameras, lights, animation,
-    skins, morph targets, extras, texture coordinates, images or vertex colors)."""
-    bpy.ops.export_scene.gltf(
+def export_glb(path, animations=False):
+    """The scene as a GLB: Y up, modifiers applied, and nothing a game of this kind has no use for (no cameras, lights, skins, morph
+    targets, extras, texture coordinates, images or vertex colors). With `animations=True` each NLA track becomes one named
+    animation (build.py pushes a clip per joint onto a track named after the clip); without it there is no animation at all."""
+    options = dict(
         filepath=path,
         export_format="GLB",
         export_yup=True,
@@ -120,11 +121,14 @@ def export_glb(path):
         export_attributes=False,
         export_cameras=False,
         export_lights=False,
-        export_animations=False,
+        export_animations=animations,
         export_skins=False,
         export_morph=False,
         export_extras=False,
     )
+    if animations:
+        options["export_animation_mode"] = "NLA_TRACKS"
+    bpy.ops.export_scene.gltf(**options)
 
 
 def write_stats(path, after, before=None):

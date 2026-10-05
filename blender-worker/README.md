@@ -11,6 +11,7 @@ recipe.mjs            the check of a /build body (the same rules as web/src/lib/
 scripts/kit.json      the kit: kinds, joints, slots, extras, counts, default motions (shared with the web app)
 scripts/prepare.py    Blender: import a GLB, FBX or OBJ, join, triangulate, decimate, flatten colors, export a GLB
 scripts/shape.py      Blender: build one of seven low-poly shapes, export a GLB
+scripts/build.py      Blender: build a model with a skeleton and named clips from a checked recipe, export a GLB
 tests/test_blender.py the Blender scripts' tests (run inside Blender)
 server.test.mjs       the wrapper's tests (run with a fake Blender)
 fixtures/             the fake Blender, a cube and an empty OBJ, and serve-fake.mjs
