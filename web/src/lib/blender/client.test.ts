@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { makeBlenderWorker } from "@/lib/blender/client";
 import { BlenderRefusedError, BlenderUnavailableError } from "@/lib/blender/types";
+import type { BuildBody } from "@/lib/builder/recipes";
 import { builtinModel } from "@/lib/graph/builtin";
 import { makeGlb } from "@/lib/testing/glb";
 
@@ -145,6 +147,80 @@ describe("when the worker did not really answer", () => {
     });
     const error = await failure(worker.prepare(prepareInput));
     expect(error).toBeInstanceOf(BlenderUnavailableError);
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe("build", () => {
+  const body = JSON.parse(readFileSync(new URL("../../../../blender-worker/fixtures/recipes/biped-default.json", import.meta.url), "utf8")) as BuildBody;
+  const built = (headers: Record<string, string> = { "X-Triangles": "180", "X-Parts": "15", "X-Clips": "Run,Jump" }) => ok(headers);
+
+  it("posts the body as JSON to /build with the token, and reads the three headers", async () => {
+    const { worker, calls } = setup(async () => built());
+
+    const made = await worker.build({ body, timeoutMs: 5000 });
+
+    expect(made).toEqual({ bytes: GLB, triangles: 180, parts: 15, clips: ["Run", "Jump"] });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("https://worker.example/build");
+    expect(calls[0].init.method).toBe("POST");
+    expect(calls[0].init.headers).toEqual({ authorization: "Bearer tok", "content-type": "application/json" });
+    expect(JSON.parse(calls[0].init.body as string)).toEqual(body);
+    expect(calls[0].init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("takes an empty X-Clips as no clips", async () => {
+    const { worker } = setup(async () => built({ "X-Triangles": "12", "X-Parts": "1", "X-Clips": "" }));
+    expect(await worker.build({ body, timeoutMs: 5000 })).toMatchObject({ clips: [] });
+  });
+
+  it.each([
+    ["a clip that is not one of ours", { "X-Triangles": "180", "X-Parts": "15", "X-Clips": "Run,Dance" }],
+    ["a clip named twice", { "X-Triangles": "180", "X-Parts": "15", "X-Clips": "Run,Run" }],
+    ["no X-Clips", { "X-Triangles": "180", "X-Parts": "15" }],
+    ["no X-Triangles", { "X-Parts": "15", "X-Clips": "Run" }],
+    ["a triangle count of 0", { "X-Triangles": "0", "X-Parts": "15", "X-Clips": "Run" }],
+    ["a part count of 0", { "X-Triangles": "180", "X-Parts": "0", "X-Clips": "Run" }],
+    ["a part count that is not a number", { "X-Triangles": "180", "X-Parts": "many", "X-Clips": "Run" }],
+    ["a part count with a decimal point", { "X-Triangles": "180", "X-Parts": "1.5", "X-Clips": "Run" }],
+  ])("a 200 with %s is unavailable", async (_label, headers) => {
+    const { worker } = setup(async () => built(headers));
+    const error = await failure(worker.build({ body, timeoutMs: 5000 }));
+    expect(error).toBeInstanceOf(BlenderUnavailableError);
+    expect((error as BlenderUnavailableError).status).toBe(200);
+  });
+
+  it("a 200 whose body is not a usable GLB is unavailable", async () => {
+    const { worker } = setup(async () => ok({ "X-Triangles": "180", "X-Parts": "15", "X-Clips": "Run" }, new TextEncoder().encode("not a model")));
+    const error = await failure(worker.build({ body, timeoutMs: 5000 }));
+    expect(error).toBeInstanceOf(BlenderUnavailableError);
+    expect((error as BlenderUnavailableError).status).toBe(200);
+  });
+
+  it("a 422 with { error: bad-recipe } is Blender refusing the recipe, and a 422 with { error: empty } is still empty", async () => {
+    const recipe = setup(async () => refusal(422, "bad-recipe"));
+    const refused = await failure(recipe.worker.build({ body, timeoutMs: 5000 }));
+    expect(refused).toBeInstanceOf(BlenderRefusedError);
+    expect((refused as BlenderRefusedError).code).toBe("bad-recipe");
+
+    const empty = setup(async () => refusal(422, "empty"));
+    expect(((await failure(empty.worker.build({ body, timeoutMs: 5000 }))) as BlenderRefusedError).code).toBe("empty");
+  });
+
+  it("a bad-recipe code on any other status is not believed", async () => {
+    const { worker } = setup(async () => refusal(500, "bad-recipe"));
+    const error = await failure(worker.build({ body, timeoutMs: 5000 }));
+    expect(error).toBeInstanceOf(BlenderUnavailableError);
+    expect((error as BlenderUnavailableError).status).toBe(500);
+  });
+
+  it("never sends a body that fails the recipe check: it is refused as bad-recipe and fetch is not called", async () => {
+    const bad = structuredClone(body);
+    bad.recipe.build.headSize = 2; // outside 0.3 to 0.8
+    const { worker, calls } = setup(async () => built());
+    const error = await failure(worker.build({ body: bad, timeoutMs: 5000 }));
+    expect(error).toBeInstanceOf(BlenderRefusedError);
+    expect((error as BlenderRefusedError).code).toBe("bad-recipe");
     expect(calls).toHaveLength(0);
   });
 });

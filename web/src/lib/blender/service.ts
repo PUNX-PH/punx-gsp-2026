@@ -38,6 +38,7 @@ const REFUSED = {
   "too-big": "This file is larger than 32 MB.",
   timeout: "This model took longer than 60 seconds. Try a simpler one.",
   failed: "This file could not be prepared. Try another one.",
+  "bad-recipe": "This model could not be built from that description. Try different words.", // only a build can be refused for its recipe
 } as const;
 
 interface Kind {

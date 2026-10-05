@@ -1,6 +1,8 @@
 // The vocabulary of the Blender steps: the shapes and settings a person can choose, what the worker gives back, the service the
 // steps call, and the two ways the worker can fail. The rules (cache, limits, time) live in the other files of lib/blender.
 import type { User } from "@/lib/auth/ports";
+import type { ClipName } from "@/lib/builder/kinds";
+import type { BuildBody } from "@/lib/builder/recipes";
 import type { DerivedFiles } from "@/lib/graph/types";
 
 /** The shapes Make Shape can build. A fixed list, so Describe Game can pick from it later. */
@@ -35,15 +37,24 @@ export interface MadeModel {
   trianglesAfter: number;
 }
 
+/** What a build gives back: the GLB (a model with a skeleton and named clips) and what is in it. */
+export interface BuiltGlb {
+  bytes: Uint8Array;
+  triangles: number;
+  parts: number;
+  clips: ClipName[];
+}
+
 /** The Blender worker, one call per job. `color` is a `#rrggbb` color, or null to keep the model's own colors. */
 export interface BlenderWorker {
   prepare(input: { bytes: Uint8Array; format: ModelFormat; triangles: number; color: string | null; timeoutMs: number }): Promise<MadeModel>;
   shape(input: { shape: Shape; color: string; timeoutMs: number }): Promise<MadeModel>;
+  build(input: { body: BuildBody; timeoutMs: number }): Promise<BuiltGlb>;
 }
 
 /** Blender ran and said no to this file. Carries a code and nothing else on purpose. */
 export class BlenderRefusedError extends Error {
-  constructor(readonly code: "empty" | "bad-format" | "too-big" | "timeout" | "failed") {
+  constructor(readonly code: "empty" | "bad-format" | "too-big" | "timeout" | "failed" | "bad-recipe") {
     super("Blender refused the file");
     this.name = "BlenderRefusedError";
   }

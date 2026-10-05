@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { JOB_VERSION, prepareKey, shapeKey } from "@/lib/blender/key";
+import { buildKey, canonicalJson, hashKey, JOB_VERSION, prepareKey, shapeKey } from "@/lib/blender/key";
+import type { BuildBody } from "@/lib/builder/recipes";
 import { sha256Hex } from "@/lib/runs/service";
 
 const SHA = "a".repeat(64);
@@ -52,5 +54,62 @@ describe("shapeKey", () => {
 
   it("is never the key of a prepare job, whatever the values", async () => {
     expect(await shapeKey({ graphId: "g1", shape: "cube", color: "#000000" })).not.toBe(await prepareKey({ graphId: "g1", inputSha: "cube", triangles: 0, color: "#000000" }));
+  });
+});
+
+describe("canonicalJson", () => {
+  it("sorts object keys at every level and keeps arrays in order", () => {
+    expect(canonicalJson({ b: 1, a: { d: [2, { f: 1, e: 0 }], c: null } })).toBe('{"a":{"c":null,"d":[2,{"e":0,"f":1}]},"b":1}');
+  });
+
+  it("writes strings, numbers and booleans as JSON does, and leaves out what JSON leaves out", () => {
+    expect(canonicalJson(["a\"b", -0.5, 1e21, true, null])).toBe(JSON.stringify(["a\"b", -0.5, 1e21, true, null]));
+    expect(canonicalJson({ a: undefined, b: 1 })).toBe('{"b":1}');
+    expect(canonicalJson([undefined])).toBe("[null]");
+  });
+});
+
+describe("hashKey", () => {
+  it("is the SHA-256 of the canonical text, which for a list of plain values is what prepare and shape keys always were", async () => {
+    expect(await hashKey([1, "x", null])).toBe(await sha([1, "x", null]));
+  });
+});
+
+describe("buildKey", () => {
+  const body = JSON.parse(readFileSync(new URL("../../../../blender-worker/fixtures/recipes/biped-default.json", import.meta.url), "utf8")) as BuildBody;
+  const reversed = (value: unknown): unknown =>
+    Array.isArray(value)
+      ? value.map(reversed)
+      : value !== null && typeof value === "object"
+        ? Object.fromEntries(Object.entries(value).reverse().map(([k, v]) => [k, reversed(v)]))
+        : value;
+
+  it("is the SHA-256 of the canonical text of the version, the kind, the graph, the recipe, the motions and the palette", async () => {
+    expect(await buildKey({ graphId: "g1", body })).toBe(
+      await sha256Hex(new TextEncoder().encode(canonicalJson([JOB_VERSION, "build", "g1", body.recipe, body.motions, body.palette]))),
+    );
+  });
+
+  it("is the same whatever order the keys come in, at every level (Claude may write them in any order)", async () => {
+    expect(await buildKey({ graphId: "g1", body: reversed(body) as BuildBody })).toBe(await buildKey({ graphId: "g1", body }));
+  });
+
+  it("changes with the graph, a build number, a track and a palette color, each alone", async () => {
+    const key = await buildKey({ graphId: "g1", body });
+    const edit = (change: (copy: BuildBody) => void): BuildBody => {
+      const copy = structuredClone(body);
+      change(copy);
+      return copy;
+    };
+    expect(await buildKey({ graphId: "g2", body })).not.toBe(key);
+    expect(await buildKey({ graphId: "g1", body: edit((b) => { b.recipe.build.headSize = 0.51; }) })).not.toBe(key);
+    expect(await buildKey({ graphId: "g1", body: edit((b) => { b.motions.motions.run!.tracks[0].amplitude = 36; }) })).not.toBe(key);
+    expect(await buildKey({ graphId: "g1", body: edit((b) => { b.palette[2] = "#ffd167"; }) })).not.toBe(key);
+  });
+
+  it("is never the key of a prepare or a shape job", async () => {
+    const key = await buildKey({ graphId: "g1", body });
+    expect(key).not.toBe(await prepareKey({ graphId: "g1", inputSha: SHA, triangles: 2000, color: null }));
+    expect(key).not.toBe(await shapeKey({ graphId: "g1", shape: "cube", color: "#000000" }));
   });
 });

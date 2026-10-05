@@ -45,6 +45,9 @@ function setup(options: { perPerson?: number; total?: number; putFails?: boolean
       calls.push({ kind: "shape", input: i });
       return reply();
     },
+    build: async () => {
+      throw new Error("the service tests of prepare and shape never build");
+    },
   };
   const logs: Record<string, unknown>[] = [];
   const stored = new Map<string, Uint8Array>();

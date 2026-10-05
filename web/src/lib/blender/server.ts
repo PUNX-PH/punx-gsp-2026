@@ -43,6 +43,7 @@ export function getBlenderService(stores: { cache?: JobCache; limits?: UsageLimi
   const worker: BlenderWorker = {
     prepare: async (input) => makeWorker().prepare(input),
     shape: async (input) => makeWorker().shape(input),
+    build: async (input) => makeWorker().build(input),
   };
   return makeBlenderService({
     cache: stores.cache ?? new FirestoreJobCache(),
