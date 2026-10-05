@@ -1,0 +1,657 @@
+// The kit: everything a recipe may be made of, in one place. The same data lives once in blender-worker/scripts/kit.json, which the worker's
+// recipe check and build.py read; the KIT literal below is a typed copy of it, and a test keeps the two equal. Names and ranges here are the
+// ones the spec lists. Colors in recipes are palette slots 0 to 4, never hex.
+import type { Role } from "@/lib/graph/types";
+
+export const MODEL_KINDS = ["biped", "vehicle", "blob", "prop"] as const;
+export type ModelKind = (typeof MODEL_KINDS)[number];
+export const KIND_NAMES: Record<ModelKind, string> = {
+  biped: "Two-legged character",
+  vehicle: "Wheeled vehicle",
+  blob: "Bouncy blob",
+  prop: "Simple prop",
+};
+
+export const EXTRAS = ["tail", "ears", "antenna", "hat", "backpack"] as const;
+export type Extra = (typeof EXTRAS)[number];
+
+export const SCENERY_KINDS = ["tree", "pine", "rock", "cactus", "windmill", "lamp"] as const;
+export type SceneryKind = (typeof SCENERY_KINDS)[number];
+export const SCENERY_NAMES: Record<SceneryKind, string> = {
+  tree: "Tree",
+  pine: "Pine",
+  rock: "Rock",
+  cactus: "Cactus",
+  windmill: "Windmill",
+  lamp: "Lamp",
+};
+
+/** The seven Make Shape shapes plus two of ours. */
+export const PROP_SHAPES = ["cube", "sphere", "cone", "cylinder", "pyramid", "coin", "ring", "gem", "crate"] as const;
+export type PropShape = (typeof PROP_SHAPES)[number];
+
+export const CLIP_KEYS = ["run", "jump", "loop"] as const;
+export type ClipKey = (typeof CLIP_KEYS)[number];
+export type ClipName = "Run" | "Jump" | "Loop";
+export const CLIP_NAMES: Record<ClipKey, ClipName> = { run: "Run", jump: "Jump", loop: "Loop" };
+/** A hero runs and jumps; an obstacle or a collectible loops. */
+export const CLIPS_FOR_ROLE: Record<Role, ClipKey[]> = { hero: ["run", "jump"], obstacle: ["loop"], collectible: ["loop"] };
+
+export const CHANNELS = ["rotate", "move", "scale"] as const;
+export type Channel = (typeof CHANNELS)[number];
+export const AXES = ["x", "y", "z"] as const;
+export type Axis = (typeof AXES)[number];
+export const WAVES = ["swing", "spin", "bounce", "pulse", "hold"] as const;
+export type Wave = (typeof WAVES)[number];
+
+export interface NumberField {
+  min: number;
+  max: number;
+  default: number;
+  whole?: true;
+}
+export interface ChoiceField {
+  choices: readonly string[];
+  default: string;
+}
+export type BuildField = NumberField | ChoiceField;
+
+export interface TrackSpec {
+  joint: string;
+  channel: Channel;
+  axis: Axis;
+  wave: Wave;
+  amplitude: number;
+  cycles: number;
+  phase: number;
+}
+export interface MotionSpec {
+  seconds: number;
+  tracks: TrackSpec[];
+}
+export interface Counts {
+  parts: number;
+  triangles: number;
+}
+export interface KindCounts extends Partial<Counts> {
+  cab?: Counts;
+  wheel?: Counts;
+  shapes?: Record<PropShape, Counts>;
+}
+export interface KindSpec {
+  summary: string;
+  build: Record<string, BuildField>;
+  slots: Record<string, number>;
+  /** [name, parent], parents first; a null parent is the root. */
+  joints: [string, string | null][];
+  /** Named places an extra can attach to: `@back`, `@top`, `@chest` resolve here. */
+  anchors: Record<string, string>;
+  extras: Extra[];
+  count: KindCounts;
+  motions: Record<ClipKey, MotionSpec>;
+}
+export interface ExtraSpec extends Counts {
+  /** [name, parent]; a parent starting with `@` is an anchor of the kind. */
+  joints: [string, string][];
+}
+export interface Kit {
+  version: 1;
+  caps: { parts: number; triangles: number; sceneryTriangles: number; extras: number; tracks: number; summary: number };
+  motion: {
+    fps: number;
+    seconds: [number, number];
+    cycles: [number, number];
+    phase: [number, number];
+    amplitude: Record<Channel, [number, number]>;
+  };
+  kinds: Record<ModelKind, KindSpec>;
+  extras: Record<Extra, ExtraSpec>;
+  scenery: Record<string, unknown>;
+}
+
+export const KIT: Kit = {
+  "version": 1,
+  "caps": { "parts": 24, "triangles": 2000, "sceneryTriangles": 600, "extras": 2, "tracks": 12, "summary": 140 },
+  "motion": {
+    "fps": 24,
+    "seconds": [0.3, 3],
+    "cycles": [0.5, 4],
+    "phase": [0, 1],
+    "amplitude": { "rotate": [-90, 90], "move": [-0.5, 0.5], "scale": [-0.5, 0.5] }
+  },
+  "kinds": {
+    "biped": {
+      "summary": "A blocky two-legged character.",
+      "build": {
+        "headSize": { "min": 0.3, "max": 0.8, "default": 0.5 },
+        "torsoWidth": { "min": 0.3, "max": 0.9, "default": 0.5 },
+        "torsoHeight": { "min": 0.3, "max": 0.9, "default": 0.55 },
+        "armLength": { "min": 0.3, "max": 0.8, "default": 0.5 },
+        "armThickness": { "min": 0.08, "max": 0.25, "default": 0.14 },
+        "legLength": { "min": 0.3, "max": 0.9, "default": 0.5 },
+        "legThickness": { "min": 0.1, "max": 0.3, "default": 0.17 },
+        "footSize": { "min": 0.1, "max": 0.35, "default": 0.2 }
+      },
+      "slots": { "head": 4, "body": 3, "arms": 3, "legs": 2, "feet": 0, "extra": 1 },
+      "joints": [
+        ["hips", null],
+        ["spine", "hips"],
+        ["chest", "spine"],
+        ["neck", "chest"],
+        ["head", "neck"],
+        ["upperarm_l", "chest"],
+        ["forearm_l", "upperarm_l"],
+        ["hand_l", "forearm_l"],
+        ["upperarm_r", "chest"],
+        ["forearm_r", "upperarm_r"],
+        ["hand_r", "forearm_r"],
+        ["thigh_l", "hips"],
+        ["shin_l", "thigh_l"],
+        ["foot_l", "shin_l"],
+        ["thigh_r", "hips"],
+        ["shin_r", "thigh_r"],
+        ["foot_r", "shin_r"]
+      ],
+      "anchors": { "back": "hips", "top": "head", "chest": "chest" },
+      "extras": ["tail", "ears", "antenna", "hat", "backpack"],
+      "count": { "parts": 15, "triangles": 180 },
+      "motions": {
+        "run": {
+          "seconds": 0.6,
+          "tracks": [
+            {
+              "joint": "thigh_l",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "swing",
+              "amplitude": 35,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "thigh_r",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "swing",
+              "amplitude": 35,
+              "cycles": 1,
+              "phase": 0.5
+            },
+            {
+              "joint": "shin_l",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "bounce",
+              "amplitude": 40,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "shin_r",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "bounce",
+              "amplitude": 40,
+              "cycles": 1,
+              "phase": 0.5
+            },
+            {
+              "joint": "upperarm_l",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "swing",
+              "amplitude": 30,
+              "cycles": 1,
+              "phase": 0.5
+            },
+            {
+              "joint": "upperarm_r",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "swing",
+              "amplitude": 30,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "hips",
+              "channel": "move",
+              "axis": "y",
+              "wave": "bounce",
+              "amplitude": 0.04,
+              "cycles": 2,
+              "phase": 0
+            }
+          ]
+        },
+        "jump": {
+          "seconds": 0.8,
+          "tracks": [
+            {
+              "joint": "thigh_l",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "swing",
+              "amplitude": -40,
+              "cycles": 0.5,
+              "phase": 0
+            },
+            {
+              "joint": "thigh_r",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "swing",
+              "amplitude": -40,
+              "cycles": 0.5,
+              "phase": 0
+            },
+            {
+              "joint": "shin_l",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "swing",
+              "amplitude": 60,
+              "cycles": 0.5,
+              "phase": 0
+            },
+            {
+              "joint": "shin_r",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "swing",
+              "amplitude": 60,
+              "cycles": 0.5,
+              "phase": 0
+            },
+            {
+              "joint": "upperarm_l",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "swing",
+              "amplitude": -80,
+              "cycles": 0.5,
+              "phase": 0
+            },
+            {
+              "joint": "upperarm_r",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "swing",
+              "amplitude": -80,
+              "cycles": 0.5,
+              "phase": 0
+            }
+          ]
+        },
+        "loop": {
+          "seconds": 1.2,
+          "tracks": [
+            {
+              "joint": "upperarm_r",
+              "channel": "rotate",
+              "axis": "z",
+              "wave": "swing",
+              "amplitude": 30,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "head",
+              "channel": "rotate",
+              "axis": "y",
+              "wave": "swing",
+              "amplitude": 15,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "hips",
+              "channel": "move",
+              "axis": "y",
+              "wave": "bounce",
+              "amplitude": 0.03,
+              "cycles": 2,
+              "phase": 0
+            }
+          ]
+        }
+      }
+    },
+    "vehicle": {
+      "summary": "A blocky little vehicle.",
+      "build": {
+        "bodyLength": { "min": 0.8, "max": 2.5, "default": 1.6 },
+        "bodyWidth": { "min": 0.5, "max": 1.5, "default": 0.9 },
+        "bodyHeight": { "min": 0.3, "max": 1, "default": 0.45 },
+        "cabSize": { "min": 0, "max": 0.8, "default": 0.45 },
+        "wheelCount": { "min": 2, "max": 6, "default": 4, "whole": true },
+        "wheelRadius": { "min": 0.15, "max": 0.5, "default": 0.25 }
+      },
+      "slots": { "body": 3, "cab": 4, "wheels": 0, "extra": 1 },
+      "joints": [["body", null]],
+      "anchors": { "back": "body", "top": "body", "chest": "body" },
+      "extras": ["antenna"],
+      "count": {
+        "parts": 1,
+        "triangles": 12,
+        "cab": { "parts": 1, "triangles": 12 },
+        "wheel": { "parts": 1, "triangles": 28 }
+      },
+      "motions": {
+        "run": {
+          "seconds": 0.5,
+          "tracks": [
+            {
+              "joint": "wheel_1",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "spin",
+              "amplitude": 1,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "wheel_2",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "spin",
+              "amplitude": 1,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "wheel_3",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "spin",
+              "amplitude": 1,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "wheel_4",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "spin",
+              "amplitude": 1,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "wheel_5",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "spin",
+              "amplitude": 1,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "wheel_6",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "spin",
+              "amplitude": 1,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "body",
+              "channel": "move",
+              "axis": "y",
+              "wave": "bounce",
+              "amplitude": 0.02,
+              "cycles": 2,
+              "phase": 0
+            }
+          ]
+        },
+        "jump": {
+          "seconds": 0.8,
+          "tracks": [
+            {
+              "joint": "body",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "swing",
+              "amplitude": -10,
+              "cycles": 0.5,
+              "phase": 0
+            }
+          ]
+        },
+        "loop": {
+          "seconds": 1,
+          "tracks": [
+            {
+              "joint": "wheel_1",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "spin",
+              "amplitude": 1,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "wheel_2",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "spin",
+              "amplitude": 1,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "wheel_3",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "spin",
+              "amplitude": 1,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "wheel_4",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "spin",
+              "amplitude": 1,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "wheel_5",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "spin",
+              "amplitude": 1,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "wheel_6",
+              "channel": "rotate",
+              "axis": "x",
+              "wave": "spin",
+              "amplitude": 1,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "body",
+              "channel": "move",
+              "axis": "y",
+              "wave": "bounce",
+              "amplitude": 0.03,
+              "cycles": 2,
+              "phase": 0
+            }
+          ]
+        }
+      }
+    },
+    "blob": {
+      "summary": "A bouncy blob with two eyes.",
+      "build": {
+        "radius": { "min": 0.3, "max": 1, "default": 0.5 },
+        "squash": { "min": 0.5, "max": 1.5, "default": 0.85 },
+        "eyeSize": { "min": 0.05, "max": 0.3, "default": 0.12 }
+      },
+      "slots": { "body": 3, "eyes": 4, "extra": 1 },
+      "joints": [["body", null], ["eye_l", "body"], ["eye_r", "body"]],
+      "anchors": { "back": "body", "top": "body", "chest": "body" },
+      "extras": ["tail", "ears", "antenna", "hat"],
+      "count": { "parts": 3, "triangles": 104 },
+      "motions": {
+        "run": {
+          "seconds": 0.5,
+          "tracks": [
+            {
+              "joint": "body",
+              "channel": "scale",
+              "axis": "y",
+              "wave": "pulse",
+              "amplitude": -0.2,
+              "cycles": 2,
+              "phase": 0
+            },
+            {
+              "joint": "body",
+              "channel": "move",
+              "axis": "y",
+              "wave": "bounce",
+              "amplitude": 0.08,
+              "cycles": 2,
+              "phase": 0
+            }
+          ]
+        },
+        "jump": {
+          "seconds": 0.8,
+          "tracks": [
+            {
+              "joint": "body",
+              "channel": "scale",
+              "axis": "y",
+              "wave": "swing",
+              "amplitude": 0.25,
+              "cycles": 0.5,
+              "phase": 0
+            }
+          ]
+        },
+        "loop": {
+          "seconds": 1,
+          "tracks": [
+            {
+              "joint": "body",
+              "channel": "move",
+              "axis": "y",
+              "wave": "bounce",
+              "amplitude": 0.12,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "body",
+              "channel": "scale",
+              "axis": "y",
+              "wave": "pulse",
+              "amplitude": -0.15,
+              "cycles": 1,
+              "phase": 0
+            }
+          ]
+        }
+      }
+    },
+    "prop": {
+      "summary": "A simple spinning prop.",
+      "build": {
+        "shape": {
+          "choices": ["cube", "sphere", "cone", "cylinder", "pyramid", "coin", "ring", "gem", "crate"],
+          "default": "gem"
+        },
+        "size": { "min": 0.3, "max": 1.5, "default": 1 }
+      },
+      "slots": { "body": 3, "extra": 4 },
+      "joints": [["root", null]],
+      "anchors": {},
+      "extras": [],
+      "count": {
+        "shapes": {
+          "cube": { "parts": 1, "triangles": 12 },
+          "sphere": { "parts": 1, "triangles": 80 },
+          "cone": { "parts": 1, "triangles": 14 },
+          "cylinder": { "parts": 1, "triangles": 28 },
+          "pyramid": { "parts": 1, "triangles": 6 },
+          "coin": { "parts": 1, "triangles": 44 },
+          "ring": { "parts": 1, "triangles": 144 },
+          "gem": { "parts": 1, "triangles": 12 },
+          "crate": { "parts": 3, "triangles": 36 }
+        }
+      },
+      "motions": {
+        "run": {
+          "seconds": 1,
+          "tracks": [
+            {
+              "joint": "root",
+              "channel": "rotate",
+              "axis": "y",
+              "wave": "spin",
+              "amplitude": 1,
+              "cycles": 1,
+              "phase": 0
+            }
+          ]
+        },
+        "jump": {
+          "seconds": 0.8,
+          "tracks": [
+            {
+              "joint": "root",
+              "channel": "rotate",
+              "axis": "y",
+              "wave": "spin",
+              "amplitude": 1,
+              "cycles": 1,
+              "phase": 0
+            }
+          ]
+        },
+        "loop": {
+          "seconds": 1,
+          "tracks": [
+            {
+              "joint": "root",
+              "channel": "rotate",
+              "axis": "y",
+              "wave": "spin",
+              "amplitude": 1,
+              "cycles": 1,
+              "phase": 0
+            },
+            {
+              "joint": "root",
+              "channel": "move",
+              "axis": "y",
+              "wave": "swing",
+              "amplitude": 0.1,
+              "cycles": 1,
+              "phase": 0
+            }
+          ]
+        }
+      }
+    }
+  },
+  "extras": {
+    "tail": { "joints": [["tail_1", "@back"], ["tail_2", "tail_1"]], "parts": 2, "triangles": 24 },
+    "ears": { "joints": [["ear_l", "@top"], ["ear_r", "@top"]], "parts": 2, "triangles": 24 },
+    "antenna": { "joints": [["antenna", "@top"]], "parts": 2, "triangles": 40 },
+    "hat": { "joints": [["hat", "@top"]], "parts": 1, "triangles": 28 },
+    "backpack": { "joints": [["backpack", "@chest"]], "parts": 1, "triangles": 12 }
+  },
+  "scenery": {}
+};
