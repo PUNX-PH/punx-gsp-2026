@@ -21,6 +21,22 @@ export function describedStarterGraph(): Graph {
   };
 }
 
+/** The third starter: a character built from the kit, with no words and no AI. It plays as it is, and the person can describe it later. */
+export function builtStarterGraph(): Graph {
+  return {
+    schemaVersion: 1,
+    nodes: [
+      { id: "n1", type: "build-model", params: { role: "hero", kind: "biped", description: "", run: "", jump: "", loop: "" }, position: { x: 0, y: 0 } },
+      { id: "n2", type: "game-template", params: { tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } }, position: { x: 260, y: 0 } },
+      { id: "n3", type: "preview", params: {}, position: { x: 520, y: 0 } },
+    ],
+    edges: [
+      { from: { node: "n1", port: "model" }, to: { node: "n2", port: "hero" } },
+      { from: { node: "n2", port: "settings" }, to: { node: "n3", port: "settings" } },
+    ],
+  };
+}
+
 export function starterGraph(): Graph {
   return {
     schemaVersion: 1,

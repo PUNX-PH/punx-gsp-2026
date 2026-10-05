@@ -21,7 +21,7 @@ export default async function GraphsPage() {
         <NewGraphButton />
 
         {graphs.length === 0 ? (
-          <p className={styles.hint}>You have no graphs yet. Describe a game, or start from the starter graph.</p>
+          <p className={styles.hint}>You have no graphs yet. Describe a game, build a character, or start from the starter graph.</p>
         ) : (
           <ul className={styles.listRows}>
             {graphs.map((graph) => (

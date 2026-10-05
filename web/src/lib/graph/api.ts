@@ -68,10 +68,10 @@ export function makeGraphApi({ auth, graphs, domain }: GraphApiDeps) {
         const body = await readJson(req, MAX_CREATE_BODY_BYTES, "The request is too large.", "The request is not valid JSON.");
         if (!body.ok) return body.response;
         const input = body.value ?? {};
-        if (!isObject(input) || (input.name !== undefined && typeof input.name !== "string") || (input.starter !== undefined && typeof input.starter !== "boolean" && input.starter !== "described")) {
-          return json(400, { error: 'Send { name?: text, starter?: true, false or "described" } as JSON.' });
+        if (!isObject(input) || (input.name !== undefined && typeof input.name !== "string") || (input.starter !== undefined && typeof input.starter !== "boolean" && input.starter !== "described" && input.starter !== "built")) {
+          return json(400, { error: 'Send { name?: text, starter?: true, false, "described" or "built" } as JSON.' });
         }
-        return json(201, publicGraph(await graphs.createGraph(user, { name: input.name as string | undefined, starter: input.starter as boolean | "described" | undefined })));
+        return json(201, publicGraph(await graphs.createGraph(user, { name: input.name as string | undefined, starter: input.starter as boolean | "described" | "built" | undefined })));
       }),
 
     getGraph: (req: Request, id: string) =>

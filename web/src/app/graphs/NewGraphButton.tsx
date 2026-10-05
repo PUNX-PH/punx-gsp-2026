@@ -14,7 +14,7 @@ export function NewGraphButton() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function create(starter: true | "described") {
+  async function create(starter: true | "described" | "built") {
     setError("");
     setBusy(true);
     try {
@@ -34,6 +34,9 @@ export function NewGraphButton() {
     <p>
       <button type="button" className={styles.play} onClick={() => create("described")} disabled={busy}>
         New: describe a game
+      </button>{" "}
+      <button type="button" className={styles.secondary} onClick={() => create("built")} disabled={busy}>
+        New: build a character
       </button>{" "}
       <button type="button" className={styles.secondary} onClick={() => create(true)} disabled={busy}>
         New from starter

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryAuth } from "@/lib/auth/memory";
 import { makeGraphApi } from "@/lib/graph/api";
 import { type GraphService, makeGraphService } from "@/lib/graph/service";
-import { describedStarterGraph, starterGraph } from "@/lib/graph/starter";
+import { builtStarterGraph, describedStarterGraph, starterGraph } from "@/lib/graph/starter";
 import { MemoryGraphFiles, MemoryGraphRecords } from "@/lib/graph/store/memory";
 import { MemoryFileStore, MemoryRunRecords } from "@/lib/runs/memory";
 import { makeRunService } from "@/lib/runs/service";
@@ -283,6 +283,23 @@ describe("creating a graph from the Describe a game starter", () => {
     const response = await api.createGraph(request("POST", "/api/graphs", { body: asJson({ starter }) }));
     expect(response.status).toBe(400);
     expect((await readJson(response)).error).toMatch(/starter/);
+    expect(await service.listGraphs({ uid: "alice", email: "alice@punx.ai" })).toEqual([]);
+  });
+});
+
+describe("creating a graph from the Build a character starter", () => {
+  it("accepts starter: \"built\" and makes that graph", async () => {
+    const { api } = setup();
+    const response = await api.createGraph(request("POST", "/api/graphs", { body: asJson({ starter: "built" }) }));
+    expect(response.status).toBe(201);
+    expect((await readJson(response)).graph).toEqual(builtStarterGraph());
+  });
+
+  it.each([["another word", "other"], ["a number", 1], ["null", null]])("still refuses a starter that is %s, with the new sentence, and makes nothing", async (_label, starter) => {
+    const { api, service } = setup();
+    const response = await api.createGraph(request("POST", "/api/graphs", { body: asJson({ starter }) }));
+    expect(response.status).toBe(400);
+    expect((await readJson(response)).error).toBe('Send { name?: text, starter?: true, false, "described" or "built" } as JSON.');
     expect(await service.listGraphs({ uid: "alice", email: "alice@punx.ai" })).toEqual([]);
   });
 });

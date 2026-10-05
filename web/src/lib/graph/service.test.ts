@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { checkGlb } from "@/lib/glb";
 import { parseGraph } from "@/lib/graph/schema";
 import { makeGraphService } from "@/lib/graph/service";
-import { describedStarterGraph, starterGraph } from "@/lib/graph/starter";
+import { builtStarterGraph, describedStarterGraph, starterGraph } from "@/lib/graph/starter";
 import { MemoryGraphFiles, MemoryGraphRecords } from "@/lib/graph/store/memory";
 import { type Graph, GraphError } from "@/lib/graph/types";
 import { MemoryFileStore, MemoryRunRecords } from "@/lib/runs/memory";
@@ -328,6 +328,16 @@ describe("deleting a graph", () => {
 describe("creating a graph from the Describe a game starter", () => {
   it("stores that graph, and the original starter and the empty graph are unchanged", async () => {
     const { service } = setup();
+    expect((await service.createGraph(alice, { starter: "described" })).graph).toEqual(describedStarterGraph());
+    expect((await service.createGraph(alice, { starter: true })).graph).toEqual(starterGraph());
+    expect((await service.createGraph(alice, { starter: false })).graph).toEqual({ schemaVersion: 1, nodes: [], edges: [] });
+  });
+});
+
+describe("creating a graph from the Build a character starter", () => {
+  it("stores that graph, and the other starters and the empty graph are unchanged", async () => {
+    const { service } = setup();
+    expect((await service.createGraph(alice, { starter: "built" })).graph).toEqual(builtStarterGraph());
     expect((await service.createGraph(alice, { starter: "described" })).graph).toEqual(describedStarterGraph());
     expect((await service.createGraph(alice, { starter: true })).graph).toEqual(starterGraph());
     expect((await service.createGraph(alice, { starter: false })).graph).toEqual({ schemaVersion: 1, nodes: [], edges: [] });

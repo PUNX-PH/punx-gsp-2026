@@ -38,7 +38,7 @@ import { type GameView, clampRect, viewToReturnTo } from "@/lib/canvas/prefs";
 import { isOutOfDate, revealSchedule } from "@/lib/canvas/runView";
 import { stepNumbers } from "@/lib/canvas/stepNumbers";
 import { type Edit, addEdge, addNode, editAsset, editPrompt, editSettings, editTuning, removeEdge, removeNode } from "@/lib/graph/edits";
-import { describedStarterGraph, starterGraph } from "@/lib/graph/starter";
+import { builtStarterGraph, describedStarterGraph, starterGraph } from "@/lib/graph/starter";
 import type { Assets, Graph, PortRef } from "@/lib/graph/types";
 import { wiringProblem } from "@/lib/graph/wiring";
 
@@ -472,6 +472,9 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
                 <p>This graph has no steps yet.</p>
                 <button type="button" className={styles.play} onClick={() => apply({ graph: describedStarterGraph(), touched: [] })}>
                   Start by describing a game
+                </button>
+                <button type="button" className={styles.secondary} onClick={() => apply({ graph: builtStarterGraph(), touched: [] })}>
+                  Start by building a character
                 </button>
                 <button type="button" className={styles.secondary} onClick={() => apply({ graph: starterGraph(), touched: [] })}>
                   Start from the starter
