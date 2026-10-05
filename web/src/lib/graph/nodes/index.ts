@@ -1,4 +1,5 @@
 // The code behind each node type, by the id the registry gives it.
+import { buildModel } from "@/lib/graph/nodes/buildModel";
 import { describeGame } from "@/lib/graph/nodes/describeGame";
 import { makeShape } from "@/lib/graph/nodes/makeShape";
 import { model } from "@/lib/graph/nodes/model";
@@ -14,6 +15,7 @@ export const EXECUTORS: Record<string, Executor> = {
   model,
   "prepare-model": prepareModel,
   "make-shape": makeShape,
+  "build-model": buildModel,
   "palette-from-image": paletteFromImage,
   "describe-game": describeGame,
   "game-template": gameTemplate,

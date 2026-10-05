@@ -4,6 +4,8 @@
 // graph can always be saved (what stops a run is checked at Play).
 import type { DescribeGameService } from "@/lib/ai/types";
 import type { BlenderService } from "@/lib/blender/types";
+import { makeBuilderService } from "@/lib/builder/service";
+import type { BuilderService } from "@/lib/builder/types";
 import type { User } from "@/lib/auth/ports";
 import { checkGlb } from "@/lib/glb";
 import { checkGraph } from "@/lib/graph/checks";
@@ -67,6 +69,8 @@ export interface GraphServiceDeps {
   ai?: DescribeGameService;
   /** Prepare Model and Make Shape. Without one, a graph that uses them fails those steps plainly. */
   blender?: BlenderService;
+  /** Build Model. Without one, a builder over the Blender service above (or over none, which fails the step plainly). */
+  builder?: BuilderService;
 }
 
 // What Describe Game gets when no AI service is wired (a deployment without the key): the step fails in plain words, nothing else does.
@@ -263,6 +267,7 @@ export function makeGraphService(deps: GraphServiceDeps): GraphService {
       // Files steps make (Blender's results) live in the graph's folder beside its uploads. A step can read one only after this Play
       // has stored it or found it there again, so a hash is never a way to reach another graph's files.
       const made = new Set<string>();
+      const blender = deps.blender ?? noBlender;
       const ctx: ExecutorContext = {
         user,
         graphId: id,
@@ -282,7 +287,8 @@ export function makeGraphService(deps: GraphServiceDeps): GraphService {
           },
         },
         deadline: now() + PLAY_BUDGET_MS,
-        blender: deps.blender ?? noBlender,
+        blender,
+        builder: deps.builder ?? makeBuilderService({ blender, now }),
         runs,
         lastRun: { get: () => lastRun, set: (runId) => void (lastRun = runId) },
         ai: deps.ai ?? noAi,

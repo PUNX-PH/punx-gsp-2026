@@ -2,7 +2,8 @@
 // name node types by id only, so nothing in a graph can add behavior. The plain names and one-line help are here so
 // that every screen (and every error message) uses the same words.
 import { SHAPES, TRIANGLES } from "@/lib/blender/types";
-import type { WireType } from "@/lib/graph/types";
+import { MODEL_KINDS } from "@/lib/builder/kinds";
+import { ROLE_FILES, type WireType } from "@/lib/graph/types";
 
 export interface PortSpec {
   name: string;
@@ -83,6 +84,34 @@ function shapeParams(params: Record<string, unknown>): string | null {
   return isSwatch(color) ? null : "color must be a swatch from 1 to 5.";
 }
 
+export const MAX_DESCRIPTION_CHARACTERS = 300;
+export const MAX_MOTION_CHARACTERS = 200;
+
+const MOTION_BOXES = [
+  ["run", "Run"],
+  ["jump", "Jump"],
+  ["loop", "Loop"],
+] as const;
+
+function buildModelParams(params: Record<string, unknown>): string | null {
+  if (!hasExactly(params, ["role", "kind", "description", "run", "jump", "loop"])) {
+    return "role, kind, description, run, jump and loop are the only settings a Build Model step has.";
+  }
+  const { role, kind, description } = params;
+  if (typeof role !== "string" || !Object.hasOwn(ROLE_FILES, role)) return "role must be hero, obstacle or collectible.";
+  if (typeof kind !== "string" || (kind !== "auto" && !(MODEL_KINDS as readonly string[]).includes(kind))) {
+    return "kind must be auto, biped, vehicle, blob or prop.";
+  }
+  if (typeof description !== "string") return "description must be text.";
+  if (Array.from(description).length > MAX_DESCRIPTION_CHARACTERS) return `the description is longer than ${MAX_DESCRIPTION_CHARACTERS} characters.`;
+  for (const [key, name] of MOTION_BOXES) {
+    const text = params[key];
+    if (typeof text !== "string") return `${key} must be text.`;
+    if (Array.from(text).length > MAX_MOTION_CHARACTERS) return `the ${name} box is longer than ${MAX_MOTION_CHARACTERS} characters.`;
+  }
+  return null;
+}
+
 const port = (name: string, label: string, help: string, type: WireType, required = false, missing?: string): PortSpec => ({
   name,
   label,
@@ -139,6 +168,21 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     defaultParams: () => ({ shape: "cube", color: 4 }),
     shapeProblem: shapeParams,
     incompleteProblem: () => null,
+  },
+  "build-model": {
+    type: "build-model",
+    label: "Build Model",
+    help: "Builds a moving model from your words: a hero, an obstacle or a collectible.",
+    final: false,
+    inputs: [
+      port("palette", "palette", "Colors to paint the model with. Without one, a sample palette is used.", "palette"),
+      port("image", "picture", "A picture to take the look from. Optional.", "image"),
+    ],
+    outputs: [port("model", "3D model", "The model, with its motions.", "model")],
+    defaultParams: () => ({ role: "hero", kind: "auto", description: "", run: "", jump: "", loop: "" }),
+    shapeProblem: buildModelParams,
+    incompleteProblem: (params) =>
+      params.kind === "auto" && typeof params.description === "string" && params.description.trim() === "" ? "describe it first, or pick a kind." : null,
   },
   "palette-from-image": {
     type: "palette-from-image",

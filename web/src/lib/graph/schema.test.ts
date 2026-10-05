@@ -34,8 +34,8 @@ function refused(input: unknown) {
 }
 
 describe("the node registry", () => {
-  it("has the eight node types, with plain names and help on every port", () => {
-    expect(Object.keys(NODE_SPECS).sort()).toEqual(["describe-game", "game-template", "make-shape", "model", "palette-from-image", "prepare-model", "preview", "reference-image"]);
+  it("has the nine node types, with plain names and help on every port", () => {
+    expect(Object.keys(NODE_SPECS).sort()).toEqual(["build-model", "describe-game", "game-template", "make-shape", "model", "palette-from-image", "prepare-model", "preview", "reference-image"]);
     for (const spec of Object.values(NODE_SPECS)) {
       expect(spec.label).not.toBe("");
       expect(spec.help).not.toBe("");

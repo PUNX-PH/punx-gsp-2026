@@ -3,6 +3,7 @@
 import type { DescribeGameService } from "@/lib/ai/types";
 import type { User } from "@/lib/auth/ports";
 import type { BlenderService, ModelFormat } from "@/lib/blender/types";
+import type { BuilderService } from "@/lib/builder/types";
 import type { ClipName } from "@/lib/builder/kinds";
 import type { RunService } from "@/lib/runs/types";
 
@@ -136,6 +137,8 @@ export interface ExecutorContext {
   runs: Pick<RunService, "createRun" | "putFile" | "deleteRun">;
   /** The run this graph's Preview last stored; Preview replaces it. */
   lastRun: { get(): string | null; set(id: string | null): void };
+  /** Build Model turns a person's words (or just a kind) into an animated GLB through this (the kit, Blender, and later the AI). */
+  builder: BuilderService;
   /** Describe Game turns a person's words and picture into a palette and a feel through this (cache, limits and the model). */
   ai: DescribeGameService;
 }

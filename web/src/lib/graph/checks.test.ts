@@ -191,3 +191,26 @@ describe("checkGraph and Describe Game", () => {
     expect(checkGraph(g, assets)).toEqual([]);
   });
 });
+
+describe("a Build Model step", () => {
+  const withBuild = (params: Record<string, unknown>): Graph => ({
+    schemaVersion: 1,
+    nodes: [
+      node("n1", "build-model", params),
+      node("n2", "game-template", { tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } }),
+      node("n3", "preview"),
+    ],
+    edges: [wire("n1", "model", "n2", "hero"), wire("n2", "settings", "n3", "settings")],
+  });
+  const settings = (change: Record<string, unknown>) => ({ ...NODE_SPECS["build-model"].defaultParams(), ...change });
+
+  it("stops Play when it is on Auto with no words", () => {
+    expect(checkGraph(withBuild(settings({})), assets)).toEqual([{ node: "n1", message: "Build Model: describe it first, or pick a kind." }]);
+    expect(checkGraph(withBuild(settings({ description: "  \n " })), assets)).toEqual([{ node: "n1", message: "Build Model: describe it first, or pick a kind." }]);
+  });
+
+  it("lets Play start with a chosen kind and no words, or with words", () => {
+    expect(checkGraph(withBuild(settings({ kind: "biped" })), assets)).toEqual([]);
+    expect(checkGraph(withBuild(settings({ description: "a red fox" })), assets)).toEqual([]);
+  });
+});
