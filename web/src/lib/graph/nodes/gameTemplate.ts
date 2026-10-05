@@ -6,6 +6,8 @@ import { validateSettings } from "@/lib/settings";
 
 const ROLES = Object.keys(ROLE_FILES) as Role[];
 
+const article = (role: Role) => (role === "obstacle" ? "an" : "a");
+
 export const gameTemplate: Executor = async (inputs, params) => {
   // A connected feel replaces the sliders for this run (the saved setting is left alone, so unplugging it brings them back).
   // Either way the numbers are checked below like any others; the settings' own shape was checked when the graph was saved.
@@ -19,6 +21,10 @@ export const gameTemplate: Executor = async (inputs, params) => {
       // Only a GLB can go into a game as it is: an FBX or an OBJ has to be prepared first.
       if (given?.type === "model" && given.format !== "glb") {
         throw new NodeError(`Game Template: the ${role} model is an ${given.format.toUpperCase()} file. Put a Prepare Model step after it.`);
+      }
+      // A built model knows what it was built for (an obstacle has no Run clip to play): a mismatch is the person's to fix.
+      if (given?.type === "model" && given.role !== undefined && given.role !== role) {
+        throw new NodeError(`Game Template: the ${role} model was built as ${article(given.role)} ${given.role}. Set its role to ${role}.`);
       }
       return [role, given?.type === "model" ? { kind: "asset", sha256: given.sha256 } : { kind: "builtin", role }];
     }),

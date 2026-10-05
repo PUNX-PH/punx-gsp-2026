@@ -87,6 +87,47 @@ describe("the Game Template node", () => {
   });
 });
 
+describe("the Game Template node and the role a model was built for", () => {
+  const built = (role: "hero" | "obstacle" | "collectible", clips: ("Run" | "Jump" | "Loop")[] = ["Run", "Jump"]) => ({
+    type: "model" as const,
+    sha256: SHA,
+    name: `${role}.glb`,
+    size: 100,
+    format: "glb" as const,
+    role,
+    clips,
+  });
+  const failure = (run: Promise<unknown>) => run.then(() => null, (e: unknown) => e);
+
+  it("refuses a model built for another role, and says which role to set", async () => {
+    const wrongHero = await failure(gameTemplate({ hero: built("obstacle") }, { tuning }, ctx));
+    expect(wrongHero).toBeInstanceOf(NodeError);
+    expect((wrongHero as Error).message).toBe("Game Template: the hero model was built as an obstacle. Set its role to hero.");
+
+    const wrongCollectible = await failure(gameTemplate({ collectible: built("hero") }, { tuning }, ctx));
+    expect((wrongCollectible as Error).message).toBe("Game Template: the collectible model was built as a hero. Set its role to collectible.");
+
+    const wrongObstacle = await failure(gameTemplate({ obstacle: built("collectible") }, { tuning }, ctx));
+    expect((wrongObstacle as Error).message).toBe("Game Template: the obstacle model was built as a collectible. Set its role to obstacle.");
+  });
+
+  it("takes a model built for the role it is plugged into", async () => {
+    const { output } = await gameTemplate({ hero: built("hero"), obstacle: built("obstacle", ["Loop"]), collectible: built("collectible", ["Loop"]) }, { tuning }, ctx);
+    expect(output).toMatchObject({ type: "settings", models: { hero: { kind: "asset", sha256: SHA }, obstacle: { kind: "asset" }, collectible: { kind: "asset" } } });
+  });
+
+  it("takes a model that carries no role, as before (an upload, a prepared model, a shape)", async () => {
+    const plain = { type: "model" as const, sha256: SHA, name: "thing.glb", size: 100, format: "glb" as const };
+    const { output } = await gameTemplate({ hero: plain, obstacle: plain, collectible: plain }, { tuning }, ctx);
+    expect(output?.type).toBe("settings");
+  });
+
+  it("takes a hero that was built with no clips", async () => {
+    const { output } = await gameTemplate({ hero: built("hero", []) }, { tuning }, ctx);
+    expect(output?.type).toBe("settings");
+  });
+});
+
 describe("the Game Template node and model files that are not GLBs", () => {
   const raw = (format: "fbx" | "obj") => ({ type: "model" as const, sha256: SHA, name: `thing.${format}`, size: 100, format });
   const failure = (run: Promise<unknown>) => run.then(() => null, (e: unknown) => e);

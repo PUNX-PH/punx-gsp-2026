@@ -3,6 +3,7 @@
 import type { DescribeGameService } from "@/lib/ai/types";
 import type { User } from "@/lib/auth/ports";
 import type { BlenderService, ModelFormat } from "@/lib/blender/types";
+import type { ClipName } from "@/lib/builder/kinds";
 import type { RunService } from "@/lib/runs/types";
 
 /** What a wire carries. A `feel` is the three tuning numbers (how fast, how high, how far apart). */
@@ -98,7 +99,9 @@ export type ModelSource = { kind: "asset"; sha256: string } | { kind: "builtin";
 
 export type WireValue =
   | { type: "image"; sha256: string; name: string; width: number; height: number }
-  | { type: "model"; sha256: string; name: string; size: number; format: ModelFormat }
+  // `role` and `clips` come only from Build Model (the role it was built for, and the clips it carries); an upload, a prepared model and a
+  // shape have neither.
+  | { type: "model"; sha256: string; name: string; size: number; format: ModelFormat; role?: Role; clips?: ClipName[] }
   | { type: "palette"; colors: string[] }
   | { type: "feel"; tuning: Tuning }
   | { type: "settings"; settingsText: string; tuning: Tuning; models: Record<Role, ModelSource> };
