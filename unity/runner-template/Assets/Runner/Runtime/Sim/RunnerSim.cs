@@ -32,6 +32,7 @@ namespace Runner.Sim
         readonly Tuning tuning;
         readonly List<Entity> entities = new List<Entity>();
         float verticalVelocity;
+        float takeOffSpeed;
         int nextSlot;
 
         public RunnerSim(Tuning tuning)
@@ -46,6 +47,25 @@ namespace Runner.Sim
         public int Score { get; private set; }
         public bool GameOver { get; private set; }
 
+        /// <summary>
+        /// How far through the jump the hero is: 0 at take-off, 1 at landing, 0 on the ground. The parabola is symmetric, so the vertical speed
+        /// is a clock that follows the real jump whatever the tuning: (v0 - v) / (2 * v0), which a Jump clip can be driven by.
+        /// </summary>
+        public float AirProgress
+        {
+            get
+            {
+                if (Grounded || takeOffSpeed <= 0f) return 0f;
+                return Math.Max(0f, Math.Min(1f, (takeOffSpeed - verticalVelocity) / (2f * takeOffSpeed)));
+            }
+        }
+
+        /// <summary>How long a jump of this height lasts: up and down again, 2 * v0 / g.</summary>
+        public static float Airtime(float jumpHeight)
+        {
+            return 2f * (float)Math.Sqrt(2f * Gravity * jumpHeight) / Gravity;
+        }
+
         /// <summary>Entities from 5 m behind the hero to 60 m ahead, in ascending Z, collected ones included.</summary>
         public IReadOnlyList<Entity> Entities => entities;
 
@@ -54,6 +74,7 @@ namespace Runner.Sim
             Z = 0f;
             HeroY = 0f;
             verticalVelocity = 0f;
+            takeOffSpeed = 0f;
             Grounded = true;
             Score = 0;
             GameOver = false;
@@ -69,7 +90,8 @@ namespace Runner.Sim
 
             if (jump && Grounded)
             {
-                verticalVelocity = (float)Math.Sqrt(2f * Gravity * tuning.jumpHeight);
+                takeOffSpeed = (float)Math.Sqrt(2f * Gravity * tuning.jumpHeight);
+                verticalVelocity = takeOffSpeed;
                 Grounded = false;
             }
             if (!Grounded)

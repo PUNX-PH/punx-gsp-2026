@@ -185,6 +185,56 @@ namespace Runner.Tests
             }
         }
 
+        [Test]
+        public void AirProgress_is_zero_on_the_ground()
+        {
+            var sim = new RunnerSim(Defaults());
+            Assert.AreEqual(0f, sim.AirProgress);
+            sim.Tick(Step, false);
+            Assert.AreEqual(0f, sim.AirProgress);
+        }
+
+        [Test]
+        public void AirProgress_follows_the_time_since_take_off_over_the_tuning_range()
+        {
+            foreach (var height in new[] { 1.5f, 2.2f, 3.5f, 5f })
+            {
+                var sim = new RunnerSim(new Tuning { speed = 6f, jumpHeight = height, obstacleSpacing = 12f });
+                var airtime = RunnerSim.Airtime(height);
+                var previous = 0f;
+                var ticks = 1;
+                sim.Tick(Step, true);
+                while (!sim.Grounded && ticks < 2000)
+                {
+                    Assert.AreEqual(ticks * Step / airtime, sim.AirProgress, 0.02f, "jumpHeight " + height + " at tick " + ticks);
+                    Assert.GreaterOrEqual(sim.AirProgress, previous, "it went backwards at tick " + ticks);
+                    previous = sim.AirProgress;
+                    sim.Tick(Step, false);
+                    ticks++;
+                }
+                Assert.IsTrue(sim.Grounded, "the jump never ended for jumpHeight " + height);
+                Assert.Greater(previous, 0.9f, "it never got near 1 for jumpHeight " + height);
+            }
+        }
+
+        [Test]
+        public void AirProgress_is_zero_again_after_landing()
+        {
+            var sim = new RunnerSim(Defaults());
+            sim.Tick(Step, true);
+            for (var i = 0; i < 240 && !sim.Grounded; i++) sim.Tick(Step, false);
+            Assert.IsTrue(sim.Grounded);
+            Assert.AreEqual(0f, sim.AirProgress);
+            sim.Tick(Step, false);
+            Assert.AreEqual(0f, sim.AirProgress);
+        }
+
+        [Test]
+        public void Airtime_at_the_default_jump_is_about_0_77_s()
+        {
+            Assert.AreEqual(0.766f, RunnerSim.Airtime(2.2f), 0.01f);
+        }
+
         sealed class FloatComparer : System.Collections.IComparer
         {
             public int Compare(object x, object y)
