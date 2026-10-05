@@ -505,6 +505,67 @@ class BuildScript(unittest.TestCase):
             self.assertEqual(json.load(handle)["clips"], [])
         self.assertNotIn("animations", read_glb(self.out))
 
+    def test_each_default_kind_builds_with_its_joints_clips_and_counts(self):
+        joints = {
+            "vehicle": ["body", "wheel_1", "wheel_2", "wheel_3", "wheel_4"],
+            "blob": ["body", "eye_l", "eye_r"],
+            "prop": ["root"],
+        }
+        for kind, wanted in joints.items():
+            with self.subTest(kind=kind):
+                _, gltf, _ = self.built(f"{kind}-default.json")
+                names = node_names(gltf)
+                for joint in wanted:
+                    self.assertIn(joint, names)
+                self.assertEqual(sorted(a["name"] for a in gltf.get("animations", [])), sorted(recipe_fixture("expected.json")[f"{kind}-default.json"]["clips"]))
+                self.assertEqual(self.stats, recipe_fixture("expected.json")[f"{kind}-default.json"])
+                self.assertEqual(triangles(gltf), self.stats["triangles"])
+
+    def test_each_stress_recipe_stays_within_the_caps(self):
+        for kind in ("vehicle", "blob", "prop"):
+            with self.subTest(kind=kind):
+                _, gltf, _ = self.built(f"{kind}-stress.json")
+                self.assertLessEqual(self.stats["parts"], 24)
+                self.assertLessEqual(self.stats["triangles"], 2000)
+                self.assertEqual(self.stats, recipe_fixture("expected.json")[f"{kind}-stress.json"])
+                self.assertEqual(sorted(a["name"] for a in gltf["animations"]), ["Jump", "Loop", "Run"])
+
+    def test_the_vehicle_is_longest_forward(self):
+        _, gltf, _ = self.built("vehicle-default.json")
+        x, y, z = extents(gltf)
+        self.assertGreater(z, x)
+        self.assertGreater(z, y)
+        self.assertAlmostEqual(lowest_y(gltf), 0.0, delta=0.01)  # the wheels are on the ground
+
+    def test_the_wheels_spin_about_the_side_axis(self):
+        _, gltf, binary = self.built("vehicle-default.json")
+        animation = animation_named(gltf, "Loop")
+        channel = channels_of(gltf, animation, "rotation")[self.node_index(gltf, "wheel_1")]
+        rotations = accessor_values(gltf, binary, animation["samplers"][channel["sampler"]]["output"])
+        self.assertTrue(all(abs(q[1]) < 0.01 and abs(q[2]) < 0.01 for q in rotations), "a wheel wobbles instead of spinning about the axle")
+        self.assertGreater(max(abs(q[0]) for q in rotations), 0.9)  # it turns through a half turn and more
+        mesh = gltf["meshes"][gltf["nodes"][self.node_index(gltf, "wheel_1_mesh")]["mesh"]]
+        box = gltf["accessors"][mesh["primitives"][0]["attributes"]["POSITION"]]
+        width, height, depth = (box["max"][i] - box["min"][i] for i in range(3))
+        self.assertLess(width, height * 0.5, "the wheel is not a disc whose axle is the model's x")
+        self.assertAlmostEqual(height, depth, delta=0.01)
+
+    def test_every_prop_shape_builds(self):
+        counts = json.load(open(os.path.join(SCRIPTS, "kit.json")))["kinds"]["prop"]["count"]["shapes"]
+        self.assertEqual(len(counts), 9)
+        for shape, wanted in counts.items():
+            with self.subTest(shape=shape):
+                body = recipe_fixture("prop-default.json")
+                body["recipe"]["build"]["shape"] = shape
+                result = self.build(body)
+                self.assertEqual(result.returncode, 0, result.stderr[-1500:])
+                with open(self.stats_path, encoding="utf-8") as handle:
+                    stats = json.load(handle)
+                self.assertEqual((stats["parts"], stats["triangles"]), (wanted["parts"], wanted["triangles"]))
+                gltf = read_glb(self.out)
+                self.assertEqual(triangles(gltf), wanted["triangles"])
+                self.assertAlmostEqual(extents(gltf)[1], body["recipe"]["build"]["size"], delta=0.02)  # `size` tall
+
     def test_a_body_the_worker_would_refuse_exits_5(self):
         def mutated(change):
             body = recipe_fixture("biped-default.json")

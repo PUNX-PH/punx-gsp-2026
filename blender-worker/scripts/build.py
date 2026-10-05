@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bmesh  # noqa: E402
 import bpy  # noqa: E402
 import common  # noqa: E402
-from mathutils import Vector  # noqa: E402
+from mathutils import Matrix, Vector  # noqa: E402
 
 EXIT_BAD_RECIPE = 5
 
@@ -138,15 +138,115 @@ def biped_layout(build, extras):
     return pivots, parts
 
 
-LAYOUTS = {"biped": biped_layout}  # the other kinds are added in the next task
+def vehicle_layout(build, extras):
+    """A body box on the axle line, a cab box over its back half, wheels beside it in rows from front to back (a pair to a row; an odd last
+    wheel sits alone in the middle of the back row). Every wheel touches y = 0 and spins about the model's x."""
+    length, width, height = build["bodyLength"], build["bodyWidth"], build["bodyHeight"]
+    cab, count, radius = build["cabSize"], int(build["wheelCount"]), build["wheelRadius"]
+    wheel_w = radius * 0.7
+    top = radius + height
+    pivots = {"body": (0, radius + height / 2, 0)}
+    parts = [("body", "body", "box", (width, height, length), (0, radius + height / 2, 0))]
+    if cab > 0:
+        parts.append(("body", "cab", "box", (width * 0.8, cab, length * 0.45), (0, top + cab / 2, -length / 4)))
+    rows = (count + 1) // 2
+    reach = max(0.0, length / 2 - radius * 1.3)  # the first and last axle, from the middle
+    for k in range(1, count + 1):
+        row = (k + 1) // 2 - 1
+        z = 0.0 if rows == 1 else reach - row * 2 * reach / (rows - 1)
+        alone = count % 2 == 1 and k == count
+        x = 0.0 if alone else (width / 2 + wheel_w / 2) * (1 if k % 2 == 1 else -1)
+        pivots[f"wheel_{k}"] = (x, radius, z)
+        parts.append((f"wheel_{k}", "wheels", "cylinder", (radius, wheel_w, "x", 8), (x, radius, z)))
+    if "antenna" in extras:
+        ax, az, base = width * 0.3, -length * 0.4, top + cab
+        pivots["antenna"] = (ax, base, az)
+        parts += [
+            ("antenna", "extra", "box", (width * 0.06, width * 0.4, width * 0.06), (ax, base + width * 0.2, az)),
+            ("antenna", "extra", "cylinder", (width * 0.08, width * 0.1), (ax, base + width * 0.45, az)),
+        ]
+    return pivots, parts
+
+
+def blob_layout(build, extras):
+    """An icosphere squashed in height and sitting on y = 0, two cube eyes on its front, and the extras."""
+    r, squash, eye = build["radius"], build["squash"], build["eyeSize"]
+    half = r * squash
+    cy, top = half, 2 * half
+    eye_y, eye_z = cy + half * 0.25, r * 0.88  # on the surface: sqrt(1 - 0.4^2 - 0.25^2) = 0.88 of the radius
+    pivots = {"body": (0, 0, 0), "eye_l": (r * 0.4, eye_y, eye_z), "eye_r": (-r * 0.4, eye_y, eye_z)}
+    parts = [
+        ("body", "body", "sphere", (r, squash), (0, cy, 0)),
+        ("eye_l", "eyes", "box", (eye, eye, eye), pivots["eye_l"]),
+        ("eye_r", "eyes", "box", (eye, eye, eye), pivots["eye_r"]),
+    ]
+    for extra in extras:
+        if extra == "tail":
+            back = -r * 0.95
+            pivots["tail_1"], pivots["tail_2"] = (0, cy, back), (0, cy, back - r * 0.4)
+            parts += [
+                ("tail_1", "extra", "box", (r * 0.2, r * 0.2, r * 0.4), (0, cy, back - r * 0.2)),
+                ("tail_2", "extra", "box", (r * 0.15, r * 0.15, r * 0.4), (0, cy, back - r * 0.6)),
+            ]
+        elif extra == "ears":
+            for side, sign in (("l", 1), ("r", -1)):
+                base = (sign * r * 0.5, cy + half * 0.85, 0)
+                pivots[f"ear_{side}"] = base
+                parts.append((f"ear_{side}", "extra", "box", (r * 0.2, r * 0.35, r * 0.2), (base[0], base[1] + r * 0.175, 0)))
+        elif extra == "antenna":
+            pivots["antenna"] = (0, top, 0)
+            parts += [
+                ("antenna", "extra", "box", (r * 0.06, r * 0.5, r * 0.06), (0, top + r * 0.25, 0)),
+                ("antenna", "extra", "cylinder", (r * 0.1, r * 0.12), (0, top + r * 0.56, 0)),
+            ]
+        elif extra == "hat":
+            pivots["hat"] = (0, top, 0)
+            parts.append(("hat", "extra", "cylinder", (r * 0.45, r * 0.25), (0, top + r * 0.08, 0)))
+    return pivots, parts
+
+
+def prop_layout(build, extras):
+    """One shape, `size` tall, standing on y = 0 and centered over the origin; its one joint is at its center."""
+    s, shape = build["size"], build["shape"]
+    mid = (0, s / 2, 0)
+    pivots = {"root": mid}
+    if shape == "cube":
+        parts = [("root", "body", "box", (s, s, s), mid)]
+    elif shape == "sphere":
+        parts = [("root", "body", "sphere", (s / 2, 1.0), mid)]
+    elif shape == "cone":
+        parts = [("root", "body", "cone", (s / 2, s, 8, "up"), mid)]
+    elif shape == "cylinder":
+        parts = [("root", "body", "cylinder", (s / 2, s), mid)]
+    elif shape == "pyramid":
+        parts = [("root", "body", "cone", (s / 2, s, 4, "up"), mid)]
+    elif shape == "coin":
+        parts = [("root", "body", "cylinder", (s / 2, s * 0.15, "z", 12), mid)]
+    elif shape == "ring":
+        parts = [("root", "body", "torus", (s * 0.35, s * 0.15, 12, 6), mid)]
+    elif shape == "gem":
+        parts = [("root", "body", "gem", (s * 0.35, s), mid)]
+    else:  # crate: a cube and two bands round it
+        parts = [
+            ("root", "body", "box", (s, s, s), mid),
+            ("root", "extra", "box", (s * 1.08, s * 0.14, s * 1.08), (0, s * 0.2, 0)),
+            ("root", "extra", "box", (s * 1.08, s * 0.14, s * 1.08), (0, s * 0.8, 0)),
+        ]
+    return pivots, parts
+
+
+LAYOUTS = {"biped": biped_layout, "vehicle": vehicle_layout, "blob": blob_layout, "prop": prop_layout}
 
 
 # ---- checking the body ----
 
 
-def joint_list(spec, extras):
-    """[(joint, parent)] in order: the kind's joints, then each extra's (an `@anchor` parent is the joint the kind names for it)."""
+def joint_list(kind, spec, build, extras):
+    """[(joint, parent)] in order: the kind's joints (a vehicle's wheels follow its body), then each extra's (an `@anchor` parent is the
+    joint the kind names for it)."""
     joints = [(name, parent) for name, parent in spec["joints"]]
+    if kind == "vehicle":
+        joints += [(f"wheel_{k}", "body") for k in range(1, int(build["wheelCount"]) + 1)]
     for extra in extras:
         for name, parent in KIT["extras"][extra]["joints"]:
             joints.append((name, spec["anchors"][parent[1:]] if parent.startswith("@") else parent))
@@ -170,11 +270,12 @@ def check_body(body):
             need(build[name] in field["choices"])
         else:
             need(is_number(build[name]) and field["min"] <= build[name] <= field["max"])
+            need(not field.get("whole") or float(build[name]).is_integer())
     colors = recipe.get("colors")
     need(isinstance(colors, dict) and set(colors) == set(spec["slots"]))
     need(all(isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 4 for v in colors.values()))
 
-    joints = joint_list(spec, extras)
+    joints = joint_list(recipe["kind"], spec, build, extras)
     names = {name for name, _ in joints}
     need(isinstance(motions, dict) and set(motions) == {"version", "motions"} and isinstance(motions["motions"], dict))
     for key, motion in motions["motions"].items():
@@ -194,6 +295,85 @@ def check_body(body):
 
 
 # ---- building the model ----
+
+
+# A shape is made in Blender's own axes, centered on the origin, with its axis along Blender's Z (the model's up) unless it says otherwise.
+TURNS = {"y": None, "x": Matrix.Rotation(math.radians(90), 3, "Y"), "z": Matrix.Rotation(math.radians(90), 3, "X")}  # up -> model x, up -> model z
+
+
+def turned(verts, axis):
+    if TURNS[axis] is not None:
+        for v in verts:
+            v.co = TURNS[axis] @ v.co
+    return verts
+
+
+def make_box(bm, size):
+    sx, sy, sz = size  # model x, y (up), z (forward)
+    verts = bmesh.ops.create_cube(bm, size=1.0)["verts"]
+    for v in verts:
+        v.co = Vector((v.co.x * sx, v.co.y * sz, v.co.z * sy))
+    return verts
+
+
+def make_cylinder(bm, size):
+    """(radius, depth) standing up with 8 sides, or (radius, depth, axis, sides)."""
+    radius, depth, *more = size
+    axis, sides = (more[0], more[1]) if more else ("y", 8)
+    verts = bmesh.ops.create_cone(bm, cap_ends=True, segments=sides, radius1=radius, radius2=radius, depth=depth)["verts"]
+    return turned(verts, axis)
+
+
+def make_cone(bm, size):
+    """(radius, depth, sides, 'up' | 'down'): the base is the wide end and the point the other."""
+    radius, depth, sides, direction = size
+    r1, r2 = (radius, 0.0) if direction == "up" else (0.0, radius)
+    return bmesh.ops.create_cone(bm, cap_ends=True, segments=sides, radius1=r1, radius2=r2, depth=depth)["verts"]
+
+
+def make_sphere(bm, size):
+    """(radius, squash): an 80-triangle icosphere, its height scaled by squash."""
+    radius, squash = size
+    verts = bmesh.ops.create_icosphere(bm, subdivisions=2, radius=radius)["verts"]
+    for v in verts:
+        v.co.z *= squash
+    return verts
+
+
+def make_torus(bm, size):
+    """(major radius, minor radius, major sides, minor sides), standing on edge with its hole facing the model's z."""
+    major, minor, ring_sides, tube_sides = size
+    rings = []
+    for i in range(ring_sides):
+        a = 2 * math.pi * i / ring_sides
+        ring = []
+        for j in range(tube_sides):
+            b = 2 * math.pi * j / tube_sides
+            reach = major + minor * math.cos(b)
+            ring.append(bm.verts.new((reach * math.cos(a), reach * math.sin(a), minor * math.sin(b))))
+        rings.append(ring)
+    faces = []
+    for i in range(ring_sides):
+        for j in range(tube_sides):
+            n, m = (i + 1) % ring_sides, (j + 1) % tube_sides
+            faces.append(bm.faces.new((rings[i][j], rings[n][j], rings[n][m], rings[i][m])))
+    bmesh.ops.recalc_face_normals(bm, faces=faces)  # a closed shape of its own, so "outward" is well defined
+    return turned([v for ring in rings for v in ring], "z")
+
+
+def make_gem(bm, size):
+    """(radius, height): two 4-sided cones base to base."""
+    radius, height = size
+    verts = []
+    for direction, shift in (("up", height / 4), ("down", -height / 4)):
+        made = make_cone(bm, (radius, height / 2, 4, direction))
+        for v in made:
+            v.co.z += shift
+        verts += made
+    return verts
+
+
+SHAPES = {"box": make_box, "cylinder": make_cylinder, "cone": make_cone, "sphere": make_sphere, "torus": make_torus, "gem": make_gem}
 
 
 class Meshes:
@@ -218,16 +398,9 @@ class Meshes:
             materials.append(material)
         index = materials.index(material)
         offset = blender_point(center)
-        if shape == "box":
-            made = bmesh.ops.create_cube(bm, size=1.0)["verts"]
-            sx, sy, sz = size  # model x, y (up), z (forward)
-            for v in made:
-                v.co = Vector((v.co.x * sx, v.co.y * sz, v.co.z * sy)) + offset
-        else:  # an 8-sided cylinder, standing up
-            radius, depth = size
-            made = bmesh.ops.create_cone(bm, cap_ends=True, segments=8, radius1=radius, radius2=radius, depth=depth)["verts"]
-            for v in made:
-                v.co = v.co + offset
+        made = SHAPES[shape](bm, size)
+        for v in made:
+            v.co = v.co + offset
         for face in {f for v in made for f in v.link_faces}:
             face.material_index = index
         self.parts += 1

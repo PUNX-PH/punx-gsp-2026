@@ -116,12 +116,16 @@ Edit the three `ARG`s in the Dockerfile (the checksum is on `download.blender.or
 
 ## The web app's fixtures
 
-`web/src/lib/blender/fixtures/*.glb` are real output of these scripts (a prepared cube and a ring); `blenderOutput.test.ts` checks that
-the app accepts them. After changing a script, regenerate them (Blender 5.2, from the repository root):
+`web/src/lib/blender/fixtures/*.glb` are real output of these scripts (a prepared cube and a ring, and a built character and prop);
+`blenderOutput.test.ts` checks that the app accepts them. After changing a script, regenerate them (Blender 5.2, from the repository root):
 
 ```bash
 blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/prepare.py -- --in blender-worker/fixtures/cube.obj \
   --format obj --triangles 2000 --color "#ff6f59" --out web/src/lib/blender/fixtures/prepared-cube.glb --stats stats.json
 blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/shape.py -- --shape ring --color "#06d6a0" \
   --out web/src/lib/blender/fixtures/ring.glb --stats stats.json
+blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/build.py -- --recipe blender-worker/fixtures/recipes/biped-default.json \
+  --out web/src/lib/blender/fixtures/built-biped.glb --stats stats.json
+blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/build.py -- --recipe blender-worker/fixtures/recipes/prop-default.json \
+  --out web/src/lib/blender/fixtures/built-prop.glb --stats stats.json
 ```
