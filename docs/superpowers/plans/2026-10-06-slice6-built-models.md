@@ -2,17 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans. This plan is executed **inline ("native", the user's standing
 > choice)**: one session implements every task in order, **without check-ins between tasks**, and keeps a ledger at
-> `.superpowers/sdd/2026-10-06-slice6-built-models/progress.md` (git-ignored). **One fresh whole-branch review at the end** (Task 36), then one
+> `.superpowers/sdd/2026-10-06-slice6-built-models/progress.md` (git-ignored). **One fresh whole-branch review at the end** (Task 46), then one
 > fix pass. Steps use checkbox (`- [ ]`) syntax for tracking. **Ask before any push, install or deploy.**
 >
 > **Steps that need the studio** (ask before each; if it is not available, ledger `Task N: <step> deferred (needs the studio)` and carry on;
-> Task 38 repeats every deferred check): an **active Unity Hub sign-in** on this machine for every Unity batch run, tests and builds alike
-> (Tasks 7 to 11 and 33 to 35; without it the C# is still written test-first and the run is ledgered for the next task that has it, and
-> Task 35 must run them all); the **funded Anthropic key** in Vercel for the live AI half (Task 38); **a phone on the same Wi-Fi and an
-> administrator shell** for the phone check (Tasks 21 and 35, with the result carried into Task 38); the Google Cloud (worker redeploy) and
-> Vercel steps and any push to `main` (Tasks 21 and 38).
+> Task 48 repeats every deferred check): an **active Unity Hub sign-in** on this machine for every Unity batch run, tests and builds alike
+> (Tasks 7 to 11, 33 to 35, 42 and 44; without it the C# is still written test-first and the run is ledgered for the next task that has it, and
+> Tasks 35 and 44 must run them all); the **funded Anthropic key** in Vercel for the live AI half (Task 48); **a phone on the same Wi-Fi and an
+> administrator shell** for the phone check (Tasks 21, 35 and 44, with the result carried into Task 48); the Google Cloud (worker redeploy) and
+> Vercel steps and any push to `main` (Tasks 21 and 48).
 
-**Goal:** A creator describes a hero, an obstacle or a collectible in words (or picks a kind and types nothing) and gets a low-poly model
+**Goal:** A creator describes a hero, an obstacle or a collectible in words (or picks a kind and types nothing) and gets a low-poly (or, with Quality set to High, a lit, detailed and budget-bound) model
 that moves, built by our Blender worker from a checked recipe; and a theme gives the game a field, edge stripes, a sky color and animated
 scenery that recycles along both sides.
 
@@ -27,7 +27,7 @@ and `Jump` (Jump's time driven by `RunnerSim.AirProgress`) and `Loop`, and build
 worker in Node 24 (built-in `node --test`) and Blender 5.2.2 LTS Python; Unity 6000.3 with glTFast 6.20 (legacy `Animation`), NUnit EditMode
 and PlayMode tests. No new npm dependencies.
 
-**Spec:** `docs/superpowers/specs/2026-10-06-built-models-design.md` (approved 2026-10-06). Evidence: `docs/superpowers/notes/slice6-spikes.md`.
+**Spec:** `docs/superpowers/specs/2026-10-06-built-models-design.md` (approved 2026-10-06; amended the same day with the High quality tier, `4fc146d`). Evidence: `docs/superpowers/notes/slice6-spikes.md`; the quality showcase in the session folder `showcase/` shows the look Stage 6 targets and the cost it must avoid.
 
 ## Global Constraints
 
@@ -92,6 +92,10 @@ and PlayMode tests. No new npm dependencies.
   escapes (`\u0007`, Windows paths) with the editor tools, not shell heredocs. Commit Unity's generated `.meta` files with the assets they
   belong to. Every commit message ends with the session's `Co-Authored-By:` attribution line. No new npm dependency.
 
+- **The High tier (Stage 6, spec amended `4fc146d`):** `quality` is `standard` (the default and everything above) or `high`. A High recipe adds
+  `quality`, `finishes` and `details`; budgets are enforced by the recipe check, the worker's second check and `build.py`; the constants,
+  tables and numbers are listed at the top of Stage 6. Standard recipes, keys and fixtures must stay exactly as defined in Stages 1 to 5.
+
 ## Review Focus
 
 Failure modes the spec implies that no single task's tests would otherwise pin, most likely first. Each line names the task that pins it.
@@ -108,6 +112,11 @@ Failure modes the spec implies that no single task's tests would otherwise pin, 
 5. **A Claude motion that names only joints the model lacks** (a tail on a blob), and **a model with no clip for its slot** (an uploaded GLB as
    hero): the clip falls back to the kind's default motion and the card lists what was skipped; a hero with no clips plays still
    (Tasks 3, 8, 10 and 26).
+6. **A High recipe over any budget** (estimate or real counts) never reaches Blender from the web app (`fitToBudget` or a refusal) and is refused
+   by the worker on its own; `build.py` exits 5 rather than ship a model over a cap; a Standard recipe carrying High keys is refused
+   (Tasks 36 to 38 and 40).
+7. **A High game on a slow device** keeps its frame rate by stepping down in fixed levels and never steps back up; a tab switch (one very long
+   frame) does not step it; a Standard game, and any settings file from before this stage, plays exactly as before (Tasks 41 and 43).
 
 ## Rulings already made in this plan
 
@@ -142,6 +151,13 @@ Copy these to the ledger as `Ruling:` lines at the start. The spec is the author
   list is empty after filtering takes the meadow's scenery.
 - The model wire's name is `<kind>.glb`; the prop's default shape is `gem`.
 - The template is published once at the end of stage 5 (Task 35), and in Task 21 only if the stage 3 live checks run before stage 5 is done.
+- **Stage 6 rulings.** The tier is a setting with Standard as the default, so phones and existing games stay on the cheap path. High keeps
+  rigid parts and node animation (no skinning). Static joints are merged into their moving ancestor's mesh in High only (Standard keeps one mesh
+  per joint, as the spec says). Vertex colors reach the GLB only through a Color Attribute node on the material with
+  `export_vertex_color="MATERIAL"` (the showcase's exporter wrote an all-white `COLOR_0` otherwise). Open surfaces never get
+  `recalc_face_normals`. The template builds its own meshes in code (no `CreatePrimitive`: physics is stripped). Compression (Draco, meshopt) is a
+  new dependency and stays the studio's decision; if the 15 s load budget cannot be met without it, Task 44 ledgers `Decision needed`. The kit's
+  High counts are estimates until Tasks 37 to 39 measure them. The showcase's look is the target; its brute-force detail is not.
 
 ---
 
@@ -810,7 +826,7 @@ the rest position; scale multiplies the rest scale on that axis by `1 + value`. 
   shows none), 7 (Play again: "Reused your earlier result", Cloud Run's request count unchanged), 9 (the phone, Unity's mobile build: from an
   administrator shell run `powershell -NoProfile -ExecutionPolicy Bypass -File tools/serve.ps1 -Root Builds/runner-mobile -Lan`, open
   `http://<this machine's address>:8080/index.html?settings=StreamingAssets/sample-built/settings.json&debug=1` on a phone on the same Wi-Fi, and
-  read the frame rate for a minute: 30 or more). Ledger each result. Otherwise ledger `Task 21: live checks deferred to Task 38`.
+  read the frame rate for a minute: 30 or more). Ledger each result. Otherwise ledger `Task 21: live checks deferred to Task 48`.
 
 ---
 
@@ -1198,20 +1214,286 @@ the rest position; scale multiplies the rest scale on that axis by `1 + value`. 
 
 ---
 
+## Stage 6: The High quality tier, optimized (spec amended 2026-10-06, `4fc146d`)
+
+The tier is a contract of budgets. Every task below either enforces a budget or removes a way to break one. The numbers are the spec's; the
+kit's High counts (base triangles, detail costs) start as estimates and are **corrected from Blender's real output in Tasks 37 to 39**, with
+`kit.json`, `kinds.ts` and the fixtures corrected together and the change ledgered (as Task 5 does for Standard).
+
+**Constants for this stage** (add to the ledger as `Ruling:` lines): `QUALITIES = ["standard", "high"]`; `FINISHES = ["matte", "painted",
+"metal", "rubber", "glow"]` with `{ metallic, roughness, emission }` = matte `{0, 0.85, 0}`, painted `{0, 0.35, 0}`, metal `{0.9, 0.3, 0}`, rubber
+`{0, 0.9, 0}`, glow `{0, 0.5, 1}`; `DETAILS = ["seams", "bolts", "cables", "lights"]`, **dropped in this order when over budget: cables, bolts, seams,
+lights, then extras from the end, then bevel segments**; `LOOKS = ["flat", "lit"]`; `WORLD_STYLES = ["desert", "meadow"]`; world files
+`terrain.glb`, `road.glb`, `backdrop.glb`; the governor: window **3 s**, step above **34 ms** average, at most one step per **5 s**, levels
+**0 to 3**, never back up in a session. High caps (triangles / vertices / parts / meshes, materials 7 for all): biped 12,000 / 9,500 / 80 / 14;
+vehicle 6,000 / 4,800 / 50 / 10; blob 5,000 / 4,000 / 30 / 6; prop 3,500 / 2,800 / 24 / 5; scenery 1,500 / 1,200 / 24 / 3; world terrain 8,000 /
+4,200, road 1,500 / 1,200, backdrop 1,200 / 700. Game budgets: visible triangles 100,000; active renderers 100 (Standard 120); run folder 1.5 MB
+and 60,000 vertices; ready 15 s; 60 fps desktop, 30 fps phone.
+
+### Task 36: The tier in the kit and in both recipe checks
+
+**Files:**
+- Modify: `blender-worker/scripts/kit.json`, `web/src/lib/builder/kinds.ts`, `web/src/lib/builder/recipes.ts`, `web/src/lib/builder/repair.ts`,
+  `blender-worker/recipe.mjs`
+- Create: `blender-worker/fixtures/recipes/high/` with `<kind>-high-default.json`, `<kind>-high-stress.json` (four kinds each), `expected-high.json`
+  and the invalid files below
+- Test: `kinds.test.ts`, `recipes.test.ts`, `repair.test.ts`, `blender-worker/recipe.test.mjs`
+
+**Interfaces:**
+- `kit.json` gains `tiers: { high: { caps: { "<kind>": { triangles, vertices, parts, meshes } , "scenery": {...}, "world": { "terrain": {...},
+  "road": {...}, "backdrop": {...} }, "materials": 7, "details": 4 }, finishes: { "<name>": { metallic, roughness, emission } },
+  details: { "<name>": { "<kind>": { triangles, parts } } }, defaults: { "<kind>": { finishes: { "<slot>": "<finish>" }, details: [...] } },
+  base: { "<kind>": { triangles, vertices, parts, meshes } }, worldStyles: { desert: {...}, meadow: {...} } } }`. `kinds.ts` mirrors it
+  (`QUALITIES`, `FINISHES`, `FINISH_VALUES`, `DETAILS`, `WORLD_STYLES`, `tierCaps(kind, quality)`); the test that keeps the two files equal covers it.
+- Recipes: `quality`, `finishes`, `details` are optional keys. Absent (or `quality: "standard"` with neither of the others) is a Standard
+  recipe, checked exactly as in Task 2. `quality: "high"` requires `finishes` (exactly the kind's slots, each a finish name) and `details` (distinct
+  names from `DETAILS`, at most 4), and the estimate (`estimate(recipe)` gives `{ parts, triangles, vertices, meshes }` from `base`, the chosen
+  extras and details, and the wheel count for a vehicle) must be within the kind's High caps. A `scenery` recipe may be High; a `world` kind
+  exists only for High (`build: { piece: terrain | road | backdrop, style: desert | meadow }`, colors slots `ground`, `accent`, `far`).
+- `defaultHighRecipe(kind)`, `fitToBudget(recipe)` (adds nothing; drops, in the order above, until the estimate is within the caps, and returns
+  null if a High recipe is still over with nothing left to drop), and `repairModelRecipe` takes `{ kind, quality }`: for High it also repairs
+  `finishes` (an unknown finish takes the kind's default for that slot) and `details` (unknown dropped, duplicates removed, first four kept), then
+  `fitToBudget`.
+- Invalid High fixtures (fragment each must contain): `invalid-high-no-finishes.json` ("recipe.finishes"), `invalid-high-unknown-finish.json`
+  ("recipe.finishes"), `invalid-high-unknown-detail.json` ("recipe.details"), `invalid-high-five-details.json` ("recipe.details"),
+  `invalid-high-over-triangles.json` (a biped with every extra and detail raised past 12,000, "triangles"), `invalid-standard-with-finishes.json`
+  ("recipe.finishes"), `invalid-quality-word.json` (`"ultra"`, "recipe.quality"), `invalid-world-standard.json` ("recipe.kind").
+
+- [ ] **Step 1: Write the failing tests:** the tier mirrors `kit.json`; every High default and stress fixture passes both checks and every
+  `invalid-high-*` fails with its fragment on both sides (the same table, as Task 2); `estimate` of each default equals `expected-high.json`;
+  every stress fixture is within its caps (parts, triangles, vertices, meshes); `fitToBudget` on a biped with every extra and detail drops cables
+  first, then bolts, and never touches a recipe already within budget (property: the result's estimate is within the caps and is a subset of the
+  input's details and extras); a High repair is deterministic (the same raw input twice gives deep-equal results); a Standard recipe with
+  `details` is refused.
+- [ ] **Step 2: Run** `npx vitest run src/lib/builder` and `npm --prefix blender-worker test`. Expected: FAIL.
+- [ ] **Step 3: Implement** the kit tier (estimates for now), both checks and the repair.
+- [ ] **Step 4: Run** both. Expected: PASS. **Mutation-check:** make `fitToBudget` drop `lights` before `cables` (its ordering test must fail); let a
+  High recipe skip the estimate check in `recipe.mjs` (the over-budget fixture must fail the worker test); restore.
+- [ ] **Step 5: Commit** `feat: the High quality tier in the kit and both recipe checks`.
+
+### Task 37: `build.py` High tier: finishes, welded meshes, cavity shading, details, and the biped
+
+**Files:**
+- Modify: `blender-worker/scripts/build.py`, `blender-worker/scripts/common.py`, `blender-worker/tests/test_blender.py` (a class `BuildHigh`),
+  `blender-worker/scripts/kit.json`, `blender-worker/fixtures/recipes/high/expected-high.json`, `blender-worker/server.mjs` (an `X-Vertices` header
+  and a `vertices` stats field, required for High)
+- Create: `web/src/lib/blender/fixtures/high/built-biped-high.glb` and its `.stats.json`
+
+**Interfaces:**
+- `common.py`: `finish_material(name, rgb, finish)` (Principled with the finish's metallic, roughness and an emission color of the base color at
+  strength 1 for `glow`; when the mesh has a `Col` color attribute the base color is multiplied by it through a **Color Attribute node**, which
+  is what makes the exporter write `COLOR_0`; export with `export_vertex_color="MATERIAL"`, and a test reads the accessor as float32 VEC3);
+  `cavity_colors(mesh)` writes the per-vertex multiplier **0.55 to 1.0** (concave surface and low height darker); `weld_and_smooth(mesh, angle=38)`.
+- `build.py` High path (when the recipe has `quality: "high"`): every part gets the slot's finish; parts above an area threshold get a bevel of 2
+  segments, the rest stay hard; the details are added in kit order while the budget holds (`seams`: thin dark grooves around the torso and head;
+  `bolts`: small cylinders on panel corners; `cables`: tubes between anchors; `lights`: small glow boxes), all through tables; **joints that no clip
+  moves are merged into their nearest moving ancestor's mesh** (the joint node stays, so children keep their transforms) so meshes stay within the
+  kit's cap; then weld, smooth, cavity colors, export. Stats gain `vertices` (and `meshes`). A High build over any cap, or whose real counts differ
+  from the estimate by more than 10 percent, exits 5 (the second is a kit-table bug, caught by the tests).
+- The High biped is the showcase's courier family driven by the build fields: a rounded head with a dark lens and two glow eyes and a smile, ear
+  cups, a chest panel with a glow core, a belt, shoulder balls and cuffs, thigh and shin guards, shoes with soles, joint balls; extras
+  `antenna`, `ears`, `tail`, `hat`, `backpack` (a strapped parcel) as before; the scarf is not in the kit.
+
+- [ ] **Step 1: Write the failing tests** (`BuildHigh`, on `biped-high-default.json` and `biped-high-stress.json`): `test_the_default_high_biped_is_within_its_caps`
+  (triangles <= 12,000, vertices <= 9,500, parts <= 80, meshes <= 14, materials <= 7, all taken from the GLB, not from the stats);
+  `test_the_stats_match_the_glb`; `test_the_estimate_is_within_ten_percent_of_the_real_counts`; `test_finishes_become_pbr_values` (each material's
+  metallic and roughness equal its finish's within 0.01, `glow` has `emissiveFactor` > 0, others 0); `test_cavity_colors_are_within_range_and_vary`
+  (every `COLOR_0` component within 0.55 to 1.0 and not all equal; the accessor is float32 VEC3); `test_no_vertex_is_duplicated_needlessly` (vertices
+  <= 0.9 x triangles x 3 / 2... use: vertices per triangle below 0.85); `test_static_joints_are_merged` (the default Run and Jump clips move only
+  hips, thighs, shins and upper arms, so mesh count <= 9; every joint is still a node); `test_the_animations_are_unchanged_by_the_tier` (clip
+  names and channel targets equal the Standard build of the same motions); `test_the_same_recipe_gives_the_same_counts_twice`;
+  `test_a_recipe_over_budget_exits_5`; `test_high_glb_size` (<= 450 KB for the default biped).
+- [ ] **Step 2: Run** `"$BLENDER" -b --factory-startup --python-exit-code 1 -P blender-worker/tests/test_blender.py -- BuildHigh`. Expected: FAIL.
+- [ ] **Step 3: Implement.** Take Blender's counts for `base` and the detail costs, write them into `kit.json`, `kinds.ts` and `expected-high.json`
+  together (ledger it).
+- [ ] **Step 4: Run** the whole Blender file and `npm --prefix blender-worker test` and the web `kinds` and `recipes` tests. Expected: `OK`, `fail 0`.
+  Write the web fixture with the command pattern of Task 6 (`biped-high-default.json` to `built-biped-high.glb` and its stats).
+- [ ] **Step 5: Commit** `feat: build.py High tier with finishes, shared vertices, cavity shading and the courier biped`.
+
+### Task 38: High vehicle, blob, prop and the six scenery pieces
+
+**Files:** Modify `blender-worker/scripts/build.py`, `blender-worker/tests/test_blender.py` (`BuildHigh`), `kit.json`, `kinds.ts`, the fixtures'
+`expected-high.json`; Create `web/src/lib/blender/fixtures/high/built-prop-high.glb` and `built-lamp-high.glb` with stats.
+
+**Interfaces:** the vehicle gets a bevelled body, cab with a dark glass strip, wheels with hubs, `lights` as head and tail lamps; the blob a
+glossy shell with a rim and two glow eyes; the prop its shape with bevels, `seams` and `bolts` where the shape has flat faces (crate and cube), the
+gem as a faceted glow crystal; scenery pieces (`tree`, `pine`, `rock`, `cactus`, `windmill`, `lamp`) in High: tree and pine with layered canopies,
+rock with strata vertex colors, cactus fluted (ribbed rings) with glow blossoms, windmill with a three-blade hub that spins, lamp with a glow
+globe; the animated ones keep their `Loop` clip. Every piece is within its caps.
+
+- [ ] **Step 1: Write the failing tests:** for each kind's High default and stress fixture the Task 37 budget tests (caps from the GLB, stats match,
+  estimate within 10 percent, finishes, cavity range, static merge, deterministic counts), and for each of the six scenery pieces: within the
+  scenery caps, the animated ones (`windmill`, `tree` sway) have a `Loop` animation and the others none, the model stands on y = 0, and a
+  piece's GLB is at most 90 KB.
+- [ ] **Step 2: Run** the `BuildHigh` class. Expected: FAIL (those kinds exit 5 in High).
+- [ ] **Step 3: Implement**, correcting the kit counts from Blender as in Task 37.
+- [ ] **Step 4: Run** the whole Blender file and the worker and web tests. Expected: all green. Write the two web fixtures.
+- [ ] **Step 5: Commit** `feat: build.py High vehicle, blob, prop and scenery`.
+
+### Task 39: The world builders: terrain, road and backdrop
+
+**Files:** Modify `build.py`, `kit.json`, `kinds.ts`, `recipes.ts`, `recipe.mjs`, `test_blender.py` (`BuildWorld`); Create
+`blender-worker/fixtures/recipes/high/world-{terrain,road,backdrop}-{desert,meadow}.json` (six) and `web/src/lib/blender/fixtures/high/world-*.glb`
+for desert with stats.
+
+**Interfaces:** `build.py` for `kind: "world"`: **terrain** a 2 m grid, 160 m wide and 100 m long, **periodic in z** (the first and last rows have
+identical heights and matching normals at the seam), shared vertices, flat within 9 m of the road and rising to dunes (`desert`) or hills
+(`meadow`) beyond, baked slope shading in `COLOR_0`, gravel near the road; **road** 8 m wide with 16 columns and 100 rows, asphalt wear in
+vertex colors, edge lines and center dashes as raised quads, curbs as closed boxes (no `recalc_face_normals` on open surfaces: it flipped the
+showcase's road); **backdrop** two rings of mesas (`desert`) or rounded hills (`meadow`) at 112 m and 128 m, faces toward the center. Palette
+slots color them. The build refuses a recipe that is not High.
+
+- [ ] **Step 1: Write the failing tests:** each of the six builds within its caps (terrain <= 8,000 triangles and 4,200 vertices, road <= 1,500 and
+  1,200, backdrop <= 1,200 and 700); `test_the_terrain_repeats_seamlessly` (the vertex rows at z = 0 and z = 100 have the same x and y within
+  0.001); `test_the_road_faces_up` (every road triangle's normal y > 0.5 apart from curb sides); `test_the_backdrop_faces_the_center`;
+  `test_the_flat_strip_is_flat` (terrain within 9 m of x = 0 has y = 0 within 0.001, so the road never meets a dune); each file is at most 260 KB
+  (terrain), 80 KB (road), 60 KB (backdrop); COLOR_0 present and float32 VEC3.
+- [ ] **Step 2: Run** `... -- BuildWorld`. Expected: FAIL.
+- [ ] **Step 3: Implement** (reuse the showcase's formulas from `docs/superpowers/notes/slice6-spikes.md`'s follow-up and the scratch scripts as
+  references; do not copy their per-quad duplicate vertices).
+- [ ] **Step 4: Run** the whole Blender file and the worker and web tests. Expected: green.
+- [ ] **Step 5: Commit** `feat: build.py builds the High world (terrain, road, backdrop)`.
+
+### Task 40: The Quality setting, keys, service and cards
+
+**Files:** Modify `web/src/lib/graph/registry.ts` (both steps' settings gain `quality`: `"standard"` or `"high"`, default `"standard"`),
+`web/src/lib/graph/nodes/buildModel.ts`, `buildEnvironment.ts`, `web/src/lib/builder/{keys.ts,service.ts,types.ts}`, `web/src/lib/blender/{key.ts,service.ts}`,
+`web/src/lib/ai/{designPrompts.ts,designer.ts}` (the High kit in the prompts: finishes, details, world styles), `web/src/lib/canvas/cardView.ts`,
+the two panels and cards in `web/src/app/graphs/[id]/`; Test the matching `*.test.ts` files.
+
+**Interfaces:** `quality` is in every cache key (design, motion, environment and build; the build key's recipe already carries it). A High step
+with every box empty and a chosen kind builds `defaultHighRecipe(kind)` with the kit's default High finishes and details and **calls no AI**; an
+empty theme builds the default world for the style the person's palette suggests (`desert`) with the High meadow's scenery of three pieces.
+The service passes the High recipe through `fitToBudget` before the worker call. The Blender limit takes one count for a High build. Cards add
+"High quality" and the real numbers from the worker's headers (`X-Triangles`, `X-Vertices`, size); the panel's line: "High looks best on a
+computer. On a slow device the game lowers its own detail." The model wire gains `quality`; the environment wire gains `quality`.
+
+- [ ] **Step 1: Write the failing tests:** keys differ by quality for the same words; a Standard step's keys are unchanged from before this stage
+  (property: equal to Task 13/24's); a High empty step calls no AI and no AI count; a High recipe over budget from Claude is repaired by
+  `fitToBudget` (a table); the card shows "High quality" and the numbers; the panel shows the line and the setting saves only `standard` or
+  `high` (anything else refused on save with "the quality must be standard or high."); a High build that the worker refuses with `bad-recipe` gives
+  the count back.
+- [ ] **Step 2: Run** the web tests. Expected: FAIL.
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4: Run** the web gate (`npm test`, `npm run lint`, `npx tsc --noEmit`, `npm run build`). Expected: green. **Mutation-check:** drop `quality`
+  from the design key (the keys test must fail); restore.
+- [ ] **Step 5: Commit** `feat: Build Model and Build Environment take a Quality setting`.
+
+### Task 41: The settings contract: `look` and `environment.world`, and the run folder's world files
+
+**Files:** Modify `web/src/lib/settings.ts`, `unity/runner-template/Assets/Runner/Runtime/Settings/{GameSettings.cs,SettingsParser.cs}`,
+`web/src/lib/graph/nodes/gameTemplate.ts`, `web/src/lib/graph/types.ts`, the Preview and runs code that lists a run's files (the same places
+Task 29 changed for scenery), `fixtures/settings/`; Test `web/src/lib/settings.test.ts`, `SettingsParserTests.cs`, `gameTemplate.test.ts`.
+
+**Interfaces:** `look`: absent or `flat` or `lit` (anything else invalid: "settings.look: ... must be flat or lit"); `environment.world`: absent or
+`{ style: "desert" | "meadow" }` (the files are always `terrain.glb`, `road.glb`, `backdrop.glb`, so a run folder with a world lists them; an
+environment with a world and without them is a `LoadException` in Unity naming the file). Game Template sets `look: "lit"` when any wired model
+or the environment has quality `high`, else leaves it out; it adds the three world files to the run when the environment has a world.
+Fixtures: `valid-lit.json`, `valid-lit-world-desert.json`, `valid-world-meadow.json`, `invalid-look.json`, `invalid-world-style.json`,
+`invalid-world-extra-key.json`, `invalid-look-number.json`, accepted and refused identically by both sides.
+
+- [ ] **Step 1: Write the failing tests** (web and Unity EditMode) for the fixtures, for Game Template's `look` rule (a Standard game has no
+  `look`; one High model makes it lit), and for the run's file list.
+- [ ] **Step 2: Run** web tests and Unity EditMode. Expected: FAIL.
+- [ ] **Step 3: Implement** both sides.
+- [ ] **Step 4: Run** the web gate and EditMode and PlayMode (slice 1 and Task 10 tests unchanged). Expected: green. **Mutation-check:** let the
+  Unity parser accept `look: "ultra"` (the shared fixture must fail EditMode); restore.
+- [ ] **Step 5: Commit** `feat: settings gain look and environment.world on both sides`.
+
+### Task 42: Unity: the lit look, the world, instancing (needs the studio's Unity sign-in for the runs)
+
+**Files:**
+- Create: `unity/runner-template/Assets/Runner/Shaders/{RunnerLit.shader,RunnerSky.shader,RunnerBlobShadow.shader}` (the showcase shaders, cleaned
+  up: `RunnerLit` gains `#pragma multi_compile_instancing`, the vertex-instance macros and a `_Simple` global that skips specular, environment
+  and rim), `Runtime/Loading/LitMaterialGenerator.cs` (sets `_BaseColor` from `linear.gamma`, `_Metallic`, `_Smoothness = 1 - roughness`,
+  `_EmissionColor` from the emissive factor, and `enableInstancing = true`), `Runtime/View/WorldPlacement.cs` (pure), `Runtime/View/WorldView.cs`
+- Modify: `RunnerBootstrap.cs`, `RunnerView.cs`, `Editor/BuildScript.cs` (the three shaders join Always Included Shaders)
+- Test: `Tests/EditMode/WorldPlacementTests.cs`, `Tests/PlayMode/LitWorldTests.cs`
+
+**Interfaces:** `WorldPlacement` (pure): `TilePeriod = 100f`; `float TileBase(float heroZ)` = `floor((heroZ - 30) / 100) * 100`; `float TileZ(int index,
+float heroZ)` = `TileBase + 100 * index`; backdrop and sky follow the camera's x and z only. `WorldView` builds the sky dome and the contact shadow
+from meshes made in code (**not `CreatePrimitive`**: this build's physics module is stripped), two terrain tiles and two road tiles cloned from the
+loaded models (shared meshes, so instancing and one mesh in memory), the backdrop, and sets the shader globals (`_SunDir`, `_SunColor`, `_SkyTop`,
+`_SkyHorizon`, `_AmbSky`, `_AmbGround`, `_FogColor`, `_FogParams`, `_SkySunDir`) from the environment's palette slots as plain vectors, in a table
+per world style. `RunnerBootstrap` uses `LitMaterialGenerator` when `look` is `lit`, builds `WorldView` when the environment has a world, and logs
+`RUNNER ready in N ms` (a stopwatch from the start of `Boot`). The Jump and Run clips are driven by the sim as in Task 8.
+
+- [ ] **Step 1: Write the failing tests:** EditMode `TileBase` and `TileZ` (hero 0, 29, 31, 130, 1000: the two tiles always cover `[heroZ - 30,
+  heroZ + 170]`); `Tiles_never_pop` (for heroZ in steps of 0.5 the pattern position `(TileZ(i, z) mod 100)` is constant); PlayMode: a lit game with
+  a world loads (`State == Ready`), every renderer's material uses `Runner/Lit`, **no `CreatePrimitive` collider error is logged** (a log handler
+  fails the test on any error), the active renderer count with a High hero, obstacle, collectible and three scenery kinds is **at most 100**, and
+  enabling instancing on a pooled clone's shared material keeps one material instance for all clones.
+- [ ] **Step 2: Run** EditMode and PlayMode. Expected: FAIL.
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4: Run** EditMode and PlayMode. Expected: `0 failed`.
+- [ ] **Step 5: Commit** `feat: the template's lit look, world and instancing`.
+
+### Task 43: Unity: the quality governor, and the budget tests
+
+**Files:** Create `unity/runner-template/Assets/Runner/Runtime/Quality/QualityGovernor.cs` (pure), `Runtime/Quality/QualityLevels.cs`;
+Modify `RunnerBootstrap.cs`, `WorldView.cs`; Create `web/src/lib/builder/budgets.test.ts`; Test
+`Tests/EditMode/QualityGovernorTests.cs`.
+
+**Interfaces:** `QualityGovernor` (pure): `const WindowSeconds = 3f, StepAboveMs = 34f, MinGapSeconds = 5f, MaxLevel = 3`; `int Level`;
+`void Add(float dtSeconds)`; it keeps the frames of the last 3 seconds, and when their average frame time is above 34 ms and at least 5 seconds
+have passed since the last step it raises `Level` by one (never lowers it); frames longer than 250 ms are clamped to 250 ms (a tab switch is not
+slow hardware). `QualityLevels.Apply(level, world)`: 1 hides every other scenery item; 2 also hides the scenery, the backdrop and the shadow; 3 also
+sets the shader global `_Simple` to 1. `debug=1` shows the level. `budgets.test.ts` (web): adds up the real High fixtures
+(`web/src/lib/blender/fixtures/high/*.stats.json` and the `.glb` sizes: hero, a prop as obstacle, a prop as collectible, three scenery pieces,
+the three world pieces) and asserts the run folder is **at most 1.5 MB and 60,000 vertices** and the visible-triangle estimate (hero + 6 obstacles +
+6 collectibles + 16 scenery pieces + 1.5 terrain tiles + 1 road + backdrop) is **at most 100,000**.
+
+- [ ] **Step 1: Write the failing tests:** EditMode: 3 seconds of 16 ms frames never steps; 3 seconds of 40 ms steps to 1; right after, still 40 ms
+  frames do not step again until 5 seconds have passed, then step to 2, then 3, and level 3 stays at 3; fast frames after a step do not lower it;
+  a 2-second pause (frames of 2 s) counts as 250 ms frames (a long gap alone does not step a game that runs at 16 ms); the web budgets test.
+- [ ] **Step 2: Run** EditMode and `npx vitest run src/lib/builder/budgets.test.ts`. Expected: FAIL.
+- [ ] **Step 3: Implement.** If the real fixtures break the run-folder or vertex budget, **fix the kit's caps or the builders, not the test**, and
+  ledger what moved.
+- [ ] **Step 4: Run** both and the PlayMode tests. Expected: green. **Mutation-check:** let the governor lower its level (the never-back-up test must
+  fail); restore.
+- [ ] **Step 5: Commit** `feat: the quality governor and the High budget tests`.
+
+### Task 44: Rebuild, publish and measure (needs the studio's Unity sign-in)
+
+- [ ] **Step 1:** Rebuild both templates (`tools/build-webgl.ps1 -Target both`; ledger the sizes, each at most 15 MB) and publish with
+  `tools/publish-template.ps1` once the stage 3 and 5 live checks, if any, are ledgered. `git status` shows changes only under
+  `web/public/templates/`.
+- [ ] **Step 2: A real High game with no AI:** from the worker's `build.py`, build the four default High models, the three scenery pieces and the three
+  world pieces for desert into `Builds/runner-desktop/runs/high/` with a `settings.json` (`"look": "lit"`, an `environment` with a `world`);
+  serve with `tools/serve.ps1` and open it in the built-in browser with `debug=1`.
+- [ ] **Step 3: Measure and ledger** (`Measured:` lines): the `RUNNER ready in N ms` value (budget 15,000), the debug fps on this machine for 60 s
+  (budget 60; if the embedded pane cannot show it, say so and use the studio's own browser), the active renderer count (budget 100), the run
+  folder's bytes and vertices (budgets 1.5 MB, 60,000), a screenshot of the hero, the crate and the road. If a budget is missed: lower the kit's
+  caps or fix the builder (Tasks 37 to 39), re-measure, and ledger both numbers; a missed **load** budget that no cap change fixes is ledgered as
+  `Decision needed: mesh compression (a new dependency)` and left for the studio.
+- [ ] **Step 4: The phone:** with the studio's phone on the same Wi-Fi and an administrator shell (`tools/serve.ps1 -Lan`), open the mobile build of
+  the same run: ledger the governor level reached and the frame rate after 60 s (budget 30). If the studio is not available:
+  `Task 44: phone check deferred to Task 48`.
+- [ ] **Step 5: Commit** `build: publish the runner template with the lit look and the High world`.
+
+### Task 45: Stage 6 gate
+
+- [ ] **Step 1:** The full gate (as Task 46 step 1) and every mutation check of Tasks 36, 40, 41 and 43 once more in one pass.
+- [ ] **Step 2:** Add to Task 48's live acceptance (already listed there): done-criteria 11 and 12.
+- [ ] **Step 3:** Ledger `Stage 6 gate green`. No commit unless a fix was needed (`fix: ...`).
+
+---
+
 ## Wrap-up
 
-### Task 36: The gate and one fresh whole-branch review
+### Task 46: The gate and one fresh whole-branch review
 
 - [ ] **Step 1: The full gate:** from `web/`, with no `ANTHROPIC_*`, `AI_*` or `BLENDER_*` set: `npm test`, `npm run lint`, `npx tsc --noEmit`,
   `npm run build`; `npm --prefix blender-worker test`; the whole Blender file; Unity EditMode and PlayMode. Stop at the first failure.
 - [ ] **Step 2: One fresh whole-branch review** on the most capable model, aimed at `lib/builder/` (repair, keys, the service's AI and refund
   rules), `lib/blender/` (`build`, the client's header checks, canonical keys), `blender-worker/recipe.mjs`, `server.mjs` (`/build`) and
   `scripts/build.py` (every lookup through a table), `lib/ai/designer.ts` and `designPrompts.ts` (the person's words never in `system`), the
-  settings contract on both sides, and the Unity clip and scenery code. Give it the Review Focus section verbatim and the ledger's `Ruling:` lines.
+  settings contract on both sides, the Unity clip, scenery, lit-look and governor code, and the High tier's budgets (the recipe checks,
+  `fitToBudget`, the worker's check and `build.py`'s counts). Give it the Review Focus section verbatim and the ledger's `Ruling:` lines.
   Fix Critical and Important findings test-first in one pass, one commit per finding (`fix: ...`); ledger minors as `Final: minor (deferred): ...`.
   No re-review. Re-run the gate.
 
-### Task 37: The handoff
+### Task 47: The handoff
 
 **Files:**
 - Create: `docs/superpowers/notes/slice6-handoff.md`
@@ -1222,12 +1504,12 @@ the rest position; scale multiplies the rest scale on that axis by `1 + value`. 
   checks, the deferred minors, and the commands to regenerate every real-output fixture. Update `CLAUDE.md`.
 - [ ] **Step 2:** Commit `docs: slice 6 handoff`. Ask before pushing.
 
-### Task 38: Live acceptance (needs the studio)
+### Task 48: Live acceptance (needs the studio)
 
 - [ ] **Step 1 (the studio, once; ask before each):** the worker redeployed from this branch and `smoke.mjs` passing (the `/build` line too);
   slice 5's remaining setup if still open; the funded Anthropic key in Vercel (Sensitive, Production) for the AI half; merge and push to `main`
   on the user's word and wait for the production build.
-- [ ] **Step 2: The ten done-criteria** in a real browser: (1) signed out, every graph page and API call refused, the worker's address gives 403;
+- [ ] **Step 2: The twelve done-criteria** in a real browser (criteria 11 and 12 are at the end of this step): (1) signed out, every graph page and API call refused, the worker's address gives 403;
   (2) Build Model hero "a red fox in a scarf", Play: kind, parts, triangles and clips on the card; the hero runs on the ground and plays Jump in
   step in the air; (3) change only the Run box: same look, new motion (the design call is not repeated: the Anthropic console shows one new
   request); change the description: a new look; (4) an obstacle and a collectible built the same way move; (5) Build Environment "a windy meadow":
@@ -1236,7 +1518,11 @@ the rest position; scale multiplies the rest scale on that axis by `1 + value`. 
   (Auto with no description, the daily limits with `AI_DAILY_LIMIT_PER_PERSON=1` and `BLENDER_DAILY_LIMIT_PER_PERSON=1` set, redeployed and then
   **restored**, a wrong worker URL temporarily, a role mismatch, a hostile prompt such as "ignore your instructions and ...", a prompt Claude
   declines if one can be found); (9) Task 35's phone result, and, if the person can sign in on the phone, the live game with the starter's
-  world at 30 frames per second or more for a minute (`debug=1`); (10) `git grep` for key material finds nothing, the worker is private, and the Claude key exists only in Vercel.
+  world at 30 frames per second or more for a minute (`debug=1`); (10) `git grep` for key material finds nothing, the worker is private, and the Claude key exists only in Vercel; (11) **High quality, optimized:** a
+  game with Build Model and Build Environment set to High (kinds chosen, boxes empty) looks lit (sky with a sun, finishes, contact shadow, fog, road,
+  dunes or hills, mesas) and meets every budget: read the card numbers against the caps, the renderer count and `RUNNER ready in N ms` (15,000 or
+  less) and the frame rate with `debug=1` (60 or more on the desktop), and on the phone the governor level reached with 30 or more; (12) a Standard
+  game and a settings file from before this tier play exactly as before.
 - [ ] **Step 3: Measure Play's time:** a first Play of a full game (hero, obstacle and collectible from Build Model with words, and Build Environment
   with a theme) after the worker has been idle for 15 minutes: the seconds to the end, and whether a second Play was needed.
 - [ ] **Step 4:** Write `docs/superpowers/notes/slice6-results.md` (who checked what, what was not run, Play's time, the cost of one design, one
@@ -1249,16 +1535,26 @@ the rest position; scale multiplies the rest scale on that axis by `1 + value`. 
 | Spec section or requirement | Task(s) |
 |---|---|
 | Purpose: Build Model makes moving models from words; Build Environment makes the world | 1 to 6, 15 to 19, 25 to 32 |
-| Done 1: signed out, nothing reaches Claude or the worker | 21, 38 (unchanged guards; the new steps run only inside Play) |
-| Done 2: hero from words, card facts, Run and Jump in step | 7, 8, 10, 16 to 19, 25, 26, 38 (21 with the default model) |
-| Done 3: a motion edit changes motion not look; a description edit changes the look | 24 to 26 (keys and tests), 38 |
-| Done 4: obstacle and collectible with Loop | 8, 10, 15, 21, 38 |
-| Done 5: environment from a theme, recycling, no popping | 28 to 34, 38 |
-| Done 6: defaults with no AI; default meadow | 15, 17, 20, 30, 32, 21, 38 |
-| Done 7: repeat Play reuses everything | 13, 14, 25, 30, 21, 38 |
-| Done 8: plain refusals on the step | 12, 14 to 16, 25, 26, 30, 31, 38 |
-| Done 9: 30 fps on a phone | 34 (renderer budget), 35 (the mobile build on a phone), 21, 38 |
-| Done 10: no secret in the repo, worker private, key only in Vercel | 17, 27, 36, 38 |
+| Done 1: signed out, nothing reaches Claude or the worker | 21, 48 (unchanged guards; the new steps run only inside Play) |
+| Done 2: hero from words, card facts, Run and Jump in step | 7, 8, 10, 16 to 19, 25, 26, 48 (21 with the default model) |
+| Done 3: a motion edit changes motion not look; a description edit changes the look | 24 to 26 (keys and tests), 48 |
+| Done 4: obstacle and collectible with Loop | 8, 10, 15, 21, 48 |
+| Done 5: environment from a theme, recycling, no popping | 28 to 34, 48 |
+| Done 6: defaults with no AI; default meadow | 15, 17, 20, 30, 32, 21, 48 |
+| Done 7: repeat Play reuses everything | 13, 14, 25, 30, 21, 48 |
+| Done 8: plain refusals on the step | 12, 14 to 16, 25, 26, 30, 31, 48 |
+| Done 9: 30 fps on a phone | 34 (renderer budget), 35 (the mobile build on a phone), 21, 48 |
+| Done 10: no secret in the repo, worker private, key only in Vercel | 17, 27, 46, 48 |
+| Done 11: High quality looks lit and meets every budget (triangles, vertices, renderers, size, ready 15 s, 60 fps, phone 30 fps) | 36 to 44, 48 |
+| Done 12: a Standard game and an old settings file play as before | 36, 40, 41, 45, 48 |
+| Decisions: Quality tier (Standard default, High); what defines High (budgets); how High stays small; the lit look; slow devices; no new dependency | 36 to 43 |
+| Quality tier: budgets table and game-level budgets | 36 (caps), 37 to 39 (real counts), 43 (run-folder and visible-triangle test), 44 (measured) |
+| Quality tier: finishes, bevels, details with the budget fit, cavity shading, shared vertices, one mesh per joint group, the world | 36 to 39 |
+| Quality tier: lit look, GPU instancing, the quality governor, load time log | 41 to 44 |
+| Quality tier: settings `look` and `environment.world` on both sides | 41 |
+| Quality tier: cost and limits; the tier in every cache key | 40 |
+| Quality tier: testing (budget tables, Blender counts, seamless terrain, governor, renderer count) | 36 to 39, 42, 43 |
+| Risks 8 to 10 (one design family, the load budget, the governor's thresholds) | 37 (the family), 44 (load, phone), 43 (thresholds in one table) |
 | Covered by tests: checks and repairs, the builder for every kind, baking, Jump sync, settings both sides, keys, limits | 2 to 7, 9, 10, 13, 14, 24 to 26, 28, 33, 34 |
 | Decisions: our Blender worker builds the mesh from data; never code | 4, 5, 6, 28 |
 | Decisions: blocky primitives; rigid parts joined per joint; node animation | 5, 6, 28 |
@@ -1289,25 +1585,25 @@ the rest position; scale multiplies the rest scale on that axis by `1 + value`. 
 | Calling side: derived files by SHA-256; a gone file is a miss | 14, 17 |
 | Calling side: the `environment` wire, its word and colors; the `model` wire's role and clips | 12, 29 |
 | Calling side: Game Template's environment and clip checks | 12, 29 |
-| Play's time budget (measured) | 38 |
+| Play's time budget (measured) | 48 |
 | Unity 1: clip selection and `AirProgress` | 7, 8, 10 |
 | Unity 2: field, stripes, scenery pool, sized by height, never a hit target | 33, 34 |
 | Unity 3: settings contract on both sides, shared fixtures | 9 |
 | Unity 4: renderer budget | 34 |
 | Unity 5: rebuild and publish | 11, 21, 35 |
-| Security: untrusted words checked twice; small JSON body; private worker; `checkGlb`; fixed scenery names; logs; data leaving the studio | 2 to 4, 13, 14, 19, 25, 29, 32, 36, 38 |
+| Security: untrusted words checked twice; small JSON body; private worker; `checkGlb`; fixed scenery names; logs; data leaving the studio | 2 to 4, 13, 14, 19, 25, 29, 32, 46, 48 |
 | Error handling table, every row | 14 (Blender rows), 15 (describe first), 16 (the character limits, on save), 25 and 26 (AI rows, daily limits), 12 (role), 30 and 31 (Build Environment) |
 | Testing: fakes for shapes, repairs, keys, services, executors, role check, wire, settings | 2, 3, 9, 12 to 18, 24 to 26, 29 to 31 |
 | Testing: Blender scripts on the fixtures | 5, 6, 28 |
 | Testing: worker wrapper with a fake Blender and a hostile body | 4 |
 | Testing: Unity EditMode and PlayMode | 7 to 10, 33, 34 |
 | Testing: editor `renderToString` tests | 19, 29, 32 |
-| Testing: live acceptance | 21, 38 |
-| Risks 1 to 7 | 38 (taste, odd motions, Play time, phone), 27 (no key yet), 35 and 21 (rebuild), the stage order |
+| Testing: live acceptance | 21, 48 |
+| Risks 1 to 7 | 48 (taste, odd motions, Play time, phone), 27 (no key yet), 35 and 21 (rebuild), the stage order |
 | Plan stages 1 to 5 | Stages 1 to 5 above |
 | Repository layout | every task's Files (with `repair.ts`, `types.ts`, `memory.ts`, `firebase.ts` and `server.ts` added in `lib/builder/`, and `recipe.mjs` in the worker) |
 | Changes to earlier specs (v1, slice 5, slice 4, settings) | 4, 9, 22, 29 |
-| What only the studio can do | header; 11, 21, 35, 38 |
+| What only the studio can do | header; 11, 21, 35, 48 |
 
 Could not map to a task: "Quality is partly taste" (Risk 1) and "Claude's motion recipes may look odd" (Risk 2) can only be judged by eye with
-the studio in Task 38; nothing in the code decides them.
+the studio in Task 48; nothing in the code decides them.
