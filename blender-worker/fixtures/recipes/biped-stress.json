@@ -1,0 +1,380 @@
+{
+  "recipe": {
+    "version": 1,
+    "kind": "biped",
+    "summary": "A blocky two-legged character.",
+    "build": {
+      "headSize": 0.8,
+      "torsoWidth": 0.9,
+      "torsoHeight": 0.9,
+      "armLength": 0.8,
+      "armThickness": 0.25,
+      "legLength": 0.9,
+      "legThickness": 0.3,
+      "footSize": 0.35
+    },
+    "colors": {
+      "head": 4,
+      "body": 4,
+      "arms": 4,
+      "legs": 4,
+      "feet": 4,
+      "extra": 4
+    },
+    "extras": [
+      "ears",
+      "antenna"
+    ]
+  },
+  "motions": {
+    "version": 1,
+    "motions": {
+      "run": {
+        "seconds": 3,
+        "tracks": [
+          {
+            "joint": "hips",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "spin",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "spine",
+            "channel": "move",
+            "axis": "y",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "chest",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "neck",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "hold",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "head",
+            "channel": "move",
+            "axis": "y",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "upperarm_l",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "forearm_l",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "pulse",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "hand_l",
+            "channel": "move",
+            "axis": "y",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "upperarm_r",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "forearm_r",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "bounce",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "hand_r",
+            "channel": "move",
+            "axis": "y",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "thigh_l",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          }
+        ]
+      },
+      "jump": {
+        "seconds": 3,
+        "tracks": [
+          {
+            "joint": "hips",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "spin",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "spine",
+            "channel": "move",
+            "axis": "y",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "chest",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "neck",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "hold",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "head",
+            "channel": "move",
+            "axis": "y",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "upperarm_l",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "forearm_l",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "pulse",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "hand_l",
+            "channel": "move",
+            "axis": "y",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "upperarm_r",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "forearm_r",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "bounce",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "hand_r",
+            "channel": "move",
+            "axis": "y",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "thigh_l",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          }
+        ]
+      },
+      "loop": {
+        "seconds": 3,
+        "tracks": [
+          {
+            "joint": "hips",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "spin",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "spine",
+            "channel": "move",
+            "axis": "y",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "chest",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "neck",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "hold",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "head",
+            "channel": "move",
+            "axis": "y",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "upperarm_l",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "forearm_l",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "pulse",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "hand_l",
+            "channel": "move",
+            "axis": "y",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "upperarm_r",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "forearm_r",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "bounce",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "hand_r",
+            "channel": "move",
+            "axis": "y",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "thigh_l",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          }
+        ]
+      }
+    }
+  },
+  "palette": [
+    "#1b1f3b",
+    "#ff6f59",
+    "#ffd166",
+    "#06d6a0",
+    "#ffffff"
+  ]
+}

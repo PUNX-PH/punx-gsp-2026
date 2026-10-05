@@ -1,0 +1,67 @@
+{
+  "biped-default.json": {
+    "parts": 15,
+    "triangles": 180,
+    "clips": [
+      "Run",
+      "Jump"
+    ]
+  },
+  "biped-stress.json": {
+    "parts": 19,
+    "triangles": 244,
+    "clips": [
+      "Run",
+      "Jump",
+      "Loop"
+    ]
+  },
+  "vehicle-default.json": {
+    "parts": 6,
+    "triangles": 136,
+    "clips": [
+      "Loop"
+    ]
+  },
+  "vehicle-stress.json": {
+    "parts": 10,
+    "triangles": 232,
+    "clips": [
+      "Run",
+      "Jump",
+      "Loop"
+    ]
+  },
+  "blob-default.json": {
+    "parts": 3,
+    "triangles": 104,
+    "clips": [
+      "Loop"
+    ]
+  },
+  "blob-stress.json": {
+    "parts": 7,
+    "triangles": 168,
+    "clips": [
+      "Run",
+      "Jump",
+      "Loop"
+    ]
+  },
+  "prop-default.json": {
+    "parts": 1,
+    "triangles": 12,
+    "clips": [
+      "Loop"
+    ]
+  },
+  "prop-stress.json": {
+    "parts": 1,
+    "triangles": 144,
+    "clips": [
+      "Run",
+      "Jump",
+      "Loop"
+    ]
+  }
+}

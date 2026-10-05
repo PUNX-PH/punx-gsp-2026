@@ -1,0 +1,53 @@
+{
+  "recipe": {
+    "version": 1,
+    "kind": "blob",
+    "summary": "A bouncy blob with two eyes.",
+    "build": {
+      "radius": 0.5,
+      "squash": 0.85,
+      "eyeSize": 0.12
+    },
+    "colors": {
+      "body": 3,
+      "eyes": 4,
+      "extra": 1
+    },
+    "extras": []
+  },
+  "motions": {
+    "version": 1,
+    "motions": {
+      "loop": {
+        "seconds": 1,
+        "tracks": [
+          {
+            "joint": "body",
+            "channel": "move",
+            "axis": "y",
+            "wave": "bounce",
+            "amplitude": 0.12,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "body",
+            "channel": "scale",
+            "axis": "y",
+            "wave": "pulse",
+            "amplitude": -0.15,
+            "cycles": 1,
+            "phase": 0
+          }
+        ]
+      }
+    }
+  },
+  "palette": [
+    "#1b1f3b",
+    "#ff6f59",
+    "#ffd166",
+    "#06d6a0",
+    "#ffffff"
+  ]
+}
