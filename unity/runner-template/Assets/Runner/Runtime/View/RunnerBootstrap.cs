@@ -30,6 +30,7 @@ namespace Runner.View
         public BootState State { get; private set; } = BootState.Loading;
         public string Error { get; private set; }
         public RunnerSim Sim { get; private set; }
+        public RunnerView View => view;
 
         Hud hud;
         RunnerView view;

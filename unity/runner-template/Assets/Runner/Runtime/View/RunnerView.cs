@@ -47,16 +47,21 @@ namespace Runner.View
             ground = groundObject.transform;
 
             hero = Wrap("Hero", heroModel, root);
+            HeroClips = HeroClips.For(hero);
             for (var i = 0; i < poolSize; i++)
             {
-                obstacles.Add(Wrap("Obstacle", obstacleModel, root));
-                collectibles.Add(Wrap("Collectible", collectibleModel, root));
+                obstacles.Add(WrapLooping("Obstacle", obstacleModel, root));
+                collectibles.Add(WrapLooping("Collectible", collectibleModel, root));
             }
         }
+
+        /// <summary>The hero's Run and Jump clips, or null when the model has no Run clip.</summary>
+        public HeroClips HeroClips { get; }
 
         public void Sync(RunnerSim sim)
         {
             hero.localPosition = new Vector3(0f, sim.HeroY, sim.Z);
+            HeroClips?.Update(sim.Grounded, sim.AirProgress);
             ground.localPosition = new Vector3(0f, -0.1f, sim.Z + 100f);
             cameraTransform.localPosition = new Vector3(0f, 3f, sim.Z - 7f);
             cameraTransform.LookAt(new Vector3(0f, 1f, sim.Z + 5f));
@@ -80,6 +85,14 @@ namespace Runner.View
             var wrapper = new GameObject(name).transform;
             wrapper.SetParent(root, false);
             Object.Instantiate(model, wrapper).SetActive(true);
+            return wrapper;
+        }
+
+        // Obstacles and collectibles with a Loop clip play it, each from its own point.
+        static Transform WrapLooping(string name, GameObject model, Transform root)
+        {
+            var wrapper = Wrap(name, model, root);
+            LoopClips.Start(wrapper, Random.value);
             return wrapper;
         }
 
