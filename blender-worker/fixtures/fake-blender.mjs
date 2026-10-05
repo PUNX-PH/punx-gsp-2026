@@ -1,7 +1,8 @@
 // A stand-in for Blender, for the wrapper's tests. It is started the way the wrapper starts Blender (node fake-blender.mjs [test
 // options] -b ... -P script -- --in .. --out .. --stats ..), and what it does depends on markers in its input file:
 //   EMPTY exits 3 (no 3D shape), BROKEN exits 4 (unreadable), CRASH exits 1, LIBMISSING exits 127 (the loader could not start it),
-//   SLEEP hangs, NOOUT exits 0 without an output file.
+//   SLEEP hangs, NOOUT exits 0 without an output file. For a build job (--recipe <file>) the markers are read from the recipe file
+//   (the tests put them in its summary) and two more exist: BADRECIPE exits 5, BADSTATS writes a clip name that does not exist.
 // It also exits 7 if it can see an environment variable with SECRET in its name (the wrapper must not pass its own environment on).
 import fs from "node:fs";
 
@@ -22,7 +23,9 @@ if (pidFile) fs.writeFileSync(pidFile, String(process.pid));
 if (Object.keys(process.env).some((name) => name.includes("SECRET"))) process.exit(7);
 
 const input = option(after, "--in");
-const text = input ? fs.readFileSync(input, "latin1") : "";
+const recipe = option(after, "--recipe");
+const text = input ? fs.readFileSync(input, "latin1") : recipe ? fs.readFileSync(recipe, "latin1") : "";
+if (recipe && text.includes("BADRECIPE")) process.exit(5);
 if (text.includes("EMPTY")) process.exit(3);
 if (option(after, "--format") === "obj" && !/^v /m.test(text)) process.exit(3); // an OBJ with no vertices: the real Blender finds no mesh
 if (text.includes("BROKEN")) process.exit(4);
@@ -33,7 +36,12 @@ if (text.includes("SLEEP")) {
 } else {
   if (!text.includes("NOOUT")) {
     fs.writeFileSync(option(after, "--out"), Buffer.concat([Buffer.from("glTF"), Buffer.alloc(8)]));
-    fs.writeFileSync(option(after, "--stats"), JSON.stringify(input ? { before: 9400, after: 2000 } : { after: 80 }));
+    const stats = recipe
+      ? { triangles: 180, parts: 15, clips: text.includes("BADSTATS") ? ["Dance"] : ["Run", "Jump"] }
+      : input
+        ? { before: 9400, after: 2000 }
+        : { after: 80 };
+    fs.writeFileSync(option(after, "--stats"), JSON.stringify(stats));
   }
   process.exit(0);
 }

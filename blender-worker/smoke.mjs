@@ -57,6 +57,14 @@ await check("POST /shape, a sphere", async () => {
   expect(isGlb(await response.arrayBuffer()), "the body is not a GLB");
 });
 
+await check("POST /build, the default two-legged character (Run, Jump)", async () => {
+  const response = await fetch(`${base}/build`, { method: "POST", headers: authorised, body: fixture("recipes/biped-default.json") });
+  expect(response.status === 200, `status ${response.status}`);
+  expect(response.headers.get("x-clips") === "Run,Jump", `x-clips is ${response.headers.get("x-clips")}`);
+  expect(Number(response.headers.get("x-triangles")) >= 1 && Number(response.headers.get("x-parts")) >= 1, "no counts");
+  expect(isGlb(await response.arrayBuffer()), "the body is not a GLB");
+});
+
 if (token) {
   await check("a call with no token is refused (Cloud Run answers 401 or 403)", async () => {
     const response = await fetch(`${base}/shape`, { method: "POST", body: JSON.stringify({ shape: "cube", color: "#06d6a0" }) });

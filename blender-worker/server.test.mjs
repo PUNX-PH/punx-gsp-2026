@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { hostileBodies } from "./fixtures/hostile-bodies.mjs";
 import { createWorker } from "./server.mjs";
 
 const FAKE = fileURLToPath(new URL("./fixtures/fake-blender.mjs", import.meta.url));
@@ -264,5 +265,128 @@ describe("POST /shape", () => {
     const t = await start({ maxInputBytes: 20 });
     const response = await shape(t, { shape: "cube", color: "#06d6a0" });
     assert.equal(response.status, 413);
+  });
+});
+
+describe("POST /build", () => {
+  const RECIPES = new URL("./fixtures/recipes/", import.meta.url);
+  const fixture = (name) => JSON.parse(readFileSync(new URL(name, RECIPES), "utf8"));
+  const validNames = readdirSync(RECIPES).filter((f) => f.endsWith(".json") && !f.startsWith("invalid-") && f !== "expected.json");
+  const invalidNames = readdirSync(RECIPES).filter((f) => f.startsWith("invalid-"));
+  const build = (t, body) => fetch(`${t.base}/build`, { method: "POST", body: typeof body === "string" ? body : JSON.stringify(body) });
+  // The fake Blender reads markers from the recipe's summary (a free text of up to 140 characters).
+  const marked = (marker) => {
+    const body = fixture("biped-default.json");
+    body.recipe.summary = marker;
+    return body;
+  };
+
+  it("builds each default and stress fixture and returns the GLB with its three headers", async () => {
+    const t = await start();
+    assert.ok(validNames.length >= 8);
+    for (const name of validNames) {
+      const response = await build(t, fixture(name));
+      assert.equal(response.status, 200, name);
+      assert.equal(response.headers.get("content-type"), "model/gltf-binary");
+      assert.equal(response.headers.get("x-triangles"), "180");
+      assert.equal(response.headers.get("x-parts"), "15");
+      assert.equal(response.headers.get("x-clips"), "Run,Jump");
+      assert.equal(Buffer.from(await response.arrayBuffer()).subarray(0, 4).toString("latin1"), "glTF");
+    }
+  });
+
+  it("refuses a body that is not JSON, 400 bad-request, and never starts Blender", async () => {
+    const t = await start();
+    for (const body of ["not json", "", "{", "\u0000"]) {
+      const response = await build(t, body);
+      assert.equal(response.status, 400, JSON.stringify(body));
+      assert.deepEqual(await errorBody(response), { error: "bad-request" });
+    }
+    assert.equal(t.started(), false);
+  });
+
+  it("refuses every invalid fixture and every hostile body, 422 bad-recipe, and never starts Blender", async () => {
+    const t = await start();
+    for (const name of invalidNames) {
+      const response = await build(t, fixture(name));
+      assert.equal(response.status, 422, name);
+      assert.deepEqual(await errorBody(response), { error: "bad-recipe" }, name);
+    }
+    for (const [name, body] of hostileBodies()) {
+      const response = await build(t, JSON.stringify(body));
+      assert.equal(response.status, 422, name);
+      assert.deepEqual(await errorBody(response), { error: "bad-recipe" }, name);
+    }
+    assert.equal(t.started(), false);
+  });
+
+  it("refuses a body over 64 KiB, by its declared length and as it streams, 413 too-big", async () => {
+    const t = await start();
+    const declared = await build(t, "x".repeat(64 * 1024 + 1));
+    assert.equal(declared.status, 413);
+    assert.deepEqual(await errorBody(declared), { error: "too-big" });
+    const chunks = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("y".repeat(40 * 1024)));
+        controller.enqueue(new TextEncoder().encode("z".repeat(40 * 1024)));
+        controller.close();
+      },
+    });
+    const streamed = await fetch(`${t.base}/build`, { method: "POST", body: chunks, duplex: "half" });
+    assert.equal(streamed.status, 413);
+    assert.equal(t.started(), false);
+  });
+
+  it("accepts a body of exactly 64 KiB as far as the size goes (it is then refused as a recipe, not as too big)", async () => {
+    const t = await start();
+    const response = await build(t, " ".repeat(64 * 1024 - 2) + "{}");
+    assert.equal(response.status, 422);
+  });
+
+  it("maps what Blender does to a code", async () => {
+    const t = await start();
+    for (const [marker, status, code] of [
+      ["BADRECIPE", 422, "bad-recipe"],
+      ["CRASH", 500, "failed"],
+      ["NOOUT", 500, "failed"],
+      ["BADSTATS", 500, "failed"],
+      ["LIBMISSING", 503, "unavailable"],
+    ]) {
+      const response = await build(t, marked(marker));
+      assert.equal(response.status, status, marker);
+      assert.deepEqual(await errorBody(response), { error: code }, marker);
+    }
+  });
+
+  it("kills a Blender that runs past the limit, 504 timeout", async () => {
+    const t = await start({ jobLimitMs: 300 });
+    const response = await build(t, marked("SLEEP"));
+    assert.equal(response.status, 504);
+    assert.deepEqual(await errorBody(response), { error: "timeout" });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    assert.throws(() => process.kill(t.pid(), 0), { code: "ESRCH" });
+  });
+
+  it("refuses GET with 405", async () => {
+    const t = await start();
+    assert.equal((await fetch(`${t.base}/build`)).status, 405);
+  });
+
+  it("leaves no job folder behind, whatever happened, and answers errors with only the code", async () => {
+    const t = await start({ jobLimitMs: 300 });
+    for (const marker of ["", "BADRECIPE", "CRASH", "NOOUT", "BADSTATS", "SLEEP"]) {
+      const response = await build(t, marked(marker || "ok"));
+      if (response.status !== 200) assert.match(await response.text(), /^\{"error":"[a-z-]+"\}$/, marker);
+      assert.equal(t.jobFolders(), 0, `after ${marker || "a good job"}`);
+    }
+    await build(t, fixture("invalid-unknown-kind.json")); // refused before any folder is made
+    assert.equal(t.jobFolders(), 0);
+  });
+
+  it("writes the recipe to a file of its own name and keeps secrets from Blender", async () => {
+    process.env.SECRET_TEST = "do-not-leak";
+    cleanups.push(() => delete process.env.SECRET_TEST);
+    const t = await start();
+    assert.equal((await build(t, fixture("biped-default.json"))).status, 200); // the fake exits 7 on any SECRET variable
   });
 });

@@ -3,9 +3,12 @@
 //
 //   POST /prepare?format=glb|fbx|obj&triangles=100..5000&color=original|#rrggbb   body: the model file
 //   POST /shape                                                                    body: {"shape": "...", "color": "#rrggbb"}
+//   POST /build                                                                    body: {"recipe": {...}, "motions": {...}, "palette": [5 colors]}
 //   GET  /health        (not /healthz: Cloud Run reserves some paths that end in "z" and answers them itself)
 //
-// A good answer is 200 with the GLB as the body and the triangle counts in X-Triangles-Before and X-Triangles-After. Every
+// A good answer is 200 with the GLB as the body and the triangle counts in X-Triangles-Before and X-Triangles-After (for /build:
+// X-Triangles, X-Parts and X-Clips, the clips being a comma-separated list that may be empty). /build's body is JSON of at most 64 KiB
+// that this wrapper checks again (recipe.mjs) before Blender ever starts: a body that fails is 422 "bad-recipe". Every
 // failure is a status and a JSON body with a code and nothing else: nothing Blender or the system said is ever sent or logged. A code
 // of 413, 415, 422, 500 or 504 means Blender ran and said no to the file; 503 "unavailable" means the service itself is broken (Blender
 // could not be started, a missing library, no room for a job folder), which is never the person's file to blame.
@@ -17,6 +20,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkBuildBody } from "./recipe.mjs";
 
 const SHAPES = ["cube", "sphere", "cone", "cylinder", "pyramid", "coin", "ring"];
 const FORMATS = ["glb", "fbx", "obj"];
@@ -25,6 +29,8 @@ const HEX = /^#[0-9a-f]{6}$/i;
 
 const JOB_LIMIT_MS = 60_000;
 const MAX_INPUT_BYTES = 32 * 1024 * 1024; // Cloud Run's HTTP/1 request limit; an upload to the web app stops at 4 MB long before this
+const MAX_BUILD_BYTES = 64 * 1024; // a recipe is a few KB of JSON: anything near this is not one
+const BUILD_CLIPS = ["Run", "Jump", "Loop"];
 
 const GLB_MAGIC = "glTF";
 const FBX_MAGIC = "Kaydara FBX Binary  ";
@@ -33,6 +39,7 @@ const OBJ_HEAD_BYTES = 64 * 1024;
 // How the Blender scripts say why they stopped (anything else non-zero is a plain failure).
 const EXIT_EMPTY = 3;
 const EXIT_BAD_FORMAT = 4;
+const EXIT_BAD_RECIPE = 5; // build.py found a rule the recipe breaks that only it can see (parts or triangles over the caps once built)
 const EXIT_COULD_NOT_START = 127; // what the loader exits with when Blender cannot start (a missing library): not about the file
 
 /** A refusal: an HTTP status and one of the codes the client knows. */
@@ -167,8 +174,9 @@ export function createWorker(options) {
     });
   }
 
-  // One job: a folder of its own, Blender once, then the folder is removed whatever happened.
-  async function runJob(script, input, scriptArgs) {
+  // One job: a folder of its own, Blender once, then the folder is removed whatever happened. A build job also gets `recipe`, the
+  // already-checked body, written to a file of our own name.
+  async function runJob(script, input, scriptArgs, job = {}) {
     const dir = await mkdtemp(path.join(workRoot, "job-"));
     try {
       const out = path.join(dir, "out.glb");
@@ -179,6 +187,11 @@ export function createWorker(options) {
         await writeFile(inputPath, input.bytes);
         args.push("--in", inputPath, "--format", input.format);
       }
+      if (job.recipe) {
+        const recipePath = path.join(dir, "recipe.json");
+        await writeFile(recipePath, JSON.stringify(job.recipe));
+        args.push("--recipe", recipePath);
+      }
       args.push(...scriptArgs, "--out", out, "--stats", stats);
 
       const { code, timedOut, notStarted } = await runBlender(dir, path.join(scriptsDir, script), args);
@@ -186,6 +199,7 @@ export function createWorker(options) {
       if (timedOut) throw new Refusal(504, "timeout");
       if (code === EXIT_EMPTY) throw new Refusal(422, "empty");
       if (code === EXIT_BAD_FORMAT) throw new Refusal(415, "bad-format");
+      if (job.recipe && code === EXIT_BAD_RECIPE) throw new Refusal(422, "bad-recipe");
       if (code !== 0) throw new Refusal(500, "failed");
 
       let glb;
@@ -195,6 +209,12 @@ export function createWorker(options) {
         counts = JSON.parse(await readFile(stats, "utf8"));
       } catch {
         throw new Refusal(500, "failed"); // Blender said it was done but left nothing usable
+      }
+      if (job.recipe) {
+        const { triangles, parts, clips } = counts ?? {};
+        const clipsOk = Array.isArray(clips) && new Set(clips).size === clips.length && clips.every((c) => BUILD_CLIPS.includes(c));
+        if (glb.length === 0 || !Number.isInteger(triangles) || triangles < 1 || !Number.isInteger(parts) || parts < 1 || !clipsOk) throw new Refusal(500, "failed");
+        return { glb, triangles, parts, clips };
       }
       const after = counts?.after;
       if (glb.length === 0 || !Number.isInteger(after) || after < 1) throw new Refusal(500, "failed");
@@ -215,9 +235,20 @@ export function createWorker(options) {
     res.end(glb);
   }
 
+  function sendBuild(res, { glb, triangles, parts, clips }) {
+    res.writeHead(200, {
+      "content-type": "model/gltf-binary",
+      "content-length": glb.length,
+      "x-triangles": String(triangles),
+      "x-parts": String(parts),
+      "x-clips": clips.join(","),
+    });
+    res.end(glb);
+  }
+
   async function handle(req, res) {
     const url = new URL(req.url ?? "/", "http://localhost");
-    const wanted = { "/health": "GET", "/prepare": "POST", "/shape": "POST" }[url.pathname];
+    const wanted = { "/health": "GET", "/prepare": "POST", "/shape": "POST", "/build": "POST" }[url.pathname];
     if (!wanted) throw new Refusal(404, "bad-request");
     if (req.method !== wanted) throw new Refusal(405, "bad-request");
 
@@ -233,6 +264,19 @@ export function createWorker(options) {
       if (bytes.length === 0) throw new Refusal(422, "empty");
       if (!matchesFormat(format, bytes)) throw new Refusal(415, "bad-format");
       sendModel(res, await runJob("prepare.py", { bytes, format }, ["--triangles", String(triangles), "--color", color]));
+      return;
+    }
+
+    if (url.pathname === "/build") {
+      const bytes = await readBody(req, MAX_BUILD_BYTES); // too big is refused before any of it is parsed
+      let body;
+      try {
+        body = JSON.parse(bytes.toString("utf8"));
+      } catch {
+        throw new Refusal(400, "bad-request");
+      }
+      if (checkBuildBody(body) !== null) throw new Refusal(422, "bad-recipe"); // the caller is not trusted: Blender never sees a body that fails
+      sendBuild(res, await runJob("build.py", null, [], { recipe: body }));
       return;
     }
 

@@ -7,6 +7,8 @@ it (cache, limits, the clock) are in `web/src/lib/blender/service.ts`. The desig
 
 ```
 server.mjs            the HTTP wrapper (Node built-ins only): validates, runs Blender, answers with a GLB or a code
+recipe.mjs            the check of a /build body (the same rules as web/src/lib/builder/recipes.ts), reads scripts/kit.json
+scripts/kit.json      the kit: kinds, joints, slots, extras, counts, default motions (shared with the web app)
 scripts/prepare.py    Blender: import a GLB, FBX or OBJ, join, triangulate, decimate, flatten colors, export a GLB
 scripts/shape.py      Blender: build one of seven low-poly shapes, export a GLB
 tests/test_blender.py the Blender scripts' tests (run inside Blender)
@@ -23,9 +25,10 @@ Dockerfile            Node 24 + Blender 5.2 LTS (pinned, checksum-verified)
 | `GET /health` | none | 200, `ok` (no Blender run; not `/healthz`, which Cloud Run reserves and answers itself) |
 | `POST /prepare?format=glb\|fbx\|obj&triangles=100..5000&color=original\|#rrggbb` | the model file, up to 32 MiB | 200 and the GLB, with `X-Triangles-Before` and `X-Triangles-After` |
 | `POST /shape` | `{"shape": "cube\|sphere\|cone\|cylinder\|pyramid\|coin\|ring", "color": "#rrggbb"}` | 200 and the GLB, with `X-Triangles-After` |
+| `POST /build` | `{"recipe": {...}, "motions": {...}, "palette": ["#rrggbb" x 5]}`, JSON up to 64 KiB, checked again here | 200 and the GLB (a model with a skeleton and named clips), with `X-Triangles`, `X-Parts` and `X-Clips` (comma-separated, may be empty) |
 
 Every failure is a status and `{"error": "<code>"}` and nothing else: `bad-request` 400 (also 404 and 405), `too-big` 413, `bad-format` 415,
-`empty` 422, `failed` 500, `timeout` 504 (Blender ran and said no to the file), and `unavailable` 503 (the service itself is broken: Blender
+`empty` 422, `bad-recipe` 422 (a /build body that fails the check, or that `build.py` refuses), `failed` 500, `timeout` 504 (Blender ran and said no to the file), and `unavailable` 503 (the service itself is broken: Blender
 could not be started, a library is missing, no room for a job folder; the web app does not blame the person's file for that). A job is
 killed at 60 seconds. Blender runs with an environment that holds no secret, as an
 unprivileged user, and its output is never logged or returned.

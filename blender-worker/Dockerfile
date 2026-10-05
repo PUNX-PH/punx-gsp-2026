@@ -27,7 +27,7 @@ RUN curl -fsSL -o /tmp/blender.tar.xz "https://download.blender.org/release/Blen
 
 # The code is owned by root and the process runs as an unprivileged user: it can read the wrapper and the scripts, not change them.
 WORKDIR /app
-COPY server.mjs package.json ./
+COPY server.mjs recipe.mjs package.json ./
 COPY scripts ./scripts
 
 ENV BLENDER_BIN=/opt/blender/blender \
