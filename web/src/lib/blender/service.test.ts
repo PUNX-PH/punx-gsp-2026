@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { personDocId, dayOf } from "@/lib/ai/key";
 import { MemoryUsageLimits } from "@/lib/ai/memory";
@@ -8,9 +9,11 @@ import {
   BlenderRefusedError,
   type BlenderWorker,
   BlenderUnavailableError,
+  type BuiltGlb,
   type MadeModel,
   type ModelFormat,
 } from "@/lib/blender/types";
+import type { BuildBody } from "@/lib/builder/recipes";
 import { type DerivedFiles, NodeError } from "@/lib/graph/types";
 import { sha256Hex } from "@/lib/runs/service";
 
@@ -34,8 +37,9 @@ function setup(options: { perPerson?: number; total?: number; putFails?: boolean
   const now = START;
   const cache = new MemoryJobCache();
   const limits = new MemoryUsageLimits();
-  const calls: { kind: "prepare" | "shape"; input: Record<string, unknown> }[] = [];
+  const calls: { kind: "prepare" | "shape" | "build"; input: Record<string, unknown> }[] = [];
   let reply: () => Promise<MadeModel> = async () => ({ bytes: MADE, trianglesBefore: 9400, trianglesAfter: 2000 });
+  let replyBuild: () => Promise<BuiltGlb> = async () => ({ bytes: MADE, triangles: 180, parts: 15, clips: ["Run", "Jump"] });
   const worker: BlenderWorker = {
     prepare: async (i) => {
       calls.push({ kind: "prepare", input: i });
@@ -45,8 +49,9 @@ function setup(options: { perPerson?: number; total?: number; putFails?: boolean
       calls.push({ kind: "shape", input: i });
       return reply();
     },
-    build: async () => {
-      throw new Error("the service tests of prepare and shape never build");
+    build: async (i) => {
+      calls.push({ kind: "build", input: i });
+      return replyBuild();
     },
   };
   const logs: Record<string, unknown>[] = [];
@@ -71,7 +76,19 @@ function setup(options: { perPerson?: number; total?: number; putFails?: boolean
   });
   const job = (deadline = now + 270_000, user = alice): BlenderJob => ({ user, graphId: "g1", derived, deadline });
   const count = (uid = "alice") => limits.counts.get(personDocId(uid, dayOf(now))) ?? 0;
-  return { service, cache, limits, calls, logs, stored, derived, job, count, reply: (f: () => Promise<MadeModel>) => (reply = f) };
+  return {
+    service,
+    cache,
+    limits,
+    calls,
+    logs,
+    stored,
+    derived,
+    job,
+    count,
+    reply: (f: () => Promise<MadeModel>) => (reply = f),
+    replyBuild: (f: () => Promise<BuiltGlb>) => (replyBuild = f),
+  };
 }
 
 const failure = (run: Promise<unknown>) => run.then(() => null, (e: unknown) => e);
@@ -281,6 +298,155 @@ describe("Make Shape", () => {
     expect((error as Error).message).toBe("Make Shape: You have used today's 0 Blender jobs. Try again tomorrow.");
     const late = await failure(setup().service.shape(setup().job(START + 1), shape));
     expect((late as Error).message).toBe(`Make Shape: ${OUT_OF_TIME}`);
+  });
+});
+
+describe("Build Model and Build Environment", () => {
+  const body = JSON.parse(readFileSync(new URL("../../../../blender-worker/fixtures/recipes/biped-default.json", import.meta.url), "utf8")) as BuildBody;
+  const model = { label: "Build Model" as const, body };
+  const environment = { label: "Build Environment" as const, body };
+
+  it("builds with the worker, stores the GLB, caches it with its parts and clips, and counts one job", async () => {
+    const t = setup();
+    const done = await t.service.build(t.job(), model);
+
+    const sha = await sha256Hex(MADE);
+    expect(done).toEqual({ sha256: sha, size: 4, triangles: 180, parts: 15, clips: ["Run", "Jump"], reused: false });
+    expect(t.calls).toEqual([{ kind: "build", input: { body, timeoutMs: 65_000 } }]);
+    expect(t.stored.get(sha)).toEqual(MADE);
+    expect([...t.cache.jobs.values()]).toEqual([
+      { sha256: sha, size: 4, trianglesBefore: null, trianglesAfter: 180, parts: 15, clips: ["Run", "Jump"], createdAt: START },
+    ]);
+    expect(t.count()).toBe(1);
+  });
+
+  it("answers a repeat from the cache: no worker call, no count, reused", async () => {
+    const t = setup();
+    await t.service.build(t.job(), model);
+    const again = await t.service.build(t.job(), model);
+
+    expect(again).toMatchObject({ reused: true, size: 4, triangles: 180, parts: 15, clips: ["Run", "Jump"] });
+    expect(t.calls).toHaveLength(1);
+    expect(t.count()).toBe(1);
+  });
+
+  it("treats a cache record whose file is gone as a miss and builds again", async () => {
+    const t = setup();
+    await t.service.build(t.job(), model);
+    t.stored.clear();
+
+    expect((await t.service.build(t.job(), model)).reused).toBe(false);
+    expect(t.calls).toHaveLength(2);
+    expect(t.count()).toBe(2);
+  });
+
+  it("treats a cache record with no parts or no clips as a miss (a record a prepare job could have left)", async () => {
+    const t = setup();
+    await t.service.build(t.job(), model);
+    const [key, record] = [...t.cache.jobs.entries()][0];
+    const withoutParts = { ...record };
+    delete withoutParts.parts;
+    t.cache.jobs.set(key, withoutParts);
+    expect((await t.service.build(t.job(), model)).reused).toBe(false);
+
+    const withoutClips = { ...[...t.cache.jobs.values()][0] };
+    delete withoutClips.clips;
+    t.cache.jobs.set(key, withoutClips);
+    expect((await t.service.build(t.job(), model)).reused).toBe(false);
+    expect(t.calls).toHaveLength(3);
+  });
+
+  it("says Play ran out of time, calls nothing and takes no count, when a miss has less than 10 seconds left", async () => {
+    const t = setup();
+    const error = await failure(t.service.build(t.job(START + 9_999), model));
+
+    expect(error).toBeInstanceOf(NodeError);
+    expect((error as Error).message).toBe(`Build Model: ${OUT_OF_TIME}`);
+    expect(t.calls).toHaveLength(0);
+    expect(t.limits.counts.size).toBe(0);
+    expect(t.logs).toEqual([{ step: "build-model", outcome: "no-time" }]);
+    await t.service.build(t.job(START + 10_000), model);
+    expect(t.calls).toHaveLength(1);
+  });
+
+  it.each([
+    ["bad-recipe", "Build Environment: The Blender service could not build this. Try different words."],
+    ["timeout", "Build Environment: This took longer than 60 seconds. Try a simpler one."],
+    ["empty", `Build Environment: ${DID_NOT_ANSWER}`],
+    ["bad-format", `Build Environment: ${DID_NOT_ANSWER}`],
+    ["too-big", `Build Environment: ${DID_NOT_ANSWER}`],
+    ["failed", `Build Environment: ${DID_NOT_ANSWER}`],
+  ] as const)("a %s refusal says its sentence under the step's name, and the count is given back", async (code, sentence) => {
+    const t = setup();
+    t.replyBuild(async () => {
+      throw new BlenderRefusedError(code);
+    });
+    const error = await failure(t.service.build(t.job(), environment));
+
+    expect(error).toBeInstanceOf(NodeError);
+    expect((error as Error).message).toBe(sentence);
+    expect(t.count()).toBe(0);
+    expect(t.logs).toEqual([{ step: "build-environment", outcome: "refused", code }]);
+  });
+
+  it("says the service did not answer, and gives the count back, when the worker is unavailable, throws or cannot store", async () => {
+    const t = setup();
+    t.replyBuild(async () => {
+      throw new BlenderUnavailableError(503);
+    });
+    expect(((await failure(t.service.build(t.job(), model))) as Error).message).toBe(`Build Model: ${DID_NOT_ANSWER}`);
+    t.replyBuild(async () => {
+      throw new TypeError("boom: C:/secret/path");
+    });
+    expect(((await failure(t.service.build(t.job(), model))) as Error).message).toBe(`Build Model: ${DID_NOT_ANSWER}`);
+    expect(t.count()).toBe(0);
+
+    const failing = setup({ putFails: true });
+    expect(((await failure(failing.service.build(failing.job(), model))) as Error).message).toBe(`Build Model: ${DID_NOT_ANSWER}`);
+    expect(failing.count()).toBe(0);
+  });
+
+  it("says the person and site limit sentences under the step's name, and builds nothing", async () => {
+    const person = setup({ perPerson: 0 });
+    expect(((await failure(person.service.build(person.job(), environment))) as Error).message).toBe(
+      "Build Environment: You have used today's 0 Blender jobs. Try again tomorrow.",
+    );
+    const site = setup({ total: 0 });
+    expect(((await failure(site.service.build(site.job(), model))) as Error).message).toBe("Build Model: Blender is busy today. Try again tomorrow.");
+    expect(person.calls).toHaveLength(0);
+    expect(site.calls).toHaveLength(0);
+  });
+
+  it("makes a new build when only the palette changes, and the same build when the keys come in another order", async () => {
+    const t = setup();
+    await t.service.build(t.job(), model);
+    const repainted = structuredClone(body);
+    repainted.palette[0] = "#000001";
+    await t.service.build(t.job(), { label: "Build Model", body: repainted });
+    expect(t.calls).toHaveLength(2);
+
+    const reordered = { palette: body.palette, motions: body.motions, recipe: { ...body.recipe } } as BuildBody;
+    expect((await t.service.build(t.job(), { label: "Build Model", body: reordered })).reused).toBe(true);
+    expect(t.calls).toHaveLength(2);
+  });
+
+  it("logs nothing of the recipe: not its summary, a joint's name or a number from it", async () => {
+    const t = setup();
+    await t.service.build(t.job(), model);
+    await t.service.build(t.job(), model);
+    t.replyBuild(async () => {
+      throw new BlenderRefusedError("bad-recipe");
+    });
+    const other = structuredClone(body);
+    other.palette[1] = "#000002";
+    await failure(t.service.build(t.job(), { label: "Build Model", body: other }));
+
+    const text = JSON.stringify(t.logs);
+    expect(text).not.toContain("summary");
+    expect(text).not.toContain(body.recipe.summary);
+    expect(text).not.toContain("thigh");
+    expect(text).not.toContain("#");
+    expect(t.logs.map((l) => l.outcome)).toEqual(["made", "reused", "refused"]);
   });
 });
 

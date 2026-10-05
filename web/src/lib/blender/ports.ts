@@ -1,12 +1,17 @@
 // The one port the Blender service stores jobs through, so its rules are tested with an in-memory fake: the cache of results
 // (Firestore in production, see firebase.ts). The daily limits use the same `UsageLimits` port as Describe Game (lib/ai/ports.ts).
 
+import type { ClipName } from "@/lib/builder/kinds";
+
 /** A finished job: where its GLB is kept (by SHA-256, in the graph's folder) and what the card shows about it. */
 export interface CachedJob {
   sha256: string;
   size: number;
   trianglesBefore: number | null;
   trianglesAfter: number;
+  /** A build also keeps how many parts it has and which clips; a prepare or shape job has neither. */
+  parts?: number;
+  clips?: ClipName[];
   createdAt: number; // milliseconds since the epoch
 }
 

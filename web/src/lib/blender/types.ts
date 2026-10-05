@@ -88,6 +88,19 @@ export interface MadeResult {
   reused: boolean;
 }
 
+/** Which step a build is for: it names the step in the sentences and the log. */
+export type BuildLabel = "Build Model" | "Build Environment";
+
+/** The stored GLB a build hands on, with what the card shows. `reused` is true when the cache answered. */
+export interface BuiltResult {
+  sha256: string;
+  size: number;
+  triangles: number;
+  parts: number;
+  clips: ClipName[];
+  reused: boolean;
+}
+
 /** What the steps call: it caches, counts, watches the clock, asks the worker, keeps the result, and says in plain words (as a NodeError) when it cannot. */
 export interface BlenderService {
   prepare(
@@ -95,4 +108,5 @@ export interface BlenderService {
     input: { sha256: string; bytes: Uint8Array; format: ModelFormat; triangles: number; color: string | null },
   ): Promise<MadeResult>;
   shape(job: BlenderJob, input: { shape: Shape; color: string }): Promise<MadeResult>;
+  build(job: BlenderJob, input: { label: BuildLabel; body: BuildBody }): Promise<BuiltResult>;
 }

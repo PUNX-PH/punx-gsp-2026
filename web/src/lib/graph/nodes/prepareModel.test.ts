@@ -22,6 +22,9 @@ function context(files: Record<string, Uint8Array> = { [SHA]: new Uint8Array([7,
     async shape() {
       throw new Error("not used");
     },
+    async build() {
+      throw new Error("not used");
+    },
   };
   const ctx = { user, graphId: "g1", derived, deadline: 123_456, blender, readAsset: async (sha: string) => files[sha] ?? null } as unknown as ExecutorContext;
   return { ctx, asked };

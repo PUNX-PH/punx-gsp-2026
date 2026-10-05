@@ -84,6 +84,9 @@ const noBlender: BlenderService = {
   async shape() {
     throw new NodeError("Make Shape: The Blender service did not answer. Try again.");
   },
+  async build(_job, input) {
+    throw new NodeError(`${input.label}: The Blender service did not answer. Try again.`);
+  },
 };
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;

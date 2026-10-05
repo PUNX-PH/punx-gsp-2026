@@ -175,6 +175,9 @@ describe("a game with both Blender steps, with a fake service", () => {
         const sha256 = await job.derived.put(COLLECTIBLE);
         return { sha256, size: COLLECTIBLE.length, trianglesBefore: null, trianglesAfter: 80, reused: false };
       },
+      async build() {
+        throw new Error("not used");
+      },
     };
     const { service, runs } = setup(blender);
     const made = await service.createGraph(alice, {});

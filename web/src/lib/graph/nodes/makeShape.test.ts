@@ -19,6 +19,9 @@ function context(reply: () => Promise<MadeResult> = async () => made) {
       asked.push({ job, input });
       return reply();
     },
+    async build() {
+      throw new Error("not used");
+    },
   };
   const ctx = { user, graphId: "g1", derived, deadline: 99, blender } as unknown as ExecutorContext;
   return { ctx, asked };
