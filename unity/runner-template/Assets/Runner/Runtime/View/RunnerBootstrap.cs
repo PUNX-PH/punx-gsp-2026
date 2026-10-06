@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using GLTFast.Materials;
@@ -34,6 +35,7 @@ namespace Runner.View
 
         Hud hud;
         RunnerView view;
+        EnvironmentView environment; // null when the settings have no environment
 
         async void Start()
         {
@@ -86,9 +88,26 @@ namespace Runner.View
                 var obstacle = await LoadRole(root, settingsUrl, "obstacle", settings.roles.obstacle, RunnerSim.ObstacleHeight, generator);
                 var collectible = await LoadRole(root, settingsUrl, "collectible", settings.roles.collectible, CollectibleHeight, generator);
 
+                // The environment is optional (settings from before it existed have none): the sky is its palette pick instead of slot 0,
+                // and the field, the stripes and the scenery are added. Without one nothing below changes.
+                var hasEnvironment = SettingsParser.HasEnvironment(settings);
+                var sceneryModels = new List<GameObject>();
+                if (hasEnvironment)
+                {
+                    foreach (var file in settings.environment.scenery ?? new string[0])
+                        sceneryModels.Add(await LoadScenery(root, settingsUrl, file, generator));
+                }
+
                 Sim = new RunnerSim(settings.tuning);
                 var poolSize = Mathf.CeilToInt(VisibleDistance / settings.tuning.obstacleSpacing) + 2;
-                view = new RunnerView(root, hero, obstacle, collectible, PaletteColor(settings, 0), PaletteColor(settings, 1), flat, poolSize);
+                var sky = PaletteColor(settings, hasEnvironment ? settings.environment.sky : 0);
+                view = new RunnerView(root, hero, obstacle, collectible, sky, PaletteColor(settings, 1), flat, poolSize);
+                if (hasEnvironment)
+                {
+                    var world = settings.environment;
+                    environment = new EnvironmentView(root, sceneryModels, PaletteColor(settings, world.field), PaletteColor(settings, world.stripe),
+                                                      flat, SceneryLayout.Spacing(world.density));
+                }
                 hud.PanelColor = PaletteColor(settings, 2);
                 hud.PanelTextColor = PaletteColor(settings, 0);
                 hud.ScoreColor = PaletteColor(settings, 4);
@@ -129,6 +148,35 @@ namespace Runner.View
             {
                 throw new LoadException(role + " (" + file + "): " + e.Message);
             }
+        }
+
+        static async Task<GameObject> LoadScenery(Transform root, string settingsUrl, string file, IMaterialGenerator generator)
+        {
+            try
+            {
+                var content = await AssetLoader.LoadModel(UrlTools.SiblingUrl(settingsUrl, file), root, generator);
+                return FitScenery(content);
+            }
+            catch (Exception e) when (e is LoadException || e is ArgumentException)
+            {
+                throw new LoadException("scenery (" + file + "): " + e.Message);
+            }
+        }
+
+        // Scenery keeps the size Blender built it at (its own height is the target) and stands on the origin: it is never capped by the hit
+        // window, because it is never hit.
+        static GameObject FitScenery(GameObject content)
+        {
+            var renderers = content.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0) throw new LoadException("has no visible geometry");
+
+            var bounds = renderers[0].bounds;
+            for (var i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+            var (scale, offset) = ModelFit.Compute(bounds, bounds.size.y);
+            content.transform.localScale = Vector3.one * scale;
+            content.transform.localPosition = offset;
+            content.SetActive(false);
+            return content;
         }
 
         // Stands the model on the origin at the target height and hides it; the view clones it.
@@ -175,6 +223,7 @@ namespace Runner.View
                 Sim.Tick(Time.deltaTime, pressed);
             }
             view.Sync(Sim);
+            environment?.Sync(Sim.Z);
             hud.Score = Sim.Score;
             hud.GameOver = Sim.GameOver;
         }
