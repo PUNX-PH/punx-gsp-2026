@@ -6,6 +6,7 @@ import { MemoryJobCache } from "@/lib/blender/memory";
 import { makeBlenderService } from "@/lib/blender/service";
 import {
   type BlenderJob,
+  BlenderNotSetUpError,
   BlenderRefusedError,
   type BlenderWorker,
   BlenderUnavailableError,
@@ -404,6 +405,19 @@ describe("Build Model and Build Environment", () => {
     const failing = setup({ putFails: true });
     expect(((await failure(failing.service.build(failing.job(), model))) as Error).message).toBe(`Build Model: ${DID_NOT_ANSWER}`);
     expect(failing.count()).toBe(0);
+  });
+
+  it("says the site is not set up, rather than 'try again', when the worker's address or key is missing, and gives the count back", async () => {
+    const t = setup();
+    t.replyBuild(async () => {
+      throw new BlenderNotSetUpError();
+    });
+    const error = await failure(t.service.build(t.job(), model));
+
+    expect(error).toBeInstanceOf(NodeError);
+    expect((error as Error).message).toBe("Build Model: The Blender service is not set up on this site yet.");
+    expect(t.count()).toBe(0);
+    expect(t.logs).toEqual([{ step: "build-model", outcome: "not-set-up" }]);
   });
 
   it("says the person and site limit sentences under the step's name, and builds nothing", async () => {

@@ -71,6 +71,17 @@ export class BlenderUnavailableError extends Error {
   }
 }
 
+/**
+ * The worker's address or key is missing or unreadable: the site was never set up to call it, which no retry can fix. It is still an
+ * "unavailable" (nothing is kept in it, and it gives the count back), but the person is told it is not set up instead of "try again".
+ */
+export class BlenderNotSetUpError extends BlenderUnavailableError {
+  constructor() {
+    super();
+    this.name = "BlenderNotSetUpError";
+  }
+}
+
 /** What a job needs from Play: who is asking, which graph's folder keeps the result, and when Play must be finished. */
 export interface BlenderJob {
   user: User;

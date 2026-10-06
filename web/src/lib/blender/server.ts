@@ -9,7 +9,7 @@ import { FirestoreJobCache } from "@/lib/blender/firebase";
 import { makeIdTokenSource } from "@/lib/blender/idToken";
 import type { JobCache } from "@/lib/blender/ports";
 import { makeBlenderService } from "@/lib/blender/service";
-import { type BlenderService, BlenderUnavailableError, type BlenderWorker } from "@/lib/blender/types";
+import { BlenderNotSetUpError, type BlenderService, type BlenderWorker } from "@/lib/blender/types";
 import { dailyLimit } from "@/lib/dailyLimit";
 
 const DEFAULT_PER_PERSON = 60;
@@ -27,12 +27,12 @@ export function blenderConfigFromEnv(env: Record<string, string | undefined>): {
 function makeWorker(): BlenderWorker {
   const address = process.env.BLENDER_WORKER_URL;
   const key = process.env.BLENDER_WORKER_KEY;
-  if (!address || !key) throw new BlenderUnavailableError();
+  if (!address || !key) throw new BlenderNotSetUpError();
   let origin: string;
   try {
     origin = new URL(address).origin;
   } catch {
-    throw new BlenderUnavailableError();
+    throw new BlenderNotSetUpError();
   }
   return makeBlenderWorker({ baseUrl: origin, getIdToken: makeIdTokenSource(key, origin) });
 }

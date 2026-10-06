@@ -54,7 +54,7 @@ describe("getBlenderService", () => {
     ["a key and no address", "", "{}"],
     ["an address that is not one", "not a url", "{}"],
     ["a key that is not JSON", "https://worker.example", "not json"],
-  ])("with %s, says the Blender service did not answer, in plain words, and gives the count back", async (_label, url, key) => {
+  ])("with %s, says the Blender service is not set up, in plain words, and gives the count back", async (_label, url, key) => {
     vi.stubEnv("BLENDER_WORKER_URL", url);
     vi.stubEnv("BLENDER_WORKER_KEY", key);
     vi.spyOn(console, "info").mockImplementation(() => undefined);
@@ -64,7 +64,7 @@ describe("getBlenderService", () => {
 
     const failure = await service.prepare(job(), prepare).then(() => null, (e: unknown) => e);
 
-    expect(failure).toEqual(new NodeError("Prepare Model: The Blender service did not answer. Try again."));
+    expect(failure).toEqual(new NodeError("Prepare Model: The Blender service is not set up on this site yet."));
     expect(stores.limits.counts.get(personDocId("alice", dayOf(Date.now())))).toBe(0);
   });
 
@@ -72,6 +72,14 @@ describe("getBlenderService", () => {
     vi.stubEnv("BLENDER_WORKER_URL", "");
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const failure = await getBlenderService(fakes()).shape(job(), { shape: "cube", color: "#06d6a0" }).then(() => null, (e: unknown) => e);
-    expect(failure).toEqual(new NodeError("Make Shape: The Blender service did not answer. Try again."));
+    expect(failure).toEqual(new NodeError("Make Shape: The Blender service is not set up on this site yet."));
+  });
+
+  it("says the same for a build", async () => {
+    vi.stubEnv("BLENDER_WORKER_URL", "");
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const build = { label: "Build Model" as const, body: { recipe: { kind: "biped" } } as never };
+    const failure = await getBlenderService(fakes()).build(job(), build).then(() => null, (e: unknown) => e);
+    expect(failure).toEqual(new NodeError("Build Model: The Blender service is not set up on this site yet."));
   });
 });

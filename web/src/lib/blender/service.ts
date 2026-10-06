@@ -8,6 +8,7 @@ import { buildKey, prepareKey, shapeKey } from "@/lib/blender/key";
 import type { CachedJob, JobCache } from "@/lib/blender/ports";
 import {
   type BlenderJob,
+  BlenderNotSetUpError,
   BlenderRefusedError,
   type BlenderService,
   type BlenderWorker,
@@ -31,6 +32,7 @@ export interface BlenderDeps {
 }
 
 const DID_NOT_ANSWER = "The Blender service did not answer. Try again.";
+const NOT_SET_UP = "The Blender service is not set up on this site yet.";
 
 // What a person is told when Blender ran and refused the file. (An uploaded file is at most 4 MB, so "too-big" is a guard.)
 const REFUSED = {
@@ -151,6 +153,11 @@ export function makeBlenderService(deps: BlenderDeps): BlenderService {
           if (!kind.keepsCountOnRefusal) await giveBack();
           throw say(sentence);
         }
+      } else if (error instanceof BlenderNotSetUpError) {
+        // Retrying cannot help, so the person is told what it is. (Nothing in the error says more than that the address or key is missing.)
+        log({ step: kind.step, outcome: "not-set-up" });
+        await giveBack();
+        throw say(NOT_SET_UP);
       } else if (error instanceof BlenderUnavailableError) {
         log({ step: kind.step, outcome: "unavailable", ...(error.status === undefined ? {} : { status: error.status }) });
       } else {
