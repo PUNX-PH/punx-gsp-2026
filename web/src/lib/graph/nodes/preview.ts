@@ -20,6 +20,12 @@ export const preview: Executor = async (inputs, _params, ctx) => {
     if (!bytes) throw new NodeError("Preview: a model file is missing. Choose it again.");
     models.push([ROLE_FILES[role], bytes]);
   }
+  // The scenery of a game with an environment, after the roles' files, read before anything is stored.
+  for (const piece of game.scenery ?? []) {
+    const bytes = await ctx.readAsset(piece.sha256);
+    if (!bytes) throw new NodeError("Preview: a model file is missing. Choose it again.");
+    models.push([piece.file, bytes]);
+  }
 
   // The earlier run goes first, which also frees its place under the 20-run cap. Someone may have deleted it already.
   const earlier = ctx.lastRun.get();

@@ -3,6 +3,12 @@
 import { NODE_SPECS, type NodeSpec, WIRE_WORDS } from "@/lib/graph/registry";
 import type { GraphEdge, GraphNode } from "@/lib/graph/types";
 
+// "a picture", "an environment": the article follows the word's first letter.
+const article = (word: string, capital: boolean): string => {
+  const text = /^[aeiou]/i.test(word) ? "an" : "a";
+  return capital ? text[0].toUpperCase() + text.slice(1) : text;
+};
+
 /**
  * Why `edge` may not be added to a graph with these `nodes` and the wires already there (`existing`), or null if it may.
  * The checks run in this order: both nodes exist, not the same step, the ports exist and point the right way, the types
@@ -33,7 +39,7 @@ export function wiringProblem(
     return `Node ${to.id} (${toSpec.label}) has no port "${edge.to.port}".`;
   }
 
-  if (output.type !== input.type) return `A ${WIRE_WORDS[output.type]} can't go into a ${WIRE_WORDS[input.type]} input.`;
+  if (output.type !== input.type) return `${article(WIRE_WORDS[output.type], true)} ${WIRE_WORDS[output.type]} can't go into ${article(WIRE_WORDS[input.type], false)} ${WIRE_WORDS[input.type]} input.`;
   if (existing.some((e) => e.to.node === edge.to.node && e.to.port === edge.to.port)) {
     return `${toSpec.label}'s ${input.label} input already has a wire. Remove it first.`;
   }

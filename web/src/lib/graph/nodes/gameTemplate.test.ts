@@ -148,3 +148,77 @@ describe("the Game Template node and model files that are not GLBs", () => {
     expect(output).toMatchObject({ type: "settings", models: { hero: { kind: "asset", sha256: SHA }, obstacle: { kind: "asset", sha256: SHA }, collectible: { kind: "asset", sha256: SHA } } });
   });
 });
+
+describe("the Game Template node and an environment", () => {
+  const SHA_A = "a".repeat(64);
+  const SHA_B = "b".repeat(64);
+  const SHA_C = "c".repeat(64);
+  const SHA_D = "d".repeat(64);
+  const failure = (run: Promise<unknown>) => run.then(() => null, (e: unknown) => e);
+  const world =(scenery: { kind: "tree" | "pine" | "rock" | "cactus" | "windmill" | "lamp"; sha256: string }[]) =>
+    ({ type: "environment" as const, sky: 0, field: 3, stripe: 4, density: "some" as const, scenery });
+
+  it("without an environment makes exactly the settings text it always made, and a wire with no scenery", async () => {
+    const { output } = await gameTemplate({}, { tuning }, ctx);
+    const before = JSON.stringify({ schemaVersion: 1, template: "runner", palette: [...SAMPLE_PALETTE], roles: { hero: "hero.glb", obstacle: "obstacle.glb", collectible: "collectible.glb" }, tuning });
+    expect(output?.type === "settings" && output.settingsText).toBe(before);
+    expect(output?.type === "settings" && "scenery" in output).toBe(false);
+  });
+
+  it("with an environment of two pieces adds the environment to the settings, which pass the template's own check, and names the files in order", async () => {
+    const { output } = await gameTemplate({ environment: world([{ kind: "tree", sha256: SHA_A }, { kind: "rock", sha256: SHA_B }]) }, { tuning }, ctx);
+
+    expect(output?.type).toBe("settings");
+    if (output?.type !== "settings") return;
+    const checked = validateSettings(output.settingsText);
+    expect(checked.ok).toBe(true);
+    if (!checked.ok) return;
+    expect(checked.settings.environment).toEqual({ sky: 0, field: 3, stripe: 4, density: "some", scenery: ["scenery1.glb", "scenery2.glb"] });
+    expect(output.scenery).toEqual([
+      { file: "scenery1.glb", sha256: SHA_A },
+      { file: "scenery2.glb", sha256: SHA_B },
+    ]);
+  });
+
+  it("puts the environment after the tuning, so the rest of the text is what it was", async () => {
+    const { output } = await gameTemplate({ environment: world([]) }, { tuning }, ctx);
+    const before = JSON.stringify({ schemaVersion: 1, template: "runner", palette: [...SAMPLE_PALETTE], roles: { hero: "hero.glb", obstacle: "obstacle.glb", collectible: "collectible.glb" }, tuning });
+    expect(output?.type === "settings" && output.settingsText.startsWith(before.slice(0, -1) + ",\"environment\":")).toBe(true);
+  });
+
+  it("takes an environment with no scenery: the field and the stripes only", async () => {
+    const { output } = await gameTemplate({ environment: world([]) }, { tuning }, ctx);
+    expect(output?.type === "settings" && JSON.parse(output.settingsText).environment).toEqual({ sky: 0, field: 3, stripe: 4, density: "some", scenery: [] });
+    expect(output?.type === "settings" && output.scenery).toEqual([]);
+  });
+
+  it("uses at most three scenery pieces, the first three", async () => {
+    const four = world([{ kind: "tree", sha256: SHA_A }, { kind: "pine", sha256: SHA_B }, { kind: "rock", sha256: SHA_C }, { kind: "lamp", sha256: SHA_D }]);
+    const { output } = await gameTemplate({ environment: four }, { tuning }, ctx);
+    expect(output?.type === "settings" && JSON.parse(output.settingsText).environment.scenery).toEqual(["scenery1.glb", "scenery2.glb", "scenery3.glb"]);
+    expect(output?.type === "settings" && output.scenery?.map((s) => s.sha256)).toEqual([SHA_A, SHA_B, SHA_C]);
+  });
+
+  it("carries the density and the palette picks as they came", async () => {
+    const lots = { ...world([{ kind: "windmill", sha256: SHA_A }]), sky: 1, field: 2, stripe: 0, density: "lots" as const };
+    const { output } = await gameTemplate({ environment: lots }, { tuning }, ctx);
+    expect(output?.type === "settings" && JSON.parse(output.settingsText).environment).toMatchObject({ sky: 1, field: 2, stripe: 0, density: "lots" });
+  });
+
+  it("refuses a palette pick that is not a palette index, with the template's own words, under its own name", async () => {
+    const bad = { ...world([]), sky: 5 };
+    const error = await failure(gameTemplate({ environment: bad }, { tuning }, ctx));
+    expect(error).toBeInstanceOf(NodeError);
+    expect((error as Error).message).toBe("Game Template: settings.environment.sky: 5 is not a palette index (0 to 4)");
+  });
+
+  it("ignores a connected value that is not an environment", async () => {
+    const { output } = await gameTemplate({ environment: { type: "palette", colors: [...SAMPLE_PALETTE] } }, { tuning }, ctx);
+    expect(output?.type === "settings" && JSON.parse(output.settingsText).environment).toBeUndefined();
+  });
+
+  it("its result is still just the tuning", async () => {
+    const { result } = await gameTemplate({ environment: world([{ kind: "tree", sha256: SHA_A }]) }, { tuning }, ctx);
+    expect(result).toEqual({ tuning });
+  });
+});

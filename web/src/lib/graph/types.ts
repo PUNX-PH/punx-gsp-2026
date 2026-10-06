@@ -4,15 +4,22 @@ import type { DescribeGameService } from "@/lib/ai/types";
 import type { User } from "@/lib/auth/ports";
 import type { BlenderService, ModelFormat } from "@/lib/blender/types";
 import type { BuilderService } from "@/lib/builder/types";
-import type { ClipName } from "@/lib/builder/kinds";
+import type { ClipName, SceneryKind } from "@/lib/builder/kinds";
 import type { RunService } from "@/lib/runs/types";
+import type { Density } from "@/lib/settings";
 
-/** What a wire carries. A `feel` is the three tuning numbers (how fast, how high, how far apart). */
-export type WireType = "image" | "model" | "palette" | "feel" | "settings";
+/**
+ * What a wire carries. A `feel` is the three tuning numbers (how fast, how high, how far apart); an `environment` is the world around the
+ * track (the sky, the field and the edge stripes as palette picks, and the scenery).
+ */
+export type WireType = "image" | "model" | "palette" | "feel" | "environment" | "settings";
 
 /** The three models a runner game uses, and the file each is stored under in a run. */
 export type Role = "hero" | "obstacle" | "collectible";
 export const ROLE_FILES: Record<Role, string> = { hero: "hero.glb", obstacle: "obstacle.glb", collectible: "collectible.glb" };
+
+/** The files a run keeps its scenery under (at most three), whatever the pieces are. */
+export const SCENERY_FILES = ["scenery1.glb", "scenery2.glb", "scenery3.glb"] as const;
 
 export interface PortRef {
   node: string;
@@ -105,7 +112,10 @@ export type WireValue =
   | { type: "model"; sha256: string; name: string; size: number; format: ModelFormat; role?: Role; clips?: ClipName[] }
   | { type: "palette"; colors: string[] }
   | { type: "feel"; tuning: Tuning }
-  | { type: "settings"; settingsText: string; tuning: Tuning; models: Record<Role, ModelSource> };
+  // `sky`, `field` and `stripe` are palette indices 0 to 4; each piece of scenery is a GLB stored in the graph's folder.
+  | { type: "environment"; sky: number; field: number; stripe: number; density: Density; scenery: { kind: SceneryKind; sha256: string }[] }
+  // `scenery` is there only when an environment was wired: the files, in the order the settings name them.
+  | { type: "settings"; settingsText: string; tuning: Tuning; models: Record<Role, ModelSource>; scenery?: { file: string; sha256: string }[] };
 
 // ---- what a node's code is given ----
 

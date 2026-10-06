@@ -91,6 +91,7 @@ const article = (label: string) => (/^[aeiou]/i.test(label) ? "an" : "a");
 // What happens when an optional input has no wire.
 function missingInputLine(port: { label: string; type: string }): string {
   if (port.type === "palette") return "Without a palette, a sample palette is used.";
+  if (port.type === "environment") return "Without an environment, the plain ground and sky are used.";
   return `Without ${article(port.label)} ${port.label}, a built-in shape is used.`;
 }
 

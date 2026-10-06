@@ -144,3 +144,72 @@ describe("the Preview node", () => {
     expect(records.runs.size).toBe(0);
   });
 });
+
+describe("the Preview node and scenery", () => {
+  const TREE_SHA = "1".repeat(64);
+  const ROCK_SHA = "2".repeat(64);
+  const treeGlb = makeGlb({ asset: { version: "2.0" }, extras: { piece: "tree" } });
+  const rockGlb = makeGlb({ asset: { version: "2.0" }, extras: { piece: "rock" } });
+  const world = {
+    type: "environment" as const,
+    sky: 0,
+    field: 3,
+    stripe: 4,
+    density: "some" as const,
+    scenery: [
+      { kind: "tree" as const, sha256: TREE_SHA },
+      { kind: "rock" as const, sha256: ROCK_SHA },
+    ],
+  };
+
+  function withScenery() {
+    const t = setup();
+    const readAsset = async (sha: string) => (sha === TREE_SHA ? treeGlb : sha === ROCK_SHA ? rockGlb : null);
+    const ctx = { ...t.ctx, readAsset } as ExecutorContext;
+    return { ...t, ctx };
+  }
+  const gameWithWorld = async (ctx: ExecutorContext): Promise<WireValue> => (await gameTemplate({ environment: world }, { tuning }, ctx)).output!;
+
+  it("stores the scenery files after the role files, and the run becomes ready", async () => {
+    const { records, files, ctx } = withScenery();
+    await preview({ settings: await gameWithWorld(ctx) }, {}, ctx);
+
+    expect(records.runs.get("run1")?.status).toBe("ready");
+    expect([...files.files.keys()].sort()).toEqual([
+      "run1/collectible.glb",
+      "run1/hero.glb",
+      "run1/obstacle.glb",
+      "run1/scenery1.glb",
+      "run1/scenery2.glb",
+      "run1/settings.json",
+    ]);
+    expect(files.files.get("run1/scenery1.glb")?.bytes).toEqual(treeGlb);
+    expect(files.files.get("run1/scenery2.glb")?.bytes).toEqual(rockGlb);
+  });
+
+  it("stores the environment in the run's settings.json", async () => {
+    const { files, ctx } = withScenery();
+    await preview({ settings: await gameWithWorld(ctx) }, {}, ctx);
+    const text = new TextDecoder().decode(files.files.get("run1/settings.json")!.bytes);
+    expect(JSON.parse(text).environment).toEqual({ sky: 0, field: 3, stripe: 4, density: "some", scenery: ["scenery1.glb", "scenery2.glb"] });
+  });
+
+  it("says a model file is missing, before touching anything, when a scenery file is gone", async () => {
+    const { records, lastRun, ctx } = withScenery();
+    await preview({ settings: await game(ctx) }, {}, ctx); // an earlier run, with no scenery
+    const gone = { ...ctx, readAsset: async () => null } as ExecutorContext;
+
+    const error = await preview({ settings: await gameWithWorld(gone) }, {}, gone).catch((e) => e);
+
+    expect(error).toBeInstanceOf(NodeError);
+    expect(error.message).toBe("Preview: a model file is missing. Choose it again.");
+    expect([...records.runs.keys()]).toEqual(["run1"]);
+    expect(lastRun.get()).toBe("run1");
+  });
+
+  it("stores no scenery for a game that has none, as before", async () => {
+    const { files, ctx } = withScenery();
+    await preview({ settings: await game(ctx) }, {}, ctx);
+    expect([...files.files.keys()].filter((name) => name.includes("scenery"))).toEqual([]);
+  });
+});

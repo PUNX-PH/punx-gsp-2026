@@ -30,7 +30,7 @@ export interface NodeSpec {
 }
 
 /** How each wire type is named to a person. */
-export const WIRE_WORDS: Record<WireType, string> = { image: "picture", model: "3D model", palette: "palette", feel: "feel", settings: "game" };
+export const WIRE_WORDS: Record<WireType, string> = { image: "picture", model: "3D model", palette: "palette", feel: "feel", environment: "environment", settings: "game" };
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 
@@ -219,6 +219,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     inputs: [
       port("palette", "palette", "The game's colors. Without one, a sample palette is used.", "palette"),
       port("feel", "feel", "How fast, how high and how far apart. Without one, the sliders below are used.", "feel"),
+      port("environment", "environment", "The world around the track. Without one, the plain ground and sky are used.", "environment"),
       port("hero", "hero model", "The player's model. Without one, a built-in shape is used.", "model"),
       port("obstacle", "obstacle model", "The obstacles' model. Without one, a built-in shape is used.", "model"),
       port("collectible", "collectible model", "The collectibles' model. Without one, a built-in shape is used.", "model"),

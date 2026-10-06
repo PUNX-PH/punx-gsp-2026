@@ -100,6 +100,8 @@ describe("SettingsPanel", () => {
     expect(panel("n3")).toContain("Without a hero model, a built-in shape is used.");
     expect(panel("n3")).toContain("Without an obstacle model, a built-in shape is used.");
     expect(panel("n3")).not.toContain("Without a palette"); // the starter wires the palette
+    expect(panel("n3")).toContain("Without an environment, the plain ground and sky are used.");
+    expect(panel("n3")).not.toContain("Without a environment");
 
     const wired = addEdge(starterGraph(), { from: { node: "n5", port: "model" }, to: { node: "n3", port: "hero" } });
     expect(wired.ok).toBe(true);

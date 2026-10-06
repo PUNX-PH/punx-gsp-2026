@@ -113,3 +113,34 @@ describe("wiringProblem and the Describe Game step", () => {
     expect(wiringProblem(graph, [], wire("n2", "palette", "n3", "feel"))).toBe("A palette can't go into a feel input.");
   });
 });
+
+describe("wiringProblem and the environment wire", () => {
+  // A step that gives an environment: enough to try the wire type before the Build Environment step exists.
+  const base = NODE_SPECS["palette-from-image"];
+  const source: NodeSpec = { ...base, type: "environment-source", inputs: [], outputs: [{ name: "environment", label: "environment", help: "", type: "environment", required: false }] };
+  const specs = { ...NODE_SPECS, "environment-source": source };
+  const graph = [
+    node("e", "environment-source"),
+    node("p", "palette-from-image"),
+    node("g", "game-template", { tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } }),
+  ];
+
+  it("accepts an environment into Game Template's environment input", () => {
+    expect(wiringProblem(graph, [], wire("e", "environment", "g", "environment"), specs)).toBeNull();
+  });
+
+  it("refuses an environment in a palette input, saying an environment, not a environment", () => {
+    expect(wiringProblem(graph, [], wire("e", "environment", "g", "palette"), specs)).toBe("An environment can't go into a palette input.");
+  });
+
+  it("refuses a palette in an environment input, saying an environment, not a environment", () => {
+    expect(wiringProblem(graph, [], wire("p", "palette", "g", "environment"), specs)).toBe("A palette can't go into an environment input.");
+  });
+
+  it("keeps every other sentence as it was: a picture, a 3D model, a game and a feel still start with A", () => {
+    expect(wiringProblem(nodes, [], wire("n2", "palette", "n6", "image"))).toBe("A palette can't go into a picture input.");
+    expect(wiringProblem(nodes, [], wire("n5", "model", "n2", "image"))).toBe("A 3D model can't go into a picture input.");
+    expect(wiringProblem(nodes, [], wire("n3", "settings", "n2", "image"))).toBe("A game can't go into a picture input.");
+    expect(wiringProblem(nodes, [], wire("n1", "image", "n3", "palette"))).toBe("A picture can't go into a palette input.");
+  });
+});

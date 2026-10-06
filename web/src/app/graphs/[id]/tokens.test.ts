@@ -72,6 +72,10 @@ describe("the stylesheet's other rules (deferred minors)", () => {
   it("gives the feel wire its own color, used by the wire, its handles and its pill", () => {
     expect(block(".wire_feel")).toMatch(/--wire:\s*var\(--wire-feel\)/);
   });
+
+  it("gives the environment wire its own color, used by the wire, its handles and its pill", () => {
+    expect(block(".wire_environment")).toMatch(/--wire:\s*var\(--wire-environment\)/);
+  });
 });
 
 describe.each(THEMES)("the %s theme: the feel wire", (_name, t) => {
@@ -82,5 +86,19 @@ describe.each(THEMES)("the %s theme: the feel wire", (_name, t) => {
   ])("stands out from %s by at least 3 to 1", (_label, background) => {
     expect(t["wire-feel"], "the theme needs a --wire-feel color").toBeDefined();
     expect(contrastRatio(t["wire-feel"], t[background])).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe.each(THEMES)("the %s theme: the environment wire", (_name, t) => {
+  it.each([
+    ["the canvas", "canvas"],
+    ["a card", "surface"],
+  ])("stands out from %s by at least 3 to 1", (_label, background) => {
+    expect(t["wire-environment"], "the theme needs a --wire-environment color").toBeDefined();
+    expect(contrastRatio(t["wire-environment"], t[background])).toBeGreaterThanOrEqual(3);
+  });
+
+  it("is not the color of another wire", () => {
+    for (const other of ["image", "model", "palette", "feel", "settings"]) expect(t["wire-environment"]).not.toBe(t["wire-" + other]);
   });
 });
