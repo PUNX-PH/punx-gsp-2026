@@ -93,6 +93,20 @@ function Result({ result, onOpenGame }: { result: ResultView; onOpenGame?: () =>
           {result.reused && <p className={styles.reusedNote}>Reused your earlier result</p>}
         </div>
       );
+    case "environment":
+      return (
+        <div className={cx(styles.result, styles.described)}>
+          <ul className={styles.swatches}>
+            {result.colors
+              .filter((color) => HEX.test(color))
+              .map((color, i) => (
+                <li key={`${color}-${i}`} className={styles.swatch} style={{ background: color }} title={color} />
+              ))}
+          </ul>
+          <span className={styles.chip}>{result.scenery}</span>
+          {result.reused && <p className={styles.reusedNote}>Reused your earlier result</p>}
+        </div>
+      );
     case "open-game":
       return (
         <div className={styles.result}>

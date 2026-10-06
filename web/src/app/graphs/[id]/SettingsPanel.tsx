@@ -11,8 +11,9 @@ import { SHAPES, SHAPE_NAMES, TRIANGLES } from "@/lib/blender/types";
 import { KIND_NAMES, MODEL_KINDS } from "@/lib/builder/kinds";
 import { TUNING_FIELDS, tuningProblem } from "@/lib/canvas/tuning";
 import { SAMPLE_PALETTE } from "@/lib/graph/palette";
-import { MAX_DESCRIPTION_CHARACTERS, MAX_MOTION_CHARACTERS, MAX_PROMPT_CHARACTERS } from "@/lib/graph/registry";
+import { MAX_DESCRIPTION_CHARACTERS, MAX_MOTION_CHARACTERS, MAX_PROMPT_CHARACTERS, MAX_THEME_CHARACTERS } from "@/lib/graph/registry";
 import { type Assets, type GraphNode, ROLE_FILES, type Role, type Tuning } from "@/lib/graph/types";
+import { DENSITIES, type Density } from "@/lib/settings";
 
 export interface SettingsPanelProps {
   node: GraphNode | null;
@@ -268,6 +269,27 @@ function BuildModelPanel({ node, onSettings }: { node: GraphNode; onSettings: Se
   );
 }
 
+const DENSITY_NAMES: Record<Density, string> = { few: "Few", some: "Some", lots: "Lots" };
+
+// Build Environment: the person's theme for the world, and how much scenery there is. An empty theme builds a meadow and sends nothing.
+function BuildEnvironmentPanel({ node, data, onSettings }: { node: GraphNode; data: StepData; onSettings: SettingsPanelProps["onSettings"] }) {
+  const theme = typeof node.params.theme === "string" ? node.params.theme : "";
+  return (
+    <>
+      <WordsBox label="Theme" value={theme} max={MAX_THEME_CHARACTERS} rows={3} counter onChange={(next) => onSettings(node.id, { theme: next })} />
+      <ChoiceGroup label="Scenery" choices={DENSITIES.map((value) => ({ value, name: DENSITY_NAMES[value] }))} current={node.params.density} onPick={(density) => onSettings(node.id, { density })} />
+      <p className={styles.hint}>{"Your theme is sent to Anthropic's Claude to design this; with the theme empty, nothing is sent and a meadow is built."}</p>
+      <ul className={styles.notes}>
+        {data.inputs
+          .filter((port) => !port.required && !port.wired)
+          .map((port) => (
+            <li key={port.name}>{missingInputLine(port)}</li>
+          ))}
+      </ul>
+    </>
+  );
+}
+
 function TuningSliders({ node, data, onTune }: { node: GraphNode; data: StepData; onTune: SettingsPanelProps["onTune"] }) {
   const id = useId();
   const tuning = node.params.tuning as Tuning;
@@ -373,6 +395,7 @@ export function SettingsPanel({ node, data, uploading, error, onChooseFile, onTu
         </>
       )}
       {node.type === "build-model" && <BuildModelPanel node={node} onSettings={onSettings} />}
+      {node.type === "build-environment" && <BuildEnvironmentPanel node={node} data={data} onSettings={onSettings} />}
       {node.type === "describe-game" && <PromptBox nodeId={node.id} prompt={typeof node.params.prompt === "string" ? node.params.prompt : ""} onPrompt={onPrompt} />}
       {node.type === "game-template" && <TuningSliders node={node} data={data} onTune={onTune} />}
       {node.type === "palette-from-image" && colors.length > 0 && (

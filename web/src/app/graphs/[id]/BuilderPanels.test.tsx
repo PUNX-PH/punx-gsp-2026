@@ -1,5 +1,6 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { Icon } from "@/app/graphs/[id]/icons";
 import { SettingsPanel } from "@/app/graphs/[id]/SettingsPanel";
 import { StepCardView } from "@/app/graphs/[id]/StepCardView";
 import { stepData } from "@/lib/canvas/cardView";
@@ -149,5 +150,107 @@ describe("the Build Model card", () => {
     const html = card(emptyRunView(null));
     expect(html).not.toContain("Moves:");
     expect(html).toContain("Build Model");
+  });
+});
+
+// ---- Build Environment ----
+
+const worldGraph = (params: Record<string, unknown> = {}): Graph => ({
+  schemaVersion: 1,
+  nodes: [node("n1", "build-environment", { theme: "", density: "some", ...params }), node("n2", "game-template", { tuning }), node("n3", "preview", {})],
+  edges: [wire("n1", "environment", "n2", "environment"), wire("n2", "settings", "n3", "settings")],
+});
+
+function worldPanel(params: Record<string, unknown> = {}, onSettings: (nodeId: string, patch: Record<string, unknown>) => void = () => {}) {
+  const g = worldGraph(params);
+  return renderToString(
+    <SettingsPanel node={g.nodes[0]} data={dataFor(g)} assets={{}} graphId="g1" uploading={false} error={null} onChooseFile={() => {}} onTune={() => {}} onPrompt={() => {}} onSettings={onSettings} />,
+  );
+}
+const worldCard = (run: RunView) => renderToString(<StepCardView data={dataFor(worldGraph(), run)} selected={false} />);
+const doneWorld = (result: unknown): RunView => ({ ...emptyRunView(null), outcomes: { n1: { state: "done", result } } });
+const world = { sky: "#1b1f3b", field: "#06d6a0", stripe: "#ffffff", density: "some", scenery: ["tree", "windmill", "rock"], reused: false };
+
+describe("the Build Environment panel", () => {
+  it("starts with an empty theme and Some pressed", () => {
+    const html = worldPanel();
+    expect(pressedNames(html, ["Few", "Some", "Lots"])).toEqual(["Some"]);
+    expect(html).toContain("Theme");
+    expect(html).toContain("Scenery");
+    expect(html).toMatch(/<textarea[^>]*maxLength="200"/);
+    expect(html.match(/<textarea/g)).toHaveLength(1);
+    expect(html).toContain("200 characters left");
+  });
+
+  it("offers few, some and lots as three buttons", () => {
+    const html = worldPanel();
+    for (const name of ["Few", "Some", "Lots"]) expect(buttons(html, new RegExp(`>${name}<`)), name).toHaveLength(1);
+  });
+
+  it("shows the saved density as pressed", () => {
+    expect(pressedNames(worldPanel({ density: "lots" }), ["Few", "Some", "Lots"])).toEqual(["Lots"]);
+    expect(pressedNames(worldPanel({ density: "few" }), ["Few", "Some", "Lots"])).toEqual(["Few"]);
+  });
+
+  it("holds the saved theme in its box and counts the characters left", () => {
+    const html = worldPanel({ theme: "a windy meadow" });
+    expect(html).toMatch(/<textarea[^>]*>a windy meadow<\/textarea>/);
+    expect(html).toContain("186 characters left");
+    expect(worldPanel({ theme: "👻".repeat(200) })).toContain("0 characters left");
+  });
+
+  it("says exactly once what is sent to Anthropic, and that with an empty theme nothing is sent and a meadow is built", () => {
+    const html = worldPanel();
+    expect(html.match(/Your theme is sent to Anthropic&#x27;s Claude to design this; with the theme empty, nothing is sent and a meadow is built\./g)).toHaveLength(1);
+    expect(html.match(/Anthropic/g)).toHaveLength(1);
+  });
+
+  it("says what an unconnected palette does", () => {
+    expect(worldPanel()).toContain("Without a palette, a sample palette is used.");
+  });
+
+  it("escapes a saved theme instead of drawing it as markup", () => {
+    const html = worldPanel({ theme: "<script>alert(1)</script>" });
+    expect(html).not.toContain("<script>alert(1)");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+});
+
+describe("the Build Environment card", () => {
+  it("draws the three colors as swatches, the scenery in a chip, and nothing about reuse the first time", () => {
+    const html = worldCard(doneWorld(world));
+    expect(html.match(/<li class="[^"]*swatch[^"]*"/g)).toHaveLength(3);
+    for (const color of ["#1b1f3b", "#06d6a0", "#ffffff"]) expect(html).toContain(`background:${color}`);
+    expect(html).toMatch(/<span class="[^"]*chip[^"]*">Tree, Windmill, Rock<\/span>/);
+    expect(html).not.toContain("Reused");
+  });
+
+  it("says when the result was reused", () => {
+    expect(worldCard(doneWorld({ ...world, reused: true }))).toContain("Reused your earlier result");
+  });
+
+  it("says No scenery for none", () => {
+    expect(worldCard(doneWorld({ ...world, scenery: [] }))).toContain("No scenery");
+  });
+
+  it("draws nothing extra before a run", () => {
+    const html = worldCard(emptyRunView(null));
+    expect(html).toContain("Build Environment");
+    expect(html).not.toContain("swatch");
+    expect(html).not.toContain("Windmill");
+  });
+
+  it("never puts a color that is not #rrggbb in a style, even if the card's data holds one", () => {
+    const hostile = { ...dataFor(worldGraph(), emptyRunView(null)), result: { kind: "environment" as const, colors: ["red;background:url(x)", "#06d6a0", "#ffffff"], scenery: "Tree", reused: false } };
+    const html = renderToString(<StepCardView data={hostile} selected={false} />);
+    expect(html).not.toContain("url(x)");
+    expect(html.match(/<li class="[^"]*swatch[^"]*"/g)).toHaveLength(2);
+  });
+
+  it("has an icon of its own, not the plain square", () => {
+    const own = renderToString(<Icon type="build-environment" />);
+    const plain = renderToString(<Icon type="no-such-step" />);
+    expect(own).toContain("<svg");
+    expect(own).not.toBe(plain);
   });
 });

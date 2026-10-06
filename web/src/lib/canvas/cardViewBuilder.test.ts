@@ -117,3 +117,61 @@ describe("a Build Model card", () => {
     expect(card.outputs.map((p) => [p.name, p.type, p.wired])).toEqual([["model", "model", true]]);
   });
 });
+
+describe("a Build Environment card", () => {
+  const worldGraph = (params: Record<string, unknown> = {}): Graph => ({
+    schemaVersion: 1,
+    nodes: [node("n1", "build-environment", { theme: "", density: "some", ...params }), node("n2", "game-template", { tuning }), node("n3", "preview", {})],
+    edges: [wire("n1", "environment", "n2", "environment"), wire("n2", "settings", "n3", "settings")],
+  });
+  function stepOf(run: RunView = emptyRunView(null), g: Graph = worldGraph()) {
+    return stepData({ graph: g, node: g.nodes[0], assets: {}, run, numbers: stepNumbers(g), graphId: "g1", pending: new Set() });
+  }
+  const world = { sky: "#1b1f3b", field: "#06d6a0", stripe: "#ffffff", density: "some", scenery: ["tree", "windmill", "rock"], reused: false };
+  const doneWorld = (result: unknown) => stepOf(runWith({ n1: { state: "done", result } }));
+
+  it("shows the sky, the field and the stripes as three colors, the scenery by its plain names, and whether it was reused", () => {
+    expect(doneWorld(world).result).toEqual({ kind: "environment", colors: ["#1b1f3b", "#06d6a0", "#ffffff"], scenery: "Tree, Windmill, Rock", reused: false });
+  });
+
+  it("names each piece in plain words", () => {
+    expect(doneWorld({ ...world, scenery: ["pine", "cactus", "lamp"] }).result).toMatchObject({ scenery: "Pine, Cactus, Lamp" });
+    expect(doneWorld({ ...world, scenery: ["rock"] }).result).toMatchObject({ scenery: "Rock" });
+  });
+
+  it("says No scenery for none, and passes on that the result was reused", () => {
+    expect(doneWorld({ ...world, scenery: [] }).result).toMatchObject({ scenery: "No scenery" });
+    expect(doneWorld({ ...world, reused: true }).result).toMatchObject({ reused: true });
+  });
+
+  it("shows nothing before a run, or after a step that failed or was skipped", () => {
+    expect(stepOf().result).toEqual({ kind: "none" });
+    expect(stepOf(runWith({ n1: { state: "failed", error: "Build Environment: The Blender service did not answer. Try again." } })).result).toEqual({ kind: "none" });
+    expect(stepOf(runWith({ n1: { state: "skipped" } })).result).toEqual({ kind: "none" });
+  });
+
+  it.each([
+    ["nothing", null],
+    ["text", "a meadow"],
+    ["a list", []],
+    ["no scenery list", { ...world, scenery: undefined }],
+    ["a scenery list that is not a list", { ...world, scenery: "tree" }],
+    ["a piece that is not in the kit", { ...world, scenery: ["tree", "castle"] }],
+    ["a piece that is not text", { ...world, scenery: ["tree", 7] }],
+    ["a piece named like a prototype key", { ...world, scenery: ["__proto__"] }],
+    ["a piece named like an inherited key", { ...world, scenery: ["constructor"] }],
+    ["a sky that is not a color", { ...world, sky: "red" }],
+    ["a field that is a number", { ...world, field: 3 }],
+    ["a stripe with markup in it", { ...world, stripe: "#ffffff;background:url(x)" }],
+    ["a reused that is not true or false", { ...world, reused: "yes" }],
+  ])("shows nothing for a result with %s", (_label, result) => {
+    expect(doneWorld(result).result).toEqual({ kind: "none" });
+  });
+
+  it("lists an optional palette input and an environment output, and is ready to run with an empty theme", () => {
+    const card = stepOf();
+    expect(card.inputs.map((p) => [p.name, p.type, p.required, p.wired])).toEqual([["palette", "palette", false, false]]);
+    expect(card.outputs.map((p) => [p.name, p.type, p.wired])).toEqual([["environment", "environment", true]]);
+    expect(card.status).toBe("idle");
+  });
+});

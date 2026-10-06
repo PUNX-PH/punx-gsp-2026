@@ -42,25 +42,36 @@ describe("describedStarterGraph", () => {
 });
 
 describe("builtStarterGraph", () => {
-  it("is a graph the parser accepts: Build Model into the game's hero, then the Template and the Preview", () => {
+  it("is a graph the parser accepts: Build Model into the game's hero and Build Environment into its world, then the Template and the Preview", () => {
     const graph = builtStarterGraph();
     expect(parseGraph(graph).ok).toBe(true);
     expect(graph.nodes.map((n) => [n.id, n.type])).toEqual([
       ["n1", "build-model"],
       ["n2", "game-template"],
       ["n3", "preview"],
+      ["n4", "build-environment"],
     ]);
     expect(graph.nodes[0].params).toEqual({ role: "hero", kind: "biped", description: "", run: "", jump: "", loop: "" });
     expect(graph.nodes[1].params).toEqual({ tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } });
-    expect(graph.edges.map((e) => `${e.from.node}.${e.from.port}->${e.to.node}.${e.to.port}`)).toEqual(["n1.model->n2.hero", "n2.settings->n3.settings"]);
+    expect(graph.nodes[3].params).toEqual({ theme: "", density: "some" });
+    expect(graph.edges.map((e) => `${e.from.node}.${e.from.port}->${e.to.node}.${e.to.port}`)).toEqual([
+      "n1.model->n2.hero",
+      "n4.environment->n2.environment",
+      "n2.settings->n3.settings",
+    ]);
   });
 
-  it("plays as it is: with a kind chosen and every box empty, nothing is missing", () => {
+  it("plays as it is: with a kind chosen, an empty theme and every box empty, nothing is missing", () => {
     expect(checkGraph(builtStarterGraph(), {})).toEqual([]);
   });
 
   it("lays the steps out left to right, 260 px apart, and is a new graph every time", () => {
-    expect(builtStarterGraph().nodes.map((n) => n.position)).toEqual([0, 260, 520].map((x) => ({ x, y: 0 })));
+    expect(builtStarterGraph().nodes.map((n) => n.position)).toEqual([
+      { x: 0, y: 0 },
+      { x: 260, y: 0 },
+      { x: 520, y: 0 },
+      { x: 0, y: 280 },
+    ]);
     const a = builtStarterGraph();
     a.nodes[0].params = { role: "obstacle" };
     expect(builtStarterGraph().nodes[0].params).toMatchObject({ role: "hero" });

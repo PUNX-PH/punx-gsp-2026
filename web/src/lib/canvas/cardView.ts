@@ -1,7 +1,7 @@
 // What one card shows, worked out from the graph, the run and the uploaded files: its status in words, its result, and
 // its ports. The card component only draws this, so every wording and every rule here is tested without a browser.
 import { SHAPE_NAMES, type Shape } from "@/lib/blender/types";
-import { CLIP_NAMES, KIND_NAMES, type ModelKind } from "@/lib/builder/kinds";
+import { CLIP_NAMES, KIND_NAMES, type ModelKind, SCENERY_NAMES, type SceneryKind } from "@/lib/builder/kinds";
 import type { RunView } from "@/lib/canvas/runView";
 import { SAMPLE_PALETTE } from "@/lib/graph/palette";
 import { NODE_SPECS, type NodeSpec } from "@/lib/graph/registry";
@@ -29,6 +29,8 @@ export type ResultView =
   | { kind: "made"; line: string; swatch: string | null; reused: boolean }
   /** What Build Model made: a line of plain facts, the clips it moves with, a one-sentence look (plain text), what was skipped (or null) and whether it was a stored result. */
   | { kind: "built"; line: string; clips: string; summary: string; skipped: string | null; reused: boolean }
+  /** What Build Environment made: the sky, field and stripe colors (#rrggbb), the scenery by its plain names (or "No scenery"), and whether it was a stored result. */
+  | { kind: "environment"; colors: string[]; scenery: string; reused: boolean }
   | { kind: "open-game" };
 
 export type StepData = {
@@ -152,6 +154,20 @@ function builtModel(result: unknown): ResultView | null {
   };
 }
 
+// What a finished Build Environment step handed over (lib/graph/nodes/buildEnvironment.ts), or null when the result is not that. Nothing in
+// it is trusted: the three colors must be #rrggbb and every piece must be one of ours, so only known words and hex colors reach the card.
+function builtEnvironment(result: unknown): ResultView | null {
+  const r = result as { sky?: unknown; field?: unknown; stripe?: unknown; scenery?: unknown; reused?: unknown } | null | undefined;
+  if (typeof r !== "object" || r === null) return null;
+  const { sky, field, stripe, scenery, reused } = r;
+  const colors = [sky, field, stripe];
+  if (!colors.every((c): c is string => typeof c === "string" && HEX.test(c))) return null;
+  if (!Array.isArray(scenery) || !scenery.every((piece) => typeof piece === "string" && Object.hasOwn(SCENERY_NAMES, piece))) return null;
+  if (typeof reused !== "boolean") return null;
+  const names = (scenery as SceneryKind[]).map((piece) => SCENERY_NAMES[piece]);
+  return { kind: "environment", colors, scenery: names.length === 0 ? "No scenery" : names.join(", "), reused };
+}
+
 // The colors of the palette wired into a Blender step, once the step that makes them has run (a Palette from Image or a Describe
 // Game step); the sample palette otherwise, and whenever what came back is not five #rrggbb colors.
 function swatchesFor(graph: Graph, node: GraphNode, run: RunView): string[] {
@@ -182,6 +198,7 @@ function fromRun(node: GraphNode, run: RunView): ResultView {
   if (node.type === "prepare-model") return prepared(outcome.result) ?? { kind: "none" };
   if (node.type === "make-shape") return shapeMade(outcome.result) ?? { kind: "none" };
   if (node.type === "build-model") return builtModel(outcome.result) ?? { kind: "none" };
+  if (node.type === "build-environment") return builtEnvironment(outcome.result) ?? { kind: "none" };
   if (node.type === "preview" && run.runId) return { kind: "open-game" };
   return { kind: "none" };
 }

@@ -47,6 +47,13 @@ export function Icon({ type }: { type: string }) {
           <path d="M8 5.4v4M4.5 7.2L8 6l3.5 1.2M8 9.4l-2.4 4M8 9.4l2.4 4" />
         </>,
       );
+    case "build-environment":
+      return svg(
+        <>
+          <circle cx="11.5" cy="4.6" r="1.5" />
+          <path d="M2 13l4.2-5.6 2.8 3.4 1.8-2 3.2 4.2z" />
+        </>,
+      );
     case "palette-from-image":
       return svg(<path d="M8 2.5c2.5 3 4 4.7 4 6.7a4 4 0 0 1-8 0c0-2 1.5-3.7 4-6.7z" />);
     case "describe-game":
