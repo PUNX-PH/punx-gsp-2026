@@ -4,6 +4,7 @@
 import { SHAPES, TRIANGLES } from "@/lib/blender/types";
 import { MODEL_KINDS } from "@/lib/builder/kinds";
 import { ROLE_FILES, type WireType } from "@/lib/graph/types";
+import { DENSITIES } from "@/lib/settings";
 
 export interface PortSpec {
   name: string;
@@ -112,6 +113,16 @@ function buildModelParams(params: Record<string, unknown>): string | null {
   return null;
 }
 
+export const MAX_THEME_CHARACTERS = 200;
+
+function buildEnvironmentParams(params: Record<string, unknown>): string | null {
+  if (!hasExactly(params, ["theme", "density"])) return "theme and density are the only settings a Build Environment step has.";
+  const { theme, density } = params;
+  if (typeof theme !== "string") return "theme must be text.";
+  if (Array.from(theme).length > MAX_THEME_CHARACTERS) return `the theme is longer than ${MAX_THEME_CHARACTERS} characters.`;
+  return typeof density === "string" && (DENSITIES as readonly string[]).includes(density) ? null : "density must be few, some or lots.";
+}
+
 const port = (name: string, label: string, help: string, type: WireType, required = false, missing?: string): PortSpec => ({
   name,
   label,
@@ -183,6 +194,17 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     shapeProblem: buildModelParams,
     incompleteProblem: (params) =>
       params.kind === "auto" && typeof params.description === "string" && params.description.trim() === "" ? "describe it first, or pick a kind." : null,
+  },
+  "build-environment": {
+    type: "build-environment",
+    label: "Build Environment",
+    help: "Builds the world around the track from a theme.",
+    final: false,
+    inputs: [port("palette", "palette", "Colors for the world. Without one, a sample palette is used.", "palette")],
+    outputs: [port("environment", "environment", "The sky, the field, the edge stripes and the scenery.", "environment")],
+    defaultParams: () => ({ theme: "", density: "some" }),
+    shapeProblem: buildEnvironmentParams,
+    incompleteProblem: () => null,
   },
   "palette-from-image": {
     type: "palette-from-image",

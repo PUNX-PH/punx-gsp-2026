@@ -5,6 +5,16 @@
 
 export const SAMPLE_PALETTE: readonly string[] = ["#1b1f3b", "#ff6f59", "#ffd166", "#06d6a0", "#ffffff"];
 
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+/**
+ * Five colors to paint with, from what a wire gave: each that is not #rrggbb (or is missing) is the sample palette's, so a step that
+ * builds a model or a world always has five real colors.
+ */
+export function paintingPalette(given: readonly unknown[]): string[] {
+  return SAMPLE_PALETTE.map((sample, i) => (typeof given[i] === "string" && HEX_COLOR.test(given[i] as string) ? (given[i] as string) : sample));
+}
+
 /** The least contrast (WCAG ratio, 1 to 21) each pairing of slots may have. */
 export const PALETTE_RULES = { scoreOnBackground: 4.5, hudTextOnPanel: 3, groundOnBackground: 1.5 } as const;
 

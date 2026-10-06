@@ -12,6 +12,7 @@ import { makeRunService } from "@/lib/runs/service";
 const alice = { uid: "alice", email: "alice@punx.ai" };
 const NOW = 5_000_000;
 const BUILT = new Uint8Array(readFileSync(new URL("../blender/fixtures/built-biped.glb", import.meta.url)));
+const TREE = new Uint8Array(readFileSync(new URL("../blender/fixtures/built-tree.glb", import.meta.url)));
 const tuning = { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 };
 
 function setup(blender?: BlenderService) {
@@ -33,8 +34,10 @@ function fakeBlender() {
     },
     async build(job, input) {
       asked.push({ label: input.label, recipeKind: input.body.recipe.kind, clips: Object.keys(input.body.motions.motions) });
-      const sha256 = await job.derived.put(BUILT);
-      return { sha256, size: BUILT.length, triangles: 180, parts: 15, clips: ["Run", "Jump"], reused: false };
+      const scenery = input.body.recipe.kind === "scenery";
+      const bytes = scenery ? TREE : BUILT;
+      const sha256 = await job.derived.put(bytes);
+      return { sha256, size: bytes.length, triangles: scenery ? 188 : 180, parts: scenery ? 3 : 15, clips: scenery ? ["Loop"] : ["Run", "Jump"], reused: false };
     },
   };
   return { blender, asked };
@@ -129,5 +132,71 @@ describe("Build Model played through the graph service", () => {
 
     expect(played).toMatchObject({ kind: "invalid", problems: [{ node: "n1", message: "Build Model: describe it first, or pick a kind." }] });
     expect(asked).toHaveLength(0);
+  });
+});
+
+describe("Build Environment played through the graph service", () => {
+  /** Build Model into the hero, Build Environment into the world, both into the Game Template, then the Preview. */
+  const worldGraph = (density = "lots"): Graph => ({
+    schemaVersion: 1,
+    nodes: [
+      node("n1", "build-model", { role: "hero", kind: "biped", description: "", run: "", jump: "", loop: "" }),
+      node("n2", "game-template", { tuning }),
+      node("n3", "preview"),
+      node("n4", "build-environment", { theme: "", density }),
+    ],
+    edges: [wire("n1", "model", "n2", "hero"), wire("n4", "environment", "n2", "environment"), wire("n2", "settings", "n3", "settings")],
+  });
+
+  it("builds the meadow for an empty theme, with no AI, and the run holds scenery1.glb to scenery3.glb", async () => {
+    const { blender, asked } = fakeBlender();
+    const { service, runs } = setup(blender);
+    const made = await service.createGraph(alice, {});
+    await service.saveGraph(alice, made.id, { graph: worldGraph() });
+
+    const played = await service.play(alice, made.id);
+
+    expect(played.kind).toBe("ran");
+    if (played.kind !== "ran") return;
+    expect(played.result.state).toBe("done");
+    expect(asked.filter((a) => a.label === "Build Environment")).toEqual([
+      { label: "Build Environment", recipeKind: "scenery", clips: ["loop"] },
+      { label: "Build Environment", recipeKind: "scenery", clips: ["loop"] },
+      { label: "Build Environment", recipeKind: "scenery", clips: [] },
+    ]);
+    expect(played.result.nodes.n4.result).toMatchObject({ density: "lots", scenery: ["tree", "windmill", "rock"], reused: false });
+
+    for (const name of ["scenery1.glb", "scenery2.glb", "scenery3.glb"]) expect((await runs.readFile(alice, played.runId!, name)).bytes).toEqual(TREE);
+    const settings = JSON.parse(new TextDecoder().decode((await runs.readFile(alice, played.runId!, "settings.json")).bytes));
+    expect(settings.environment).toEqual({ sky: 0, field: 3, stripe: 4, density: "lots", scenery: ["scenery1.glb", "scenery2.glb", "scenery3.glb"] });
+    expect((await runs.readFile(alice, played.runId!, "hero.glb")).bytes).toEqual(BUILT);
+  });
+
+  it("plays a game with an environment and no Build Model, and one with neither still plays as before", async () => {
+    const { blender } = fakeBlender();
+    const { service, runs } = setup(blender);
+    const made = await service.createGraph(alice, {});
+    const graph = worldGraph("few");
+    await service.saveGraph(alice, made.id, { graph: { ...graph, nodes: graph.nodes.filter((n) => n.id !== "n1"), edges: graph.edges.filter((e) => e.from.node !== "n1") } });
+
+    const played = await service.play(alice, made.id);
+    expect(played.kind === "ran" && played.result.state).toBe("done");
+    if (played.kind !== "ran") return;
+    expect((await runs.readFile(alice, played.runId!, "scenery1.glb")).bytes).toEqual(TREE);
+  });
+
+  it("says the Blender service did not answer, with no worker wired, and skips what follows", async () => {
+    const { service } = setup();
+    const made = await service.createGraph(alice, {});
+    await service.saveGraph(alice, made.id, { graph: worldGraph() });
+
+    const played = await service.play(alice, made.id);
+
+    expect(played.kind).toBe("ran");
+    if (played.kind !== "ran") return;
+    expect(played.result.state).toBe("failed");
+    expect(played.result.nodes.n4).toMatchObject({ state: "failed", error: "Build Environment: The Blender service did not answer. Try again." });
+    expect(played.result.nodes.n2.state).toBe("skipped");
+    expect(played.result.nodes.n3.state).toBe("skipped");
   });
 });

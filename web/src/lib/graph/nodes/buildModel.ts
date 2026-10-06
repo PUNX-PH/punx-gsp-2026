@@ -1,10 +1,8 @@
 // The Build Model node: a rigged, animated model made from the person's words (or from the kind alone). It only passes things along; the
 // kit, the AI, the cache, the limits, the clock and Blender are behind the builder service.
 import type { ModelKind } from "@/lib/builder/kinds";
-import { SAMPLE_PALETTE } from "@/lib/graph/palette";
+import { paintingPalette } from "@/lib/graph/palette";
 import { type Executor, NodeError, type Role } from "@/lib/graph/types";
-
-const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 export const buildModel: Executor = async (inputs, params, ctx) => {
   // The settings' shape was checked when the graph was saved.
@@ -19,8 +17,7 @@ export const buildModel: Executor = async (inputs, params, ctx) => {
   }
 
   // Each color that is not #rrggbb falls back to the sample palette's, so the builder always paints with five real colors.
-  const given = inputs.palette?.type === "palette" ? inputs.palette.colors : [];
-  const palette = SAMPLE_PALETTE.map((sample, i) => (typeof given[i] === "string" && HEX_COLOR.test(given[i]) ? given[i] : sample));
+  const palette = paintingPalette(inputs.palette?.type === "palette" ? inputs.palette.colors : []);
 
   const built = await ctx.builder.buildModel(
     { user: ctx.user, graphId: ctx.graphId, derived: ctx.derived, deadline: ctx.deadline },

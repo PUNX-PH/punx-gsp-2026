@@ -1,6 +1,6 @@
 // The catalog entry of the Build Model step: what it takes and gives, and which settings are well formed.
 import { describe, expect, it } from "vitest";
-import { MAX_DESCRIPTION_CHARACTERS, MAX_MOTION_CHARACTERS, NODE_SPECS } from "@/lib/graph/registry";
+import { MAX_DESCRIPTION_CHARACTERS, MAX_MOTION_CHARACTERS, MAX_THEME_CHARACTERS, NODE_SPECS } from "@/lib/graph/registry";
 
 const spec = NODE_SPECS["build-model"];
 const params = (change: Record<string, unknown> = {}) => ({ ...spec.defaultParams(), ...change });
@@ -74,5 +74,57 @@ describe("Build Model", () => {
     expect(spec.incompleteProblem(params({ kind: "auto", description: "   \n " }))).toBe("describe it first, or pick a kind.");
     expect(spec.incompleteProblem(params({ kind: "biped" }))).toBeNull();
     expect(spec.incompleteProblem(params({ kind: "auto", description: "a red fox" }))).toBeNull();
+  });
+});
+
+describe("Build Environment", () => {
+  const world = NODE_SPECS["build-environment"];
+  const settings = (change: Record<string, unknown> = {}) => ({ ...world.defaultParams(), ...change });
+
+  it("is a catalog step with its plain name and help, and is not the final step", () => {
+    expect(world).toMatchObject({ type: "build-environment", label: "Build Environment", help: "Builds the world around the track from a theme.", final: false });
+    expect(MAX_THEME_CHARACTERS).toBe(200);
+  });
+
+  it("takes an optional palette and gives an environment", () => {
+    expect(world.inputs.map((p) => [p.name, p.label, p.type, p.required, p.help])).toEqual([
+      ["palette", "palette", "palette", false, "Colors for the world. Without one, a sample palette is used."],
+    ]);
+    expect(world.outputs.map((p) => [p.name, p.label, p.type, p.help])).toEqual([
+      ["environment", "environment", "environment", "The sky, the field, the edge stripes and the scenery."],
+    ]);
+  });
+
+  it("starts with an empty theme and some scenery, which is ready to run (an empty theme builds a meadow)", () => {
+    expect(world.defaultParams()).toEqual({ theme: "", density: "some" });
+    expect(world.shapeProblem(world.defaultParams())).toBeNull();
+    expect(world.incompleteProblem(world.defaultParams())).toBeNull();
+    expect(world.incompleteProblem(settings({ theme: "a windy meadow" }))).toBeNull();
+  });
+
+  it.each([["few"], ["some"], ["lots"]])("accepts the density %s", (density) => {
+    expect(world.shapeProblem(settings({ density }))).toBeNull();
+  });
+
+  it.each([["many"], ["Some"], [""], [1], [null], [undefined]])("refuses the density %s", (density) => {
+    expect(world.shapeProblem(settings({ density }))).toBe("density must be few, some or lots.");
+  });
+
+  it("refuses a theme that is not text, or is too long, counting characters (not bytes)", () => {
+    for (const theme of [5, null, undefined, ["a"]]) expect(world.shapeProblem(settings({ theme }))).toBe("theme must be text.");
+    expect(world.shapeProblem(settings({ theme: "a".repeat(200) }))).toBeNull();
+    expect(world.shapeProblem(settings({ theme: "👻".repeat(200) }))).toBeNull();
+    expect(world.shapeProblem(settings({ theme: "a".repeat(201) }))).toBe("the theme is longer than 200 characters.");
+    expect(world.shapeProblem(settings({ theme: "👻".repeat(201) }))).toBe("the theme is longer than 200 characters.");
+  });
+
+  it("refuses a missing, an extra or a renamed setting", () => {
+    const sentence = "theme and density are the only settings a Build Environment step has.";
+    for (const bad of [{}, { theme: "" }, { density: "some" }, settings({ extra: 1 }), { theme: "", densities: "some" }]) expect(world.shapeProblem(bad)).toBe(sentence);
+  });
+
+  it("checks the keys before the values", () => {
+    expect(world.shapeProblem({ theme: 5, density: "many", extra: true })).toBe("theme and density are the only settings a Build Environment step has.");
+    expect(world.shapeProblem({ theme: 5, density: "many" })).toBe("theme must be text.");
   });
 });
