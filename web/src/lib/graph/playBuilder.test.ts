@@ -274,6 +274,11 @@ describe("Build Model and Build Environment at High quality, played through the 
     expect(played.result.nodes.n4.result).toMatchObject({ quality: "high", world: "desert", scenery: ["tree", "windmill", "rock"] });
     expect((await runs.readFile(alice, played.runId!, "hero.glb")).bytes).toEqual(HERO);
     for (const name of ["scenery1.glb", "scenery2.glb", "scenery3.glb"]) expect((await runs.readFile(alice, played.runId!, name)).bytes).toEqual(SCENERY);
+    // the world's three files are in the run, and the settings say the game is lit and what the world is
+    for (const piece of ["terrain", "road", "backdrop"] as const) expect((await runs.readFile(alice, played.runId!, `${piece}.glb`)).bytes).toEqual(WORLD[piece]);
+    const settings = JSON.parse(new TextDecoder().decode((await runs.readFile(alice, played.runId!, "settings.json")).bytes));
+    expect(settings.look).toBe("lit");
+    expect(settings.environment).toEqual({ sky: 0, field: 3, stripe: 4, density: "some", scenery: ["scenery1.glb", "scenery2.glb", "scenery3.glb"], world: { style: "desert" } });
   });
 
   it("plays a graph saved before the Quality setting exactly as a Standard one", async () => {

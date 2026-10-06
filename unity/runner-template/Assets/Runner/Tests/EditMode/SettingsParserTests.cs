@@ -134,5 +134,62 @@ namespace Runner.Tests
         [Test] public void Parse_rejects_a_sky_that_is_not_a_palette_index() => AssertRejected("invalid-environment-bad-index.json", "environment.sky: 5 is not a palette index (0 to 4)");
         [Test] public void Parse_rejects_scenery_that_is_not_glb() => AssertRejected("invalid-environment-not-glb.json", "environment.scenery[0]");
         [Test] public void Parse_rejects_an_unknown_density() => AssertRejected("invalid-environment-density.json", "environment.density: \"many\" must be few, some or lots");
+
+        // The look and the world of High quality: shared with the web validator, which has the same table of messages.
+        [Test]
+        public void Parse_reads_a_lit_look()
+        {
+            var result = SettingsParser.Parse(Fixture("valid-lit.json"));
+            Assert.IsTrue(result.Ok, result.Error);
+            Assert.AreEqual("lit", result.Settings.look);
+            Assert.IsTrue(SettingsParser.IsLit(result.Settings));
+            Assert.IsFalse(SettingsParser.HasEnvironment(result.Settings));
+            Assert.IsFalse(SettingsParser.HasWorld(result.Settings));
+        }
+
+        [Test]
+        public void Parse_reads_a_world_and_a_lit_look_together()
+        {
+            var result = SettingsParser.Parse(Fixture("valid-lit-world-desert.json"));
+            Assert.IsTrue(result.Ok, result.Error);
+            Assert.IsTrue(SettingsParser.IsLit(result.Settings));
+            Assert.IsTrue(SettingsParser.HasEnvironment(result.Settings));
+            Assert.IsTrue(SettingsParser.HasWorld(result.Settings));
+            Assert.AreEqual("desert", result.Settings.environment.world.style);
+            Assert.AreEqual(new[] { "scenery1.glb", "scenery2.glb", "scenery3.glb" }, result.Settings.environment.scenery);
+        }
+
+        [Test]
+        public void Parse_reads_a_meadow_world_with_no_look()
+        {
+            var result = SettingsParser.Parse(Fixture("valid-world-meadow.json"));
+            Assert.IsTrue(result.Ok, result.Error);
+            Assert.IsFalse(SettingsParser.IsLit(result.Settings));
+            Assert.IsTrue(SettingsParser.HasWorld(result.Settings));
+            Assert.AreEqual("meadow", result.Settings.environment.world.style);
+        }
+
+        [Test]
+        public void Settings_from_before_are_flat_and_have_no_world()
+        {
+            foreach (var name in new[] { "valid.json", "valid-extra-fields.json", "valid-environment.json", "valid-environment-no-scenery.json" })
+            {
+                var result = SettingsParser.Parse(Fixture(name));
+                Assert.IsTrue(result.Ok, result.Error);
+                Assert.IsFalse(SettingsParser.IsLit(result.Settings), name);
+                Assert.IsFalse(SettingsParser.HasWorld(result.Settings), name);
+            }
+        }
+
+        [Test] public void Parse_rejects_a_look_that_is_not_flat_or_lit() => AssertRejected("invalid-look.json", "settings.look: \"ultra\" must be flat or lit");
+        [Test] public void Parse_rejects_a_look_that_is_a_number() => AssertRejected("invalid-look-number.json", "settings.look: 3 must be flat or lit");
+        [Test] public void Parse_rejects_a_world_style_that_is_not_ours() => AssertRejected("invalid-world-style.json", "settings.environment.world.style: \"arctic\" must be desert or meadow");
+        [Test] public void Parse_rejects_a_world_with_another_key_in_it() => AssertRejected("invalid-world-extra-key.json", "settings.environment.world: unknown field \"sky\" (only style is allowed)");
+
+        [Test]
+        public void Parse_knows_the_three_files_of_a_world()
+        {
+            Assert.AreEqual(new[] { "terrain.glb", "road.glb", "backdrop.glb" }, SettingsParser.WorldFiles);
+        }
     }
 }

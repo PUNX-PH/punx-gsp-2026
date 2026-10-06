@@ -12,6 +12,8 @@ namespace Runner.Settings
         public Roles roles;
         public Tuning tuning;
         public EnvironmentSettings environment; // optional: JsonUtility leaves it empty when the file has none (see SettingsParser.HasEnvironment)
+        // optional: "flat" (or absent) or "lit". Not read by JsonUtility, which cannot tell a look of the wrong type from none: SettingsParser reads it from the text.
+        [NonSerialized] public string look;
     }
 
     /// <summary>Colors are indexes into the palette; the scenery files are GLBs next to settings.json.</summary>
@@ -23,6 +25,14 @@ namespace Runner.Settings
         public int stripe;
         public string density;
         public string[] scenery;
+        // optional, High only; not read by JsonUtility either (SettingsParser fills it from the text, null when the file has none)
+        [NonSerialized] public WorldSettings world;
+    }
+
+    /// <summary>The style of the High world ("desert" or "meadow"); its three files are terrain.glb, road.glb and backdrop.glb next to settings.json.</summary>
+    public class WorldSettings
+    {
+        public string style;
     }
 
     [Serializable]

@@ -207,6 +207,71 @@ describe("the Preview node and scenery", () => {
     expect(lastRun.get()).toBe("run1");
   });
 
+  describe("and the world of High quality", () => {
+    const TERRAIN_SHA = "3".repeat(64);
+    const ROAD_SHA = "4".repeat(64);
+    const BACKDROP_SHA = "5".repeat(64);
+    const pieces = { terrain: makeGlb({ asset: { version: "2.0" }, extras: { piece: "terrain" } }), road: makeGlb({ asset: { version: "2.0" }, extras: { piece: "road" } }), backdrop: makeGlb({ asset: { version: "2.0" }, extras: { piece: "backdrop" } }) };
+    const highWorld = { ...world, quality: "high" as const, world: { style: "desert" as const, terrain: TERRAIN_SHA, road: ROAD_SHA, backdrop: BACKDROP_SHA } };
+
+    function withWorld() {
+      const t = setup();
+      const bytes: Record<string, Uint8Array> = { [TREE_SHA]: treeGlb, [ROCK_SHA]: rockGlb, [TERRAIN_SHA]: pieces.terrain, [ROAD_SHA]: pieces.road, [BACKDROP_SHA]: pieces.backdrop };
+      const ctx = { ...t.ctx, readAsset: async (sha: string) => bytes[sha] ?? null } as ExecutorContext;
+      return { ...t, ctx, bytes };
+    }
+    const highGame = async (ctx: ExecutorContext): Promise<WireValue> => (await gameTemplate({ environment: highWorld }, { tuning }, ctx)).output!;
+
+    it("stores terrain.glb, road.glb and backdrop.glb after the scenery, and the run becomes ready", async () => {
+      const { records, files, ctx } = withWorld();
+      await preview({ settings: await highGame(ctx) }, {}, ctx);
+
+      expect(records.runs.get("run1")?.status).toBe("ready");
+      expect([...files.files.keys()].sort()).toEqual([
+        "run1/backdrop.glb",
+        "run1/collectible.glb",
+        "run1/hero.glb",
+        "run1/obstacle.glb",
+        "run1/road.glb",
+        "run1/scenery1.glb",
+        "run1/scenery2.glb",
+        "run1/settings.json",
+        "run1/terrain.glb",
+      ]);
+      expect(files.files.get("run1/terrain.glb")?.bytes).toEqual(pieces.terrain);
+      expect(files.files.get("run1/road.glb")?.bytes).toEqual(pieces.road);
+      expect(files.files.get("run1/backdrop.glb")?.bytes).toEqual(pieces.backdrop);
+    });
+
+    it("stores the look and the world in the run's settings.json", async () => {
+      const { files, ctx } = withWorld();
+      await preview({ settings: await highGame(ctx) }, {}, ctx);
+      const settings = JSON.parse(new TextDecoder().decode(files.files.get("run1/settings.json")!.bytes));
+      expect(settings.look).toBe("lit");
+      expect(settings.environment.world).toEqual({ style: "desert" });
+    });
+
+    it("says a model file is missing, before touching anything, when a world file is gone", async () => {
+      const { records, lastRun, ctx, bytes } = withWorld();
+      await preview({ settings: await game(ctx) }, {}, ctx); // an earlier run
+      const settings = await highGame(ctx);
+      delete bytes[ROAD_SHA];
+
+      const error = await preview({ settings }, {}, ctx).catch((e) => e);
+
+      expect(error).toBeInstanceOf(NodeError);
+      expect(error.message).toBe("Preview: a model file is missing. Choose it again.");
+      expect([...records.runs.keys()]).toEqual(["run1"]);
+      expect(lastRun.get()).toBe("run1");
+    });
+
+    it("stores no world files for a game without a world", async () => {
+      const { files, ctx } = withWorld();
+      await preview({ settings: await gameWithWorld(ctx) }, {}, ctx);
+      expect([...files.files.keys()].filter((name) => /terrain|road|backdrop/.test(name))).toEqual([]);
+    });
+  });
+
   it("stores no scenery for a game that has none, as before", async () => {
     const { files, ctx } = withScenery();
     await preview({ settings: await game(ctx) }, {}, ctx);

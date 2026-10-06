@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { filesNeeded, minPlayableSpacing, rolesNeeded, validateSettings, winnabilityError } from "@/lib/settings";
+import { WORLD_STYLES as KIT_WORLD_STYLES } from "@/lib/builder/kinds";
+import { filesNeeded, LOOKS, minPlayableSpacing, rolesNeeded, validateSettings, WORLD_FILES, WORLD_STYLES, winnabilityError } from "@/lib/settings";
 
 // web/src/lib -> repo root is three levels up.
 const FIXTURES = fileURLToPath(new URL("../../../fixtures/settings/", import.meta.url));
@@ -16,6 +17,10 @@ const EXPECTED_ERROR: Record<string, string> = {
   "invalid-environment-not-glb.json": "environment.scenery",
   "invalid-environment-path.json": "environment.scenery",
   "invalid-jump-height-1.json": "jumpHeight",
+  "invalid-look.json": "settings.look",
+  "invalid-look-number.json": "settings.look",
+  "invalid-world-style.json": "settings.environment.world.style",
+  "invalid-world-extra-key.json": "settings.environment.world",
   "invalid-malformed-json.json": "not valid JSON",
   "invalid-palette-bad-hex.json": "palette",
   "invalid-palette-four-colors.json": "palette",
@@ -229,7 +234,110 @@ describe("the environment", () => {
   });
 });
 
+describe("the look and the world (High quality)", () => {
+  const base = () => JSON.parse(fixture("valid.json"));
+  const withEnvironment = (change: (e: Record<string, unknown>) => void) => {
+    const settings = JSON.parse(fixture("valid-environment.json"));
+    change(settings.environment);
+    return JSON.stringify(settings);
+  };
+
+  it("knows the looks and the styles of the world the kit has", () => {
+    expect([...LOOKS]).toEqual(["flat", "lit"]);
+    expect([...WORLD_STYLES]).toEqual([...KIT_WORLD_STYLES]);
+    expect([...WORLD_FILES]).toEqual(["terrain.glb", "road.glb", "backdrop.glb"]);
+  });
+
+  it("accepts a game with no look, flat, or lit, and keeps what it read", () => {
+    expect(validateSettings(fixture("valid.json")).ok).toBe(true);
+    for (const look of ["flat", "lit"]) {
+      const text = JSON.stringify({ ...base(), look });
+      const result = validateSettings(text);
+      expect(result.ok && result.settings.look).toBe(look);
+    }
+    const none = validateSettings(fixture("valid.json"));
+    expect(none.ok && Object.keys(none.settings)).not.toContain("look");
+  });
+
+  it.each([["ultra"], ["Lit"], ["LIT"], [" lit"], [""], [3], [true], [null], [["lit"]], [{}]])("refuses the look %j", (look) => {
+    const result = validateSettings(JSON.stringify({ ...base(), look }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/^settings\.look: .+ must be flat or lit$/);
+  });
+
+  it("says what it found, cut short", () => {
+    expect(validateSettings(JSON.stringify({ ...base(), look: "ultra" }))).toEqual({ ok: false, error: 'settings.look: "ultra" must be flat or lit' });
+    expect(validateSettings(JSON.stringify({ ...base(), look: 3 }))).toEqual({ ok: false, error: "settings.look: 3 must be flat or lit" });
+    const long = validateSettings(JSON.stringify({ ...base(), look: "x".repeat(500) }));
+    expect(!long.ok && long.error.length).toBeLessThan(80);
+  });
+
+  it("checks the look after the tuning and before the environment, so every earlier refusal is what it was", () => {
+    const text = JSON.stringify({ ...base(), tuning: { speed: 0, jumpHeight: 2.2, obstacleSpacing: 12 }, look: "ultra" });
+    expect(validateSettings(text)).toEqual({ ok: false, error: "settings.tuning.speed: 0 is outside 1 to 20" });
+    const both = JSON.parse(fixture("valid-environment.json"));
+    both.look = "ultra";
+    both.environment.sky = 9;
+    expect(validateSettings(JSON.stringify(both))).toEqual({ ok: false, error: 'settings.look: "ultra" must be flat or lit' });
+  });
+
+  it("accepts a world of either style inside an environment", () => {
+    for (const style of ["desert", "meadow"]) {
+      const result = validateSettings(withEnvironment((e) => (e.world = { style })));
+      expect(result.ok && result.settings.environment?.world).toEqual({ style });
+    }
+    for (const name of ["valid-lit.json", "valid-lit-world-desert.json", "valid-world-meadow.json"]) expect(validateSettings(fixture(name)).ok, name).toBe(true);
+  });
+
+  it.each([
+    ["arctic", 'settings.environment.world.style: "arctic" must be desert or meadow'],
+    ["Desert", 'settings.environment.world.style: "Desert" must be desert or meadow'],
+    ["", 'settings.environment.world.style: "" must be desert or meadow'],
+    [3, "settings.environment.world.style: 3 must be desert or meadow"],
+    [null, "settings.environment.world.style: null must be desert or meadow"],
+  ])("refuses the world style %j", (style, error) => {
+    expect(validateSettings(withEnvironment((e) => (e.world = { style })))).toEqual({ ok: false, error });
+  });
+
+  it("refuses a world that is not an object with only a style", () => {
+    for (const world of [null, 3, "desert", [], ["desert"]]) {
+      expect(validateSettings(withEnvironment((e) => (e.world = world)))).toEqual({ ok: false, error: "settings.environment.world: must be an object with a style" });
+    }
+    expect(validateSettings(withEnvironment((e) => (e.world = {})))).toEqual({ ok: false, error: 'settings.environment.world.style: missing must be desert or meadow' });
+    expect(validateSettings(withEnvironment((e) => (e.world = { style: "desert", sky: 1 })))).toEqual({
+      ok: false,
+      error: 'settings.environment.world: unknown field "sky" (only style is allowed)',
+    });
+  });
+
+  it("checks the world after the scenery, so every earlier refusal in the environment is what it was", () => {
+    const text = withEnvironment((e) => {
+      e.density = "many";
+      e.world = { style: "arctic" };
+    });
+    expect(validateSettings(text)).toEqual({ ok: false, error: 'settings.environment.density: "many" must be few, some or lots' });
+  });
+
+  it("only has a world inside an environment (one beside it is just an unknown field, as ever)", () => {
+    const result = validateSettings(JSON.stringify({ ...base(), world: { style: "desert" } }));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(filesNeeded(result.settings)).toEqual(["hero.glb", "obstacle.glb", "coin.glb"]);
+  });
+});
+
 describe("filesNeeded", () => {
+  it("adds the three files of the world after the scenery when the environment has one, and nothing for a Standard game", () => {
+    const needed = (name: string) => {
+      const result = validateSettings(fixture(name));
+      if (!result.ok) throw new Error(result.error);
+      return filesNeeded(result.settings);
+    };
+    expect(needed("valid-lit-world-desert.json")).toEqual(["hero.glb", "obstacle.glb", "coin.glb", "scenery1.glb", "scenery2.glb", "scenery3.glb", "terrain.glb", "road.glb", "backdrop.glb"]);
+    expect(needed("valid-world-meadow.json")).toEqual(needed("valid-lit-world-desert.json"));
+    expect(needed("valid-lit.json")).toEqual(["hero.glb", "obstacle.glb", "coin.glb"]);
+    expect(needed("valid-environment.json")).toEqual(["hero.glb", "obstacle.glb", "coin.glb", "scenery1.glb", "scenery2.glb", "scenery3.glb"]);
+  });
+
   const needed = (text: string) => {
     const result = validateSettings(text);
     if (!result.ok) throw new Error(result.error);

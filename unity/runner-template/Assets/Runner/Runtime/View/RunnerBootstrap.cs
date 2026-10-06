@@ -36,6 +36,8 @@ namespace Runner.View
         Hud hud;
         RunnerView view;
         EnvironmentView environment; // null when the settings have no environment
+        // The three files of a High world (terrain.glb, road.glb, backdrop.glb), loaded and kept hidden until the world view takes them; empty without a world.
+        readonly Dictionary<string, GameObject> worldModels = new Dictionary<string, GameObject>();
 
         async void Start()
         {
@@ -96,6 +98,13 @@ namespace Runner.View
                 {
                     foreach (var file in settings.environment.scenery ?? new string[0])
                         sceneryModels.Add(await LoadScenery(root, settingsUrl, file, generator));
+                }
+
+                // A High environment also has a world, whose three files must be next to the settings: a missing one stops the game, naming the file.
+                if (SettingsParser.HasWorld(settings))
+                {
+                    foreach (var file in SettingsParser.WorldFiles)
+                        worldModels[file] = await LoadWorldPiece(root, settingsUrl, file, generator);
                 }
 
                 Sim = new RunnerSim(settings.tuning);
@@ -160,6 +169,21 @@ namespace Runner.View
             catch (Exception e) when (e is LoadException || e is ArgumentException)
             {
                 throw new LoadException("scenery (" + file + "): " + e.Message);
+            }
+        }
+
+        static async Task<GameObject> LoadWorldPiece(Transform root, string settingsUrl, string file, IMaterialGenerator generator)
+        {
+            try
+            {
+                var content = await AssetLoader.LoadModel(UrlTools.SiblingUrl(settingsUrl, file), root, generator);
+                if (content.GetComponentsInChildren<Renderer>(true).Length == 0) throw new LoadException("has no visible geometry");
+                content.SetActive(false); // kept for the world view; nothing of it is drawn where it was loaded
+                return content;
+            }
+            catch (Exception e) when (e is LoadException || e is ArgumentException)
+            {
+                throw new LoadException("world (" + file + "): " + e.Message);
             }
         }
 

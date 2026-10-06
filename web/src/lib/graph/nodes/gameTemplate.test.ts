@@ -149,6 +149,94 @@ describe("the Game Template node and model files that are not GLBs", () => {
   });
 });
 
+describe("the Game Template node and the look and the world of High quality", () => {
+  const SHA_A = "a".repeat(64);
+  const SHA_B = "b".repeat(64);
+  const TERRAIN = "e".repeat(64);
+  const ROAD = "f".repeat(64);
+  const BACKDROP = "9".repeat(64);
+  const settingsOf = (output: unknown) => JSON.parse((output as { settingsText: string }).settingsText);
+  const model = (extra: Record<string, unknown> = {}) => ({ type: "model" as const, sha256: SHA_A, name: "m.glb", size: 10, format: "glb" as const, ...extra });
+  const highWorld = (style: "desert" | "meadow" = "desert") => ({
+    type: "environment" as const,
+    sky: 0,
+    field: 3,
+    stripe: 4,
+    density: "some" as const,
+    scenery: [{ kind: "tree" as const, sha256: SHA_B }],
+    quality: "high" as const,
+    world: { style, terrain: TERRAIN, road: ROAD, backdrop: BACKDROP },
+  });
+
+  it("leaves a Standard game exactly as it was: no look, whatever is wired", async () => {
+    const before = JSON.stringify({ schemaVersion: 1, template: "runner", palette: [...SAMPLE_PALETTE], roles: { hero: "hero.glb", obstacle: "obstacle.glb", collectible: "collectible.glb" }, tuning });
+    expect((await gameTemplate({}, { tuning }, ctx)).output).toMatchObject({ settingsText: before });
+    const standard = await gameTemplate({ hero: model(), obstacle: model({ role: "obstacle", quality: undefined }) }, { tuning }, ctx);
+    expect(Object.keys(settingsOf(standard.output))).not.toContain("look");
+    for (const quality of ["standard" as const, undefined]) {
+      const out = await gameTemplate({ hero: model({ role: "hero", quality }) }, { tuning }, ctx);
+      expect(Object.keys(settingsOf(out.output))).not.toContain("look");
+    }
+  });
+
+  it.each([["hero"], ["obstacle"], ["collectible"]] as const)("makes the game lit when the %s is a High model", async (role) => {
+    const { output } = await gameTemplate({ [role]: model({ role, quality: "high" }) }, { tuning }, ctx);
+    expect(settingsOf(output).look).toBe("lit");
+    expect(validateSettings((output as { settingsText: string }).settingsText).ok).toBe(true);
+  });
+
+  it("makes the game lit when only the environment is High, and when only one of several models is", async () => {
+    expect(settingsOf((await gameTemplate({ environment: highWorld() }, { tuning }, ctx)).output).look).toBe("lit");
+    expect(settingsOf((await gameTemplate({ hero: model({ role: "hero" }), obstacle: model({ role: "obstacle", quality: "high" }) }, { tuning }, ctx)).output).look).toBe("lit");
+  });
+
+  it("puts the look last, after the environment, so the rest of the text is what it was", async () => {
+    const { output } = await gameTemplate({ hero: model({ role: "hero", quality: "high" }) }, { tuning }, ctx);
+    const text = (output as { settingsText: string }).settingsText;
+    expect(text.endsWith(',"look":"lit"}')).toBe(true);
+    const plain = (await gameTemplate({ hero: model({ role: "hero" }) }, { tuning }, ctx)).output as { settingsText: string };
+    expect(text.replace(',"look":"lit"}', "}")).toBe(plain.settingsText);
+  });
+
+  it("adds the world of a High environment to the settings, after the scenery, and names its three files on the wire", async () => {
+    const { output } = await gameTemplate({ environment: highWorld("meadow") }, { tuning }, ctx);
+    expect(settingsOf(output).environment).toEqual({ sky: 0, field: 3, stripe: 4, density: "some", scenery: ["scenery1.glb"], world: { style: "meadow" } });
+    expect(Object.keys(settingsOf(output).environment)).toEqual(["sky", "field", "stripe", "density", "scenery", "world"]);
+    expect(output).toMatchObject({
+      world: [
+        { file: "terrain.glb", sha256: TERRAIN },
+        { file: "road.glb", sha256: ROAD },
+        { file: "backdrop.glb", sha256: BACKDROP },
+      ],
+    });
+    const checked = validateSettings((output as { settingsText: string }).settingsText);
+    expect(checked.ok && checked.settings.look).toBe("lit");
+  });
+
+  it("gives a Standard environment no world and no world files", async () => {
+    const standard = { type: "environment" as const, sky: 0, field: 3, stripe: 4, density: "some" as const, scenery: [{ kind: "tree" as const, sha256: SHA_B }] };
+    const { output } = await gameTemplate({ environment: standard }, { tuning }, ctx);
+    expect(Object.keys(settingsOf(output).environment)).not.toContain("world");
+    expect(Object.keys(output as object)).not.toContain("world");
+  });
+
+  it("takes the world only from an environment that says it is High and has one", async () => {
+    const noQuality = { ...highWorld(), quality: undefined };
+    const { output } = await gameTemplate({ environment: noQuality }, { tuning }, ctx);
+    expect(Object.keys(settingsOf(output).environment)).not.toContain("world");
+    expect(Object.keys(settingsOf(output))).not.toContain("look");
+  });
+
+  it("refuses nothing it should accept: a High game with every piece plays through the template's own check", async () => {
+    const { output } = await gameTemplate(
+      { hero: model({ role: "hero", quality: "high" }), obstacle: model({ role: "obstacle", quality: "high" }), collectible: model({ role: "collectible", quality: "high" }), environment: highWorld() },
+      { tuning },
+      ctx,
+    );
+    expect(validateSettings((output as { settingsText: string }).settingsText).ok).toBe(true);
+  });
+});
+
 describe("the Game Template node and an environment", () => {
   const SHA_A = "a".repeat(64);
   const SHA_B = "b".repeat(64);

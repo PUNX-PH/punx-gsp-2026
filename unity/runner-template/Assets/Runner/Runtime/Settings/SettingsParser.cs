@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Runner.Sim;
@@ -18,6 +19,11 @@ namespace Runner.Settings
         const int SupportedVersion = 1;
         const int MaxScenery = 3;
         static readonly string[] Densities = { "few", "some", "lots" };
+        static readonly string[] Looks = { "flat", "lit" };
+        static readonly string[] WorldStyles = { "desert", "meadow" };
+
+        /// <summary>The three files of a world, next to settings.json, whatever its style.</summary>
+        public static readonly string[] WorldFiles = { "terrain.glb", "road.glb", "backdrop.glb" };
         static readonly Regex HexColor = new Regex("^#[0-9a-fA-F]{6}$");
         static readonly Regex GlbFileName = new Regex("^[A-Za-z0-9_-]+\\.[Gg][Ll][Bb]$");
 
@@ -34,14 +40,24 @@ namespace Runner.Settings
             }
             if (settings == null) return Fail("settings: not valid JSON (empty document)");
 
-            var error = Validate(settings);
+            // The look and the world are optional and are read from the text itself (see JsonKeys): a value of the wrong type is then an error, not
+            // an empty default.
+            var scan = JsonKeys.Scan(json);
+            settings.look = scan.String("look");
+            if (settings.environment != null)
+            {
+                var style = scan.String("environment.world.style");
+                settings.environment.world = style == null ? null : new WorldSettings { style = style };
+            }
+
+            var error = Validate(settings, scan);
             return error == null ? new ParseResult { Ok = true, Settings = settings } : Fail(error);
         }
 
         static ParseResult Fail(string error) => new ParseResult { Ok = false, Error = error };
 
         // JsonUtility fills missing fields with defaults, so absence shows up as null, "" or 0 here.
-        static string Validate(GameSettings s)
+        static string Validate(GameSettings s, JsonScan scan)
         {
             if (s.schemaVersion != SupportedVersion)
                 return $"settings.schemaVersion: {s.schemaVersion} is not supported (expected {SupportedVersion})";
@@ -65,8 +81,31 @@ namespace Runner.Settings
                               ?? CheckRange("jumpHeight", s.tuning.jumpHeight, 1.5f, 5f)
                               ?? CheckRange("obstacleSpacing", s.tuning.obstacleSpacing, 4f, 40f)
                               ?? Winnability.Check(s.tuning); // the three values together, once each is in range
-            if (tuningError != null || !HasEnvironment(s)) return tuningError;
-            return CheckEnvironment(s.environment);
+            if (tuningError != null) return tuningError;
+
+            var lookError = CheckLook(scan);
+            if (lookError != null) return lookError;
+
+            if (!HasEnvironment(s)) return null;
+            return CheckEnvironment(s.environment, scan);
+        }
+
+        /// <summary>Whether the game is lit (the High look). Absent or "flat" is the plain look every game had.</summary>
+        public static bool IsLit(GameSettings s) => s.look == "lit";
+
+        // The look is optional, but if the file writes one it must be flat or lit, whatever type it was written in.
+        static string CheckLook(JsonScan scan)
+        {
+            if (!scan.HasKey("look") || Array.IndexOf(Looks, scan.String("look")) >= 0) return null;
+            return $"settings.look: {Shown(scan, "look")} must be flat or lit";
+        }
+
+        // What a value looked like in the text, cut short like the web validator's messages ("lit" with its quotes, 3, null), "missing" when the
+        // key is not there, and a word for an object or a list.
+        static string Shown(JsonScan scan, string path)
+        {
+            if (scan.Values.TryGetValue(path, out var raw)) return raw.Length > 40 ? raw.Substring(0, 40) : raw;
+            return scan.HasKey(path) ? "an object or a list" : "missing";
         }
 
         /// <summary>
@@ -78,7 +117,13 @@ namespace Runner.Settings
             return s.environment != null && !string.IsNullOrEmpty(s.environment.density);
         }
 
-        static string CheckEnvironment(EnvironmentSettings e)
+        /// <summary>Whether the environment has a world (a High one): a style was written for it.</summary>
+        public static bool HasWorld(GameSettings s)
+        {
+            return HasEnvironment(s) && s.environment.world != null && !string.IsNullOrEmpty(s.environment.world.style);
+        }
+
+        static string CheckEnvironment(EnvironmentSettings e, JsonScan scan)
         {
             var error = CheckPaletteIndex("sky", e.sky) ?? CheckPaletteIndex("field", e.field) ?? CheckPaletteIndex("stripe", e.stripe);
             if (error != null) return error;
@@ -91,7 +136,18 @@ namespace Runner.Settings
             for (var i = 0; i < scenery.Length; i++)
                 if (scenery[i] == null || !GlbFileName.IsMatch(scenery[i]))
                     return $"settings.environment.scenery[{i}]: \"{scenery[i]}\" must be a plain file name like scenery1.glb (letters, digits, - and _ only)";
-            return null;
+            return CheckWorld(scan);
+        }
+
+        // The world is exactly { style }, and anything else inside it is refused, which JsonUtility could not see.
+        static string CheckWorld(JsonScan scan)
+        {
+            if (!scan.HasKey("environment.world")) return null;
+            if (!scan.Keys.TryGetValue("environment.world", out var worldKeys)) return "settings.environment.world: must be an object with a style";
+            foreach (var key in worldKeys)
+                if (key != "style") return $"settings.environment.world: unknown field \"{key}\" (only style is allowed)";
+            if (Array.IndexOf(WorldStyles, scan.String("environment.world.style")) >= 0) return null;
+            return $"settings.environment.world.style: {Shown(scan, "environment.world.style")} must be desert or meadow";
         }
 
         static string CheckPaletteIndex(string name, int value)

@@ -2,7 +2,7 @@
 // nothing (the Preview does); it only builds the settings and checks them exactly as the Unity template will.
 import { SAMPLE_PALETTE } from "@/lib/graph/palette";
 import { type Executor, type ModelSource, NodeError, ROLE_FILES, type Role, SCENERY_FILES, type Tuning } from "@/lib/graph/types";
-import { validateSettings } from "@/lib/settings";
+import { validateSettings, WORLD_FILES } from "@/lib/settings";
 
 const ROLES = Object.keys(ROLE_FILES) as Role[];
 
@@ -34,10 +34,19 @@ export const gameTemplate: Executor = async (inputs, params) => {
   // goes in the run under fixed names, the first three pieces in order. Without one the settings are exactly what they were.
   const world = inputs.environment?.type === "environment" ? inputs.environment : null;
   const scenery = world ? world.scenery.slice(0, SCENERY_FILES.length).map((piece, index) => ({ file: SCENERY_FILES[index], sha256: piece.sha256 })) : null;
-  const environment = world && scenery ? { sky: world.sky, field: world.field, stripe: world.stripe, density: world.density, scenery: scenery.map((s) => s.file) } : undefined;
+  // A High environment with a world adds the world's style (last in the environment) and its three files go in the run under fixed names.
+  const worldFiles = world?.quality === "high" && world.world ? WORLD_FILES.map((file) => ({ file, sha256: world.world![file.slice(0, -4) as "terrain" | "road" | "backdrop"] })) : null;
+  const environment =
+    world && scenery
+      ? { sky: world.sky, field: world.field, stripe: world.stripe, density: world.density, scenery: scenery.map((s) => s.file), ...(worldFiles && world.world ? { world: { style: world.world.style } } : {}) }
+      : undefined;
+  // The game is lit when any model it uses, or its environment, is High (last in the text, so a Standard game's text is what it always was).
+  const lit = ROLES.some((role) => inputs[role]?.type === "model" && inputs[role].quality === "high") || world?.quality === "high";
 
-  const checked = validateSettings(JSON.stringify({ schemaVersion: 1, template: "runner", palette, roles: ROLE_FILES, tuning, ...(environment ? { environment } : {}) }));
+  const checked = validateSettings(
+    JSON.stringify({ schemaVersion: 1, template: "runner", palette, roles: ROLE_FILES, tuning, ...(environment ? { environment } : {}), ...(lit ? { look: "lit" } : {}) }),
+  );
   if (!checked.ok) throw new NodeError(`Game Template: ${checked.error}`);
 
-  return { output: { type: "settings", settingsText: checked.text, tuning, models, ...(scenery ? { scenery } : {}) }, result: { tuning } };
+  return { output: { type: "settings", settingsText: checked.text, tuning, models, ...(scenery ? { scenery } : {}), ...(worldFiles ? { world: worldFiles } : {}) }, result: { tuning } };
 };

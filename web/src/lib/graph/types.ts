@@ -125,8 +125,16 @@ export type WireValue =
       quality?: Quality;
       world?: { style: WorldStyle; terrain: string; road: string; backdrop: string };
     }
-  // `scenery` is there only when an environment was wired: the files, in the order the settings name them.
-  | { type: "settings"; settingsText: string; tuning: Tuning; models: Record<Role, ModelSource>; scenery?: { file: string; sha256: string }[] };
+  // `scenery` is there only when an environment was wired: the files, in the order the settings name them. `world` only when that environment
+  // was High and had a world: its three files (terrain, road, backdrop).
+  | {
+      type: "settings";
+      settingsText: string;
+      tuning: Tuning;
+      models: Record<Role, ModelSource>;
+      scenery?: { file: string; sha256: string }[];
+      world?: { file: string; sha256: string }[];
+    };
 
 // ---- what a node's code is given ----
 

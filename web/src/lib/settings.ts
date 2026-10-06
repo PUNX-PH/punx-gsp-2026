@@ -6,13 +6,29 @@
 export const DENSITIES = ["few", "some", "lots"] as const;
 export type Density = (typeof DENSITIES)[number];
 
-/** Optional: settings from before it existed have none. The three indexes are into the palette; the scenery files are GLBs next to settings.json. */
+/** How the game is lit: `flat` is the plain shader every game had, `lit` the High one (sun, sky light, metal, glow, fog). */
+export const LOOKS = ["flat", "lit"] as const;
+export type Look = (typeof LOOKS)[number];
+
+/** The styles of the High world (the same as the kit's WORLD_STYLES; a test keeps them equal). */
+export const WORLD_STYLES = ["desert", "meadow"] as const;
+export type WorldStyle = (typeof WORLD_STYLES)[number];
+
+/** The three files a world is made of, next to settings.json, whatever its style. */
+export const WORLD_FILES = ["terrain.glb", "road.glb", "backdrop.glb"] as const;
+
+/**
+ * Optional: settings from before it existed have none. The three indexes are into the palette; the scenery files are GLBs next to
+ * settings.json. A High environment also has a `world`: the style of the land, the road and the far hills, whose three files are
+ * WORLD_FILES.
+ */
 export interface Environment {
   sky: number;
   field: number;
   stripe: number;
   density: Density;
   scenery: string[];
+  world?: { style: WorldStyle };
 }
 
 export interface GameSettings {
@@ -22,6 +38,8 @@ export interface GameSettings {
   roles: { hero: string; obstacle: string; collectible: string };
   tuning: { speed: number; jumpHeight: number; obstacleSpacing: number };
   environment?: Environment;
+  /** Optional: absent means flat. */
+  look?: Look;
 }
 
 export type SettingsResult = { ok: true; settings: GameSettings; text: string } | { ok: false; error: string };
@@ -64,9 +82,9 @@ export function rolesNeeded(s: GameSettings): string[] {
   return [...new Set(ROLES.map((role) => s.roles[role]))];
 }
 
-/** Every file a run must have besides settings.json: the role files, then the scenery files, each name once. */
+/** Every file a run must have besides settings.json: the role files, then the scenery files, then the world's three, each name once. */
 export function filesNeeded(s: GameSettings): string[] {
-  return [...new Set([...rolesNeeded(s), ...(s.environment?.scenery ?? [])])];
+  return [...new Set([...rolesNeeded(s), ...(s.environment?.scenery ?? []), ...(s.environment?.world ? WORLD_FILES : [])])];
 }
 
 function fail(error: string): SettingsResult {
@@ -102,7 +120,15 @@ function validate(s: Record<string, unknown>): string | null {
     winnabilityError(t.speed as number, t.jumpHeight as number, t.obstacleSpacing as number);
   if (tuningError) return tuningError;
 
+  const lookError = Object.hasOwn(s, "look") ? checkLook(s.look) : null;
+  if (lookError) return lookError;
+
   return Object.hasOwn(s, "environment") ? checkEnvironment(s.environment) : null;
+}
+
+function checkLook(value: unknown): string | null {
+  if (typeof value === "string" && (LOOKS as readonly string[]).includes(value)) return null;
+  return `settings.look: ${shown(value)} must be ${LOOKS.slice(0, -1).join(", ")} or ${LOOKS[LOOKS.length - 1]}`;
 }
 
 // A value in a message: as JSON, cut short, so a long or odd value cannot flood it.
@@ -117,8 +143,18 @@ function checkEnvironment(e: unknown): string | null {
     checkPaletteIndex("field", e.field) ??
     checkPaletteIndex("stripe", e.stripe) ??
     checkDensity(e.density) ??
-    checkScenery(e.scenery)
+    checkScenery(e.scenery) ??
+    (Object.hasOwn(e, "world") ? checkWorld(e.world) : null)
   );
+}
+
+// The world is exactly { style }: nothing else is read from it, so nothing else is let in.
+function checkWorld(world: unknown): string | null {
+  if (!isObject(world)) return "settings.environment.world: must be an object with a style";
+  for (const key of Object.keys(world)) if (key !== "style") return `settings.environment.world: unknown field ${shown(key)} (only style is allowed)`;
+  const style = world.style;
+  if (typeof style === "string" && (WORLD_STYLES as readonly string[]).includes(style)) return null;
+  return `settings.environment.world.style: ${shown(style)} must be ${WORLD_STYLES.slice(0, -1).join(", ")} or ${WORLD_STYLES[WORLD_STYLES.length - 1]}`;
 }
 
 function checkPaletteIndex(name: string, value: unknown): string | null {

@@ -20,8 +20,8 @@ export const preview: Executor = async (inputs, _params, ctx) => {
     if (!bytes) throw new NodeError("Preview: a model file is missing. Choose it again.");
     models.push([ROLE_FILES[role], bytes]);
   }
-  // The scenery of a game with an environment, after the roles' files, read before anything is stored.
-  for (const piece of game.scenery ?? []) {
+  // The scenery of a game with an environment, then the files of its world, after the roles' files, read before anything is stored.
+  for (const piece of [...(game.scenery ?? []), ...(game.world ?? [])]) {
     const bytes = await ctx.readAsset(piece.sha256);
     if (!bytes) throw new NodeError("Preview: a model file is missing. Choose it again.");
     models.push([piece.file, bytes]);
