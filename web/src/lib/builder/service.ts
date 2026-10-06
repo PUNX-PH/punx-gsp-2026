@@ -8,23 +8,27 @@ import { dayOf } from "@/lib/ai/key";
 import type { UsageLimits } from "@/lib/ai/ports";
 import { AiRefusedError, AiUnavailableError, type DesignReply, type Designer } from "@/lib/ai/types";
 import type { BlenderService } from "@/lib/blender/types";
-import { CLIPS_FOR_ROLE, KIT, type ClipKey, type ModelKind } from "@/lib/builder/kinds";
+import { CLIPS_FOR_ROLE, KIT, type ClipKey, type ModelKind, type Quality, WORLD_PIECES } from "@/lib/builder/kinds";
 import { designKey, environmentKey, motionKey } from "@/lib/builder/keys";
 import type { RecipeCache } from "@/lib/builder/ports";
 import {
   DEFAULT_ENVIRONMENT,
+  DEFAULT_WORLD,
+  defaultHighRecipe,
   defaultMotions,
   defaultRecipe,
   type EnvironmentDesign,
+  fitToBudget,
   jointsOf,
   type ModelRecipe,
   type MotionRecipe,
   sceneryMotions,
   sceneryRecipe,
   type Skipped,
+  worldRecipe,
 } from "@/lib/builder/recipes";
-import { repairEnvironment, repairModelRecipe, repairMotions } from "@/lib/builder/repair";
-import type { BuildEnvironmentInput, BuildModelInput, BuilderService, BuiltEnvironment } from "@/lib/builder/types";
+import { fitMotionsToMeshes, repairEnvironment, repairModelRecipe, repairMotions } from "@/lib/builder/repair";
+import type { BuildEnvironmentInput, BuildModelInput, BuilderService, BuiltEnvironment, BuiltPiece, BuiltWorld } from "@/lib/builder/types";
 import { pictureForModel } from "@/lib/graph/image";
 import { MIN_START_MS, RAN_OUT_OF_TIME, timeLeft } from "@/lib/graph/playTime";
 import { NodeError } from "@/lib/graph/types";
@@ -57,6 +61,9 @@ type Call = "design" | "motion" | "environment";
 // Each call belongs to a step, which is how its failures are logged and what every sentence it says starts with.
 const STEP_OF: Record<Call, string> = { design: STEP, motion: STEP, environment: "build-environment" };
 const LABEL_OF: Record<Call, string> = { design: "Build Model", motion: "Build Model", environment: "Build Environment" };
+
+/** Anything but "high" is Standard: a graph saved before the Quality setting has none. */
+const qualityOf = (quality: Quality | undefined): Quality => (quality === "high" ? "high" : "standard");
 
 export function makeBuilderService(deps: BuilderDeps): BuilderService {
   const log = deps.log ?? (() => {});
@@ -125,6 +132,7 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
     description: string,
   ): Promise<{ recipe: ModelRecipe; asked: boolean }> {
     const wanted = input.kind === "auto" ? null : input.kind;
+    const quality = qualityOf(input.quality);
     const key = await designKey({
       model: ai.modelId,
       uid: job.user.uid,
@@ -132,6 +140,7 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
       kind: input.kind,
       role: input.role,
       pictureSha: input.picture?.sha256 ?? null,
+      quality,
     });
 
     const found = await ai.designs.get(key);
@@ -151,10 +160,11 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
           if (!small.ok) throw say(small.error);
           picture = small.jpeg;
         }
-        return ai.designer.designModel({ description, role: input.role, kind: wanted, picture, timeoutMs });
+        // only High says its quality, so a Standard request is what it always was
+        return ai.designer.designModel({ description, role: input.role, kind: wanted, picture, ...(quality === "high" ? { quality } : {}), timeoutMs });
       },
       (raw) => {
-        const repaired = repairModelRecipe(raw, { kind: wanted });
+        const repaired = repairModelRecipe(raw, { kind: wanted, quality });
         return repaired.ok ? repaired.recipe : null;
       },
     );
@@ -184,7 +194,8 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
     const texts = Object.fromEntries(clips.map((clip) => [clip, cleanPrompt(input.motions[clip])])) as Record<ClipKey, string>;
     const wanted = clips.filter((clip) => texts[clip] !== "");
     const joints = jointsOf(recipe);
-    const key = await motionKey({ model: ai.modelId, uid: job.user.uid, kind, joints, texts });
+    const quality = qualityOf(input.quality);
+    const key = await motionKey({ model: ai.modelId, uid: job.user.uid, kind, joints, texts, quality });
 
     let answered: { motions: MotionRecipe; skipped: Skipped[] };
     let asked = false;
@@ -197,7 +208,7 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
         ai,
         job,
         "motion",
-        (timeoutMs) => ai.designer.designMotion({ kind, joints, texts: Object.fromEntries(wanted.map((clip) => [clip, texts[clip]])), timeoutMs }),
+        (timeoutMs) => ai.designer.designMotion({ kind, joints, texts: Object.fromEntries(wanted.map((clip) => [clip, texts[clip]])), ...(quality === "high" ? { quality } : {}), timeoutMs }),
         (raw) => {
           const repaired = repairMotions(raw, { recipe, clips: wanted });
           return repaired.ok ? { motions: repaired.motions, skipped: repaired.skipped } : null;
@@ -223,9 +234,14 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
   }
 
   /** The world from Claude, or from the cache. `asked` is true when Claude was asked. */
-  async function designWorld(ai: BuilderAi, job: Parameters<BuilderService["buildEnvironment"]>[0], theme: string): Promise<{ design: EnvironmentDesign; asked: boolean }> {
+  async function designWorld(
+    ai: BuilderAi,
+    job: Parameters<BuilderService["buildEnvironment"]>[0],
+    theme: string,
+    quality: Quality,
+  ): Promise<{ design: EnvironmentDesign; asked: boolean }> {
     const step = STEP_OF.environment;
-    const key = await environmentKey({ model: ai.modelId, uid: job.user.uid, theme });
+    const key = await environmentKey({ model: ai.modelId, uid: job.user.uid, theme, quality });
     const found = await ai.environments.get(key);
     if (found) {
       log({ step, call: "environment", outcome: "reused" });
@@ -236,9 +252,9 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
       ai,
       job,
       "environment",
-      (timeoutMs) => ai.designer.designEnvironment({ theme, timeoutMs }),
+      (timeoutMs) => ai.designer.designEnvironment({ theme, ...(quality === "high" ? { quality } : {}), timeoutMs }),
       (raw) => {
-        const repaired = repairEnvironment(raw);
+        const repaired = repairEnvironment(raw, { quality });
         return repaired.ok ? repaired.design : null;
       },
     );
@@ -255,6 +271,8 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
   return {
     async buildModel(job, input) {
       const description = cleanPrompt(input.description);
+      const quality = qualityOf(input.quality);
+      const high = quality === "high";
       // Only the boxes of this role's own clips count: a Loop box left behind on a hero is not a motion it has.
       const clips = CLIPS_FOR_ROLE[input.role];
       const motionWords = clips.some((clip) => cleanPrompt(input.motions[clip]) !== "");
@@ -268,7 +286,14 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
         if (!deps.ai) throw say(NO_ANSWER);
         ({ recipe, asked: askedLook } = await design(deps.ai, job, input, description));
       } else {
-        recipe = defaultRecipe(input.kind === "auto" ? "biped" : input.kind);
+        const chosen = input.kind === "auto" ? "biped" : input.kind;
+        recipe = high ? defaultHighRecipe(chosen) : defaultRecipe(chosen);
+      }
+      // A High recipe goes through the budget fit before it is built (the repair did it for Claude's, this is for every way here).
+      if (high) {
+        const fitted = fitToBudget(recipe);
+        if (!fitted) throw say("This does not fit the High limits. Try different words.");
+        recipe = fitted;
       }
       // The repair and the check allow only the four model kinds until the scenery kit exists.
       const kind = recipe.kind as ModelKind;
@@ -282,6 +307,12 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
       } else {
         motions = defaultMotions(recipe, clips);
       }
+      // A High model has one mesh for each joint that moves: the tracks that would need more than the kind has are dropped, and said so.
+      if (high) {
+        const fitted = fitMotionsToMeshes(recipe, motions);
+        motions = fitted.motions;
+        skipped = [...skipped, ...fitted.skipped];
+      }
 
       const built = await deps.blender.build(job, { label: "Build Model", body: { recipe, motions, palette: [...input.palette] } });
       return {
@@ -294,29 +325,58 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
         summary: recipe.summary !== "" ? recipe.summary : KIT.kinds[kind].summary,
         skipped,
         reused: !askedLook && !askedMotion && built.reused,
+        ...(high ? { quality, ...(built.vertices === undefined ? {} : { vertices: built.vertices }) } : {}),
       };
     },
 
     async buildEnvironment(job, input: BuildEnvironmentInput): Promise<BuiltEnvironment> {
       const theme = cleanPrompt(input.theme);
+      const quality = qualityOf(input.quality);
+      const high = quality === "high";
 
-      // An empty theme builds the meadow with no AI at all.
+      // An empty theme builds the meadow (and, in High, the desert world around it) with no AI at all.
       let design: EnvironmentDesign = DEFAULT_ENVIRONMENT;
       let asked = false;
       if (theme !== "") {
         if (!deps.ai) throw new NodeError(`Build Environment: ${NO_ANSWER}`);
-        ({ design, asked } = await designWorld(deps.ai, job, theme));
+        ({ design, asked } = await designWorld(deps.ai, job, theme, quality));
       }
 
       // One worker job for each piece, one after another; the first that fails fails the step with its own sentence.
+      const piece = (built: { sha256: string; size: number; triangles: number; vertices?: number }): BuiltPiece => ({
+        sha256: built.sha256,
+        size: built.size,
+        triangles: built.triangles,
+        ...(built.vertices === undefined ? {} : { vertices: built.vertices }),
+      });
       const scenery: BuiltEnvironment["scenery"] = [];
       let everyPieceReused = true;
       for (const kind of design.scenery) {
-        const built = await deps.blender.build(job, { label: "Build Environment", body: { recipe: sceneryRecipe(kind), motions: sceneryMotions(kind), palette: [...input.palette] } });
-        scenery.push({ kind, sha256: built.sha256, size: built.size, triangles: built.triangles });
+        const built = await deps.blender.build(job, { label: "Build Environment", body: { recipe: sceneryRecipe(kind, quality), motions: sceneryMotions(kind), palette: [...input.palette] } });
+        scenery.push({ kind, ...piece(built) });
         everyPieceReused &&= built.reused;
       }
-      return { sky: design.sky, field: design.field, stripe: design.stripe, density: input.density, scenery, reused: !asked && everyPieceReused };
+
+      let world: BuiltWorld | undefined;
+      if (high) {
+        const style = design.world ?? DEFAULT_WORLD;
+        const pieces = {} as Record<(typeof WORLD_PIECES)[number], BuiltPiece>;
+        for (const name of WORLD_PIECES) {
+          const built = await deps.blender.build(job, { label: "Build Environment", body: { recipe: worldRecipe(name, style), motions: { version: 1, motions: {} }, palette: [...input.palette] } });
+          pieces[name] = piece(built);
+          everyPieceReused &&= built.reused;
+        }
+        world = { style, ...pieces };
+      }
+      return {
+        sky: design.sky,
+        field: design.field,
+        stripe: design.stripe,
+        density: input.density,
+        scenery,
+        reused: !asked && everyPieceReused,
+        ...(world ? { quality, world } : {}),
+      };
     },
   };
 }

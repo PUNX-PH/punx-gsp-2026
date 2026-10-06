@@ -28,7 +28,7 @@ describe("Build Model", () => {
   });
 
   it("starts as a hero of any kind with every box empty", () => {
-    expect(spec.defaultParams()).toEqual({ role: "hero", kind: "auto", description: "", run: "", jump: "", loop: "" });
+    expect(spec.defaultParams()).toEqual({ role: "hero", kind: "auto", description: "", run: "", jump: "", loop: "", quality: "standard" });
     expect(spec.shapeProblem(spec.defaultParams())).toBeNull();
   });
 
@@ -63,10 +63,25 @@ describe("Build Model", () => {
   });
 
   it("refuses a missing, an extra or a renamed setting", () => {
-    const sentence = "role, kind, description, run, jump and loop are the only settings a Build Model step has.";
+    const sentence = "role, kind, description, run, jump, loop and quality are the only settings a Build Model step has.";
     const withoutRun = spec.defaultParams();
     delete withoutRun.run;
     for (const bad of [{}, withoutRun, params({ extra: 1 }), { ...withoutRun, runs: "" }]) expect(spec.shapeProblem(bad)).toBe(sentence);
+  });
+
+  it("has a Quality setting, Standard unless the person chose High, and a graph saved before it (with none) is still well formed", () => {
+    for (const quality of ["standard", "high"]) expect(spec.shapeProblem(params({ quality }))).toBeNull();
+    const old = spec.defaultParams();
+    delete old.quality;
+    expect(spec.shapeProblem(old)).toBeNull();
+  });
+
+  it.each([["ultra"], ["High"], ["STANDARD"], [" high"], [""], [1], [true], [null], [undefined], [["high"]]])("refuses the quality %s, with the sentence the save says", (quality) => {
+    expect(spec.shapeProblem(params({ quality }))).toBe("the quality must be standard or high.");
+  });
+
+  it("checks the other settings before the quality, so a refusal of one of them is what it always was", () => {
+    expect(spec.shapeProblem(params({ role: "villain", quality: "ultra" }))).toBe("role must be hero, obstacle or collectible.");
   });
 
   it("is not ready to run with Auto and no words, but is with a chosen kind or with words", () => {
@@ -96,7 +111,7 @@ describe("Build Environment", () => {
   });
 
   it("starts with an empty theme and some scenery, which is ready to run (an empty theme builds a meadow)", () => {
-    expect(world.defaultParams()).toEqual({ theme: "", density: "some" });
+    expect(world.defaultParams()).toEqual({ theme: "", density: "some", quality: "standard" });
     expect(world.shapeProblem(world.defaultParams())).toBeNull();
     expect(world.incompleteProblem(world.defaultParams())).toBeNull();
     expect(world.incompleteProblem(settings({ theme: "a windy meadow" }))).toBeNull();
@@ -119,12 +134,19 @@ describe("Build Environment", () => {
   });
 
   it("refuses a missing, an extra or a renamed setting", () => {
-    const sentence = "theme and density are the only settings a Build Environment step has.";
+    const sentence = "theme, density and quality are the only settings a Build Environment step has.";
     for (const bad of [{}, { theme: "" }, { density: "some" }, settings({ extra: 1 }), { theme: "", densities: "some" }]) expect(world.shapeProblem(bad)).toBe(sentence);
   });
 
+  it("has a Quality setting too, with the same words, and a graph saved before it is still well formed", () => {
+    for (const quality of ["standard", "high"]) expect(world.shapeProblem(settings({ quality }))).toBeNull();
+    expect(world.shapeProblem({ theme: "", density: "some" })).toBeNull();
+    for (const quality of ["ultra", "High", "", 1, null, undefined]) expect(world.shapeProblem(settings({ quality }))).toBe("the quality must be standard or high.");
+    expect(world.shapeProblem(settings({ theme: 5, quality: "ultra" }))).toBe("theme must be text.");
+  });
+
   it("checks the keys before the values", () => {
-    expect(world.shapeProblem({ theme: 5, density: "many", extra: true })).toBe("theme and density are the only settings a Build Environment step has.");
+    expect(world.shapeProblem({ theme: 5, density: "many", extra: true })).toBe("theme, density and quality are the only settings a Build Environment step has.");
     expect(world.shapeProblem({ theme: 5, density: "many" })).toBe("theme must be text.");
   });
 });

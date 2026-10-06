@@ -8,7 +8,7 @@ import styles from "@/app/graphs/[id]/editor.module.css";
 import { Icon } from "@/app/graphs/[id]/icons";
 import type { ResultView, StepData } from "@/lib/canvas/cardView";
 import { SHAPES, SHAPE_NAMES, TRIANGLES } from "@/lib/blender/types";
-import { KIND_NAMES, MODEL_KINDS } from "@/lib/builder/kinds";
+import { KIND_NAMES, MODEL_KINDS, QUALITIES, type Quality } from "@/lib/builder/kinds";
 import { TUNING_FIELDS, tuningProblem } from "@/lib/canvas/tuning";
 import { SAMPLE_PALETTE } from "@/lib/graph/palette";
 import { MAX_DESCRIPTION_CHARACTERS, MAX_MOTION_CHARACTERS, MAX_PROMPT_CHARACTERS, MAX_THEME_CHARACTERS } from "@/lib/graph/registry";
@@ -227,6 +227,18 @@ function ChoiceGroup(props: { label: string; choices: { value: string; name: str
   );
 }
 
+const QUALITY_NAMES: Record<Quality, string> = { standard: "Standard", high: "High" };
+
+// The Quality setting of Build Model and Build Environment: Standard (the default, and what a graph saved before the setting is) or High.
+function QualityGroup({ node, onSettings }: { node: GraphNode; onSettings: SettingsPanelProps["onSettings"] }) {
+  return (
+    <>
+      <ChoiceGroup label="Quality" choices={QUALITIES.map((value) => ({ value, name: QUALITY_NAMES[value] }))} current={node.params.quality === "high" ? "high" : "standard"} onPick={(quality) => onSettings(node.id, { quality })} />
+      <p className={styles.hint}>High looks best on a computer. On a slow device the game lowers its own detail.</p>
+    </>
+  );
+}
+
 function WordsBox(props: { label: string; value: string; max: number; rows: number; counter: boolean; onChange: (value: string) => void }) {
   const id = useId();
   return (
@@ -254,6 +266,7 @@ function BuildModelPanel({ node, onSettings }: { node: GraphNode; onSettings: Se
         current={node.params.kind}
         onPick={(kind) => onSettings(node.id, { kind })}
       />
+      <QualityGroup node={node} onSettings={onSettings} />
       <WordsBox label="What is it?" value={text("description")} max={MAX_DESCRIPTION_CHARACTERS} rows={4} counter onChange={(description) => onSettings(node.id, { description })} />
       {hero ? (
         <>
@@ -278,6 +291,7 @@ function BuildEnvironmentPanel({ node, data, onSettings }: { node: GraphNode; da
     <>
       <WordsBox label="Theme" value={theme} max={MAX_THEME_CHARACTERS} rows={3} counter onChange={(next) => onSettings(node.id, { theme: next })} />
       <ChoiceGroup label="Scenery" choices={DENSITIES.map((value) => ({ value, name: DENSITY_NAMES[value] }))} current={node.params.density} onPick={(density) => onSettings(node.id, { density })} />
+      <QualityGroup node={node} onSettings={onSettings} />
       <p className={styles.hint}>{"Your theme is sent to Anthropic's Claude to design this; with the theme empty, nothing is sent and a meadow is built."}</p>
       <ul className={styles.notes}>
         {data.inputs

@@ -6,12 +6,14 @@ import { MemoryUsageLimits, ScriptedDesigner } from "@/lib/ai/memory";
 import { AiRefusedError, AiUnavailableError } from "@/lib/ai/types";
 import { buildKey } from "@/lib/blender/key";
 import type { BlenderJob, BlenderService, BuiltResult } from "@/lib/blender/types";
-import type { ModelKind } from "@/lib/builder/kinds";
+import { type ModelKind, WORLD_PIECES } from "@/lib/builder/kinds";
 import { MemoryRecipeCache } from "@/lib/builder/memory";
 import {
   type BuildBody,
   clipsOf,
+  checkBuildBody,
   defaultRecipe,
+  estimate,
   type EnvironmentDesign,
   type ModelRecipe,
   type MotionRecipe,
@@ -20,6 +22,7 @@ import {
   sceneryRecipe,
   type Skipped,
   triangleEstimate,
+  worldRecipe,
 } from "@/lib/builder/recipes";
 import { makeBuilderService } from "@/lib/builder/service";
 import type { BuildEnvironmentInput, BuildModelInput } from "@/lib/builder/types";
@@ -259,6 +262,10 @@ function setupAi(
       seen.add(key);
       builds.push({ job: j, label: request.label, body: request.body, key });
       // the hash of the body stands for the stored file; the counts are the kit's
+      if (request.body.recipe.quality === "high") {
+        const counts = estimate(request.body.recipe);
+        return { sha256: key, size: 24_824, triangles: counts.triangles, parts: counts.parts, vertices: counts.vertices, clips: clipsOf(request.body.motions), reused };
+      }
       return { sha256: key, size: 24_824, triangles: triangleEstimate(request.body.recipe), parts: partCount(request.body.recipe), clips: clipsOf(request.body.motions), reused };
     },
   };
@@ -922,5 +929,184 @@ describe("the environment", () => {
     ]);
     const text = JSON.stringify(t.logs);
     for (const secret of ["private", "snowy", "pine", "lamp", "scenery"]) expect(text).not.toContain(secret);
+  });
+});
+
+// ---- the Quality setting ----
+
+const highInput = (extra: Partial<BuildModelInput> = {}): BuildModelInput => input({ quality: "high", ...extra });
+// a High answer from Claude: the finishes for every color slot and the details it chose
+const highAnswer = (kind: ModelKind = "biped", change: (raw: any) => void = () => {}) => // eslint-disable-line @typescript-eslint/no-explicit-any
+  rawModel(kind, (raw) => {
+    raw.finishes = { head: "glow", body: "matte", arms: "metal", legs: "rubber", feet: "painted", extra: "glow" };
+    raw.details = ["bolts", "lights"];
+    change(raw);
+  });
+const requestOf = (designer: ScriptedDesigner, method: string, index = 0) => designer.calls.filter((call) => call.method === method)[index].request as Record<string, unknown>;
+
+describe("Build Model at High quality", () => {
+  it.each([
+    ["hero", "biped", "high/biped-high-default.json"],
+    ["obstacle", "vehicle", "high/vehicle-high-default.json"],
+    ["collectible", "blob", "high/blob-high-default.json"],
+    ["collectible", "prop", "high/prop-high-default.json"],
+  ] as const)("builds the kit's High recipe and the role's default motions for a %s %s with every box empty, with no AI call and no AI count", async (role, kind, file) => {
+    const t = setupAi();
+    const built = await t.service.buildModel(t.jobFor(), highInput({ role, kind }));
+
+    expect(t.designer.calls).toHaveLength(0);
+    expect(t.aiCount()).toBe(0);
+    expect(t.builds).toHaveLength(1);
+    expect(t.builds[0].body).toEqual(fixture(file));
+    const counts = estimate(t.builds[0].body.recipe);
+    expect(built).toMatchObject({ kind, quality: "high", parts: counts.parts, triangles: counts.triangles, vertices: counts.vertices, reused: false });
+  });
+
+  it("leaves a Standard step's result as it was: no quality, no vertices", async () => {
+    const t = setupAi();
+    const built = await t.service.buildModel(t.jobFor(), input({ kind: "biped" }));
+    expect(Object.keys(built)).not.toContain("quality");
+    expect(Object.keys(built)).not.toContain("vertices");
+    expect(t.builds[0].body.recipe.quality).toBeUndefined();
+  });
+
+  it("asks Claude for a High design with the quality in the request, builds what it answered with its finishes and details, and keeps it apart from the Standard one", async () => {
+    const t = setupAi({ designer: scriptedDesigner(() => highAnswer()) });
+    const built = await t.service.buildModel(t.jobFor(), words("a fox in a scarf", { quality: "high" }));
+
+    expect(requestOf(t.designer, "designModel")).toMatchObject({ description: "a fox in a scarf", role: "hero", kind: null, quality: "high" });
+    const { recipe } = t.builds[0].body;
+    expect(recipe).toMatchObject({ kind: "biped", quality: "high", extras: ["tail"], details: ["bolts", "lights"] });
+    expect(recipe.finishes).toEqual({ head: "glow", body: "matte", arms: "metal", legs: "rubber", feet: "painted", extra: "glow" });
+    expect(built).toMatchObject({ quality: "high", reused: false });
+
+    // the same words at Standard are another question: asked again, with no quality in the request
+    const again = await t.service.buildModel(t.jobFor(), words("a fox in a scarf"));
+    expect(designCalls(t.designer)).toHaveLength(2);
+    expect(Object.keys(requestOf(t.designer, "designModel", 1))).not.toContain("quality");
+    expect(again).toMatchObject({ reused: false });
+    expect(t.builds[1].body.recipe.quality).toBeUndefined();
+
+    // and each is found again under its own key
+    await t.service.buildModel(t.jobFor(), words("a fox in a scarf", { quality: "high" }));
+    await t.service.buildModel(t.jobFor(), words("a fox in a scarf"));
+    expect(designCalls(t.designer)).toHaveLength(2);
+    expect(t.aiCount()).toBe(2);
+  });
+
+  it.each([
+    ["two big extras and every detail", { extras: ["backpack", "ears"], details: ["seams", "bolts", "cables", "lights"] }, ["seams", "lights"]],
+    ["a hat and every detail", { extras: ["hat"], details: ["seams", "bolts", "cables", "lights"] }, ["seams", "bolts", "lights"]],
+    ["the default details", { extras: ["tail"], details: ["seams", "bolts", "lights"] }, ["seams", "bolts", "lights"]],
+  ])("builds a High recipe within its budget when Claude answers with %s, dropping cables, bolts, seams, lights in that order", async (_label, change, details) => {
+    const t = setupAi({ designer: scriptedDesigner(() => highAnswer("biped", (raw) => Object.assign(raw, change))) });
+    await t.service.buildModel(t.jobFor(), words("a fox", { quality: "high" }));
+    const { recipe } = t.builds[0].body;
+    expect(recipe.details).toEqual(details);
+    const counts = estimate(recipe);
+    expect(counts.parts).toBeLessThanOrEqual(80);
+    expect(counts.triangles).toBeLessThanOrEqual(12000);
+  });
+
+  it("asks for High motions with the quality, under their own key, and cuts them to the mesh budget, saying what it cut", async () => {
+    const joints = ["spine", "chest", "neck", "head", "upperarm_l", "forearm_l", "hand_l", "upperarm_r", "forearm_r", "hand_r", "thigh_l", "shin_l", "foot_l", "thigh_r", "shin_r", "foot_r"];
+    const heavy = () => rawMotions({ run: joints.slice(0, 12).map((j) => track(j)), jump: joints.slice(12).map((j) => track(j)) });
+    const t = setupAi({ designer: scriptedDesigner(() => rawModel(), heavy) });
+
+    const built = await t.service.buildModel(t.jobFor(), highInput({ motions: { run: "all of it", jump: "everything", loop: "" } }));
+
+    expect(requestOf(t.designer, "designMotion")).toMatchObject({ kind: "biped", quality: "high" });
+    const body = t.builds[0].body;
+    expect(checkBuildBody(body)).toBeNull(); // the worker would take it: 14 meshes
+    expect(built.skipped).toEqual([
+      { clip: "Jump", joint: "thigh_r", why: "budget" },
+      { clip: "Jump", joint: "shin_r", why: "budget" },
+      { clip: "Jump", joint: "foot_r", why: "budget" },
+    ]);
+
+    // the same words at Standard are another question
+    await t.service.buildModel(t.jobFor(), input({ motions: { run: "all of it", jump: "everything", loop: "" } }));
+    expect(motionCalls(t.designer)).toHaveLength(2);
+    expect(Object.keys(requestOf(t.designer, "designMotion", 1))).not.toContain("quality");
+  });
+
+  it("leaves a High model's default motions whole: they fit", async () => {
+    const t = setupAi();
+    const built = await t.service.buildModel(t.jobFor(), highInput());
+    expect(built.skipped).toEqual([]);
+  });
+});
+
+const highTheme = (text: string, extra: Partial<BuildEnvironmentInput> = {}): BuildEnvironmentInput => theme(text, { quality: "high", ...extra });
+const worldAnswer = (world: unknown) => rawWorld((raw) => ((raw as { world?: unknown }).world = world));
+
+describe("Build Environment at High quality", () => {
+  it("builds the meadow's three pieces in High and the desert world's three pieces for an empty theme, with no AI call and no AI count", async () => {
+    const t = setupAi();
+    const built = await t.service.buildEnvironment(t.jobFor(), highTheme(""));
+
+    expect(t.designer.calls).toHaveLength(0);
+    expect(t.aiCount()).toBe(0);
+    expect(t.builds).toHaveLength(6);
+    expect(t.builds.map((b) => b.label)).toEqual(Array(6).fill("Build Environment"));
+    for (const [index, kind] of (["tree", "windmill", "rock"] as const).entries()) {
+      expect(t.builds[index].body).toEqual({ recipe: sceneryRecipe(kind, "high"), motions: sceneryMotions(kind), palette: [...SAMPLE_PALETTE] });
+    }
+    for (const [index, piece] of WORLD_PIECES.entries()) {
+      expect(t.builds[3 + index].body).toEqual({ recipe: worldRecipe(piece, "desert"), motions: { version: 1, motions: {} }, palette: [...SAMPLE_PALETTE] });
+    }
+    expect(built).toMatchObject({ sky: 0, field: 3, stripe: 4, density: "some", quality: "high", reused: false });
+    expect(built.scenery[0]).toEqual({ kind: "tree", sha256: t.builds[0].key, size: 24_824, triangles: estimate(sceneryRecipe("tree", "high")).triangles, vertices: estimate(sceneryRecipe("tree", "high")).vertices });
+    expect(built.world?.style).toBe("desert");
+    for (const [index, piece] of WORLD_PIECES.entries()) {
+      expect(built.world?.[piece]).toEqual({ sha256: t.builds[3 + index].key, size: 24_824, triangles: estimate(worldRecipe(piece, "desert")).triangles, vertices: estimate(worldRecipe(piece, "desert")).vertices });
+    }
+  });
+
+  it("leaves a Standard environment as it was: three builds, no quality, no world", async () => {
+    const t = setupAi();
+    const built = await t.service.buildEnvironment(t.jobFor(), theme(""));
+    expect(t.builds).toHaveLength(3);
+    expect(Object.keys(built)).not.toContain("quality");
+    expect(Object.keys(built)).not.toContain("world");
+  });
+
+  it("asks Claude for a High world with the quality in the request, uses the style it chose, and keeps it apart from the Standard answer", async () => {
+    const t = setupAi({ designer: scriptedDesigner(undefined, undefined, () => worldAnswer("meadow")) });
+    const built = await t.service.buildEnvironment(t.jobFor(), highTheme("a green valley"));
+
+    expect(requestOf(t.designer, "designEnvironment")).toMatchObject({ theme: "a green valley", quality: "high" });
+    expect(built.world?.style).toBe("meadow");
+    expect(t.builds.slice(2).map((b) => (b.body.recipe.build as { style?: string }).style)).toEqual(["meadow", "meadow", "meadow"]);
+    expect(piecesBuilt(t).slice(0, 2)).toEqual(["pine", "lamp"]);
+
+    await t.service.buildEnvironment(t.jobFor(), theme("a green valley"));
+    expect(environmentCalls(t.designer)).toHaveLength(2);
+    expect(Object.keys(requestOf(t.designer, "designEnvironment", 1))).not.toContain("quality");
+    await t.service.buildEnvironment(t.jobFor(), highTheme("a green valley"));
+    expect(environmentCalls(t.designer)).toHaveLength(2);
+  });
+
+  it.each([
+    ["no style", undefined],
+    ["a style that is not ours", "arctic"],
+    ["a number", 3],
+  ])("builds the desert when Claude's answer has %s", async (_label, world) => {
+    const t = setupAi({ designer: scriptedDesigner(undefined, undefined, () => worldAnswer(world)) });
+    const built = await t.service.buildEnvironment(t.jobFor(), highTheme("somewhere"));
+    expect(built.world?.style).toBe("desert");
+  });
+
+  it("says it reused the result only when Claude was not asked and every piece, scenery and world, came from the cache", async () => {
+    const t = setupAi();
+    expect((await t.service.buildEnvironment(t.jobFor(), highTheme(""))).reused).toBe(false);
+    expect((await t.service.buildEnvironment(t.jobFor(), highTheme(""))).reused).toBe(true);
+  });
+
+  it("fails the step with the Blender sentence, and builds no more, when a piece of the world fails", async () => {
+    const error = new NodeError("Build Environment: The Blender service did not answer. Try again.");
+    const t = setupAi({ failBuild: { at: 5, error } });
+    expect(await failure(t.service.buildEnvironment(t.jobFor(), highTheme("")))).toBe(error);
+    expect(t.builds).toHaveLength(5);
   });
 });

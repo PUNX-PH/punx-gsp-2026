@@ -79,6 +79,7 @@ interface Made {
   trianglesAfter: number;
   parts?: number;
   clips?: ClipName[];
+  vertices?: number;
 }
 
 /** What is stored for a job and handed on. */
@@ -89,6 +90,7 @@ interface Stored {
   trianglesAfter: number;
   parts?: number;
   clips?: ClipName[];
+  vertices?: number;
   reused: boolean;
 }
 
@@ -116,6 +118,7 @@ export function makeBlenderService(deps: BlenderDeps): BlenderService {
         trianglesAfter: found.trianglesAfter,
         ...(found.parts === undefined ? {} : { parts: found.parts }),
         ...(found.clips === undefined ? {} : { clips: found.clips }),
+        ...(found.vertices === undefined ? {} : { vertices: found.vertices }),
         reused: true,
       };
     }
@@ -177,7 +180,11 @@ export function makeBlenderService(deps: BlenderDeps): BlenderService {
     }
 
     const size = made.bytes.length;
-    const extra = { ...(made.parts === undefined ? {} : { parts: made.parts }), ...(made.clips === undefined ? {} : { clips: made.clips }) };
+    const extra = {
+      ...(made.parts === undefined ? {} : { parts: made.parts }),
+      ...(made.clips === undefined ? {} : { clips: made.clips }),
+      ...(made.vertices === undefined ? {} : { vertices: made.vertices }),
+    };
     try {
       await deps.cache.put(key, { sha256, size, trianglesBefore: made.trianglesBefore, trianglesAfter: made.trianglesAfter, ...extra, createdAt: deps.now() });
     } catch {
@@ -207,17 +214,27 @@ export function makeBlenderService(deps: BlenderDeps): BlenderService {
 
     async build(job, input) {
       const key = await buildKey({ graphId: job.graphId, body: input.body });
+      const high = input.body.recipe.quality === "high";
       const done = await run(
         buildKind(input.label),
         key,
         job,
         async (timeoutMs) => {
           const built = await deps.worker.build({ body: input.body, timeoutMs });
-          return { bytes: built.bytes, trianglesBefore: null, trianglesAfter: built.triangles, parts: built.parts, clips: built.clips };
+          return { bytes: built.bytes, trianglesBefore: null, trianglesAfter: built.triangles, parts: built.parts, clips: built.clips, vertices: built.vertices };
         },
-        (found) => found.parts !== undefined && found.clips !== undefined, // a record without them came from another kind of job: a miss
+        // a record without them came from another kind of job: a miss (and a High build is not whole without its vertices)
+        (found) => found.parts !== undefined && found.clips !== undefined && (!high || found.vertices !== undefined),
       );
-      return { sha256: done.sha256, size: done.size, triangles: done.trianglesAfter, parts: done.parts ?? 0, clips: done.clips ?? [], reused: done.reused };
+      return {
+        sha256: done.sha256,
+        size: done.size,
+        triangles: done.trianglesAfter,
+        parts: done.parts ?? 0,
+        clips: done.clips ?? [],
+        ...(done.vertices === undefined ? {} : { vertices: done.vertices }),
+        reused: done.reused,
+      };
     },
   };
 }

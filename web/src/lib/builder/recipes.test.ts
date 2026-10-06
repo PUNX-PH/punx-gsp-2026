@@ -11,6 +11,7 @@ import {
   estimate,
   fitToBudget,
   jointsOf,
+  meshesNeeded,
   partCount,
   sceneryMotions,
   sceneryRecipe,
@@ -215,10 +216,59 @@ const EXPECTED_HIGH_PROBLEM: Record<string, string> = {
   "invalid-high-unknown-detail.json": "recipe.details",
   "invalid-high-five-details.json": "recipe.details",
   "invalid-high-over-budget.json": "is over the biped limit",
+  "invalid-high-over-meshes.json": "17 meshes is over the biped limit of 14",
   "invalid-standard-with-finishes.json": "recipe.finishes",
   "invalid-quality-word.json": "recipe.quality",
   "invalid-world-standard.json": "recipe.kind",
 };
+
+describe("meshesNeeded: what a High build makes from the clips' tracks", () => {
+  const swing = (joint: string) => ({ joint, channel: "rotate" as const, axis: "x" as const, wave: "swing" as const, amplitude: 10, cycles: 1, phase: 0 });
+  const clip = (...joints: string[]) => ({ seconds: 1, tracks: joints.map(swing) });
+
+  it("is one for a model nothing moves", () => {
+    expect(meshesNeeded(defaultHighRecipe("biped"), { version: 1, motions: {} })).toBe(1);
+  });
+
+  it("is one for the root and the rest that stands still, and one more for each other joint a clip has a track for", () => {
+    const recipe = defaultHighRecipe("biped");
+    expect(meshesNeeded(recipe, { version: 1, motions: { run: clip("hips", "thigh_l", "thigh_r") } })).toBe(3); // the root, hips, shares the first mesh
+    expect(meshesNeeded(recipe, { version: 1, motions: { run: clip("thigh_l"), jump: clip("thigh_l", "shin_l") } })).toBe(3); // a joint counts once however many clips move it
+  });
+
+  it("counts every joint of the biped's skeleton: seventeen joints are seventeen meshes when all of them move", () => {
+    const recipe = defaultHighRecipe("biped");
+    const everything = jointsOf(recipe);
+    expect(everything).toHaveLength(17);
+    expect(meshesNeeded(recipe, { version: 1, motions: { run: clip(...everything.slice(0, 12)), jump: clip(...everything.slice(12)) } })).toBe(17);
+  });
+
+  it("counts the joints an extra adds", () => {
+    const recipe = { ...defaultHighRecipe("blob"), extras: ["tail" as const, "ears" as const] };
+    expect(meshesNeeded(recipe, { version: 1, motions: { loop: clip("tail_1", "tail_2", "ear_l", "ear_r") } })).toBe(5);
+  });
+});
+
+describe("checkBuildBody and the mesh budget", () => {
+  it("refuses a High body whose clips move more joints than the kind has meshes for, naming the count and the limit", () => {
+    const body = read("high/invalid-high-over-meshes.json");
+    expect(checkBuildBody(body)).toBe("motions: 17 meshes is over the biped limit of 14");
+  });
+
+  it("accepts a High body that moves exactly as many joints as the limit allows", () => {
+    const recipe = defaultHighRecipe("biped");
+    const joints = jointsOf(recipe).slice(1, 14); // thirteen joints besides the root: fourteen meshes
+    const track = (joint: string) => ({ joint, channel: "rotate" as const, axis: "x" as const, wave: "swing" as const, amplitude: 10, cycles: 1, phase: 0 });
+    const body: BuildBody = { recipe, motions: { version: 1, motions: { run: { seconds: 1, tracks: joints.slice(0, 12).map(track) }, jump: { seconds: 1, tracks: joints.slice(12).map(track) } } }, palette: [...SAMPLE_PALETTE] };
+    expect(meshesNeeded(recipe, body.motions)).toBe(14);
+    expect(checkBuildBody(body)).toBeNull();
+  });
+
+  it("does not apply to Standard (its models are one mesh a joint with no mesh limit of their own)", () => {
+    const body = read("biped-stress.json");
+    expect(checkBuildBody(body)).toBeNull();
+  });
+});
 
 const highBody = (recipe: ModelRecipe, role: Role): BuildBody => ({ recipe, motions: defaultMotions(recipe, CLIPS_FOR_ROLE[role]), palette: [...SAMPLE_PALETTE] });
 const everyExtra = (kind: ModelKind) => KIT.kinds[kind].extras;

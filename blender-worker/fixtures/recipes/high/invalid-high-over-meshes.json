@@ -1,0 +1,206 @@
+{
+  "recipe": {
+    "version": 1,
+    "kind": "biped",
+    "summary": "A blocky two-legged character.",
+    "build": {
+      "headSize": 0.5,
+      "torsoWidth": 0.5,
+      "torsoHeight": 0.55,
+      "armLength": 0.5,
+      "armThickness": 0.14,
+      "legLength": 0.5,
+      "legThickness": 0.17,
+      "footSize": 0.2
+    },
+    "colors": {
+      "head": 4,
+      "body": 3,
+      "arms": 3,
+      "legs": 2,
+      "feet": 0,
+      "extra": 1
+    },
+    "extras": [],
+    "quality": "high",
+    "finishes": {
+      "head": "painted",
+      "body": "painted",
+      "arms": "painted",
+      "legs": "metal",
+      "feet": "rubber",
+      "extra": "painted"
+    },
+    "details": [
+      "seams",
+      "bolts",
+      "lights"
+    ]
+  },
+  "motions": {
+    "version": 1,
+    "motions": {
+      "run": {
+        "seconds": 1,
+        "tracks": [
+          {
+            "joint": "spine",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 10,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "chest",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 10,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "neck",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 10,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "head",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 10,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "upperarm_l",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 10,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "forearm_l",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 10,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "hand_l",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 10,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "upperarm_r",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 10,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "forearm_r",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 10,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "hand_r",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 10,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "thigh_l",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 10,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "shin_l",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 10,
+            "cycles": 1,
+            "phase": 0
+          }
+        ]
+      },
+      "jump": {
+        "seconds": 1,
+        "tracks": [
+          {
+            "joint": "foot_l",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 10,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "thigh_r",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 10,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "shin_r",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 10,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "foot_r",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 10,
+            "cycles": 1,
+            "phase": 0
+          }
+        ]
+      }
+    }
+  },
+  "palette": [
+    "#1b1f3b",
+    "#ff6f59",
+    "#ffd166",
+    "#06d6a0",
+    "#ffffff"
+  ]
+}

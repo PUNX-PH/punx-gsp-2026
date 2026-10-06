@@ -1,6 +1,6 @@
 // The vocabulary of the builder: what Build Model asks for, what it gives back, and the service the step calls.
 import type { BlenderJob } from "@/lib/blender/types";
-import type { ClipKey, ClipName, ModelKind, SceneryKind } from "@/lib/builder/kinds";
+import type { ClipKey, ClipName, ModelKind, Quality, SceneryKind, WorldStyle } from "@/lib/builder/kinds";
 import type { Skipped } from "@/lib/builder/recipes";
 import type { Role } from "@/lib/graph/types";
 import type { Density } from "@/lib/settings";
@@ -15,6 +15,8 @@ export interface BuildModelInput {
   motions: Record<ClipKey, string>;
   picture: { sha256: string; bytes: Uint8Array } | null;
   palette: readonly string[];
+  /** Absent means Standard. */
+  quality?: Quality;
 }
 
 /** A built model, stored in the graph's folder, with what the card shows. */
@@ -27,9 +29,12 @@ export interface BuiltModel {
   clips: ClipName[];
   /** One sentence about the look (the recipe's), as plain text. */
   summary: string;
-  /** Motions the AI asked for that this model could not do (a tail on a blob). */
+  /** Motions the AI asked for that this model could not do (a tail on a blob), and, in High, tracks dropped to keep within the mesh budget. */
   skipped: Skipped[];
   reused: boolean;
+  /** Only a High model says so, and how many shared vertices its GLB holds. */
+  quality?: Quality;
+  vertices?: number;
 }
 
 /** What Build Environment hands the builder: the person's theme (not yet cleaned), how much scenery, and the palette. */
@@ -37,6 +42,24 @@ export interface BuildEnvironmentInput {
   theme: string;
   density: Density;
   palette: readonly string[];
+  /** Absent means Standard. */
+  quality?: Quality;
+}
+
+/** One stored GLB of the world or of the scenery, with what the card shows. `vertices` is only there in High. */
+export interface BuiltPiece {
+  sha256: string;
+  size: number;
+  triangles: number;
+  vertices?: number;
+}
+
+/** The High world: its style, and one stored GLB for each of its three pieces. */
+export interface BuiltWorld {
+  style: WorldStyle;
+  terrain: BuiltPiece;
+  road: BuiltPiece;
+  backdrop: BuiltPiece;
 }
 
 /** A built environment: the three palette picks, the density the person chose, and one stored GLB for each piece of scenery. */
@@ -45,9 +68,12 @@ export interface BuiltEnvironment {
   field: number;
   stripe: number;
   density: Density;
-  scenery: { kind: SceneryKind; sha256: string; size: number; triangles: number }[];
-  /** True only when Claude was not asked and every piece came from the cache. */
+  scenery: (BuiltPiece & { kind: SceneryKind })[];
+  /** True only when Claude was not asked and every piece, the world's too, came from the cache. */
   reused: boolean;
+  /** Only a High environment says so, and has a world. */
+  quality?: Quality;
+  world?: BuiltWorld;
 }
 
 export interface BuilderService {

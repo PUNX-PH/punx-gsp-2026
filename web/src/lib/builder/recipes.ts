@@ -83,15 +83,24 @@ export interface EnvironmentDesign {
   field: number;
   stripe: number;
   scenery: SceneryKind[];
+  /** The style of the land, road and far hills. Only a High design has one. */
+  world?: WorldStyle;
 }
 
 /** The meadow: what an empty theme gives, and what takes the place of anything Claude's answer leaves out. */
 export const DEFAULT_ENVIRONMENT: EnvironmentDesign = { version: 1, sky: 0, field: 3, stripe: 4, scenery: ["tree", "windmill", "rock"] };
 
-/** A track Claude asked for on a joint the model does not have. */
+/** The style of world a High environment has when nothing says another (an empty theme, or an answer with no style or one we do not have). */
+export const DEFAULT_WORLD: WorldStyle = "desert";
+
+/**
+ * A track that was left out: Claude asked for it on a joint the model does not have (no `why`), or it was dropped to keep a High model's
+ * moving joints within the meshes its kind may have (`why: "budget"`).
+ */
 export interface Skipped {
   clip: ClipName;
   joint: string;
+  why?: "budget";
 }
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -295,7 +304,27 @@ export function checkBuildBody(body: unknown): string | null {
   if (!Array.isArray(palette) || palette.length !== 5 || !palette.every((c) => typeof c === "string" && HEX.test(c))) return "palette: must be five #rrggbb colors";
   const recipeProblem = checkRecipe(body.recipe);
   if (recipeProblem) return recipeProblem;
-  return checkMotions(body.motions, body.recipe as ModelRecipe);
+  const motionsProblem = checkMotions(body.motions, body.recipe as ModelRecipe);
+  if (motionsProblem) return motionsProblem;
+  const recipe = body.recipe as ModelRecipe;
+  if (isHigh(recipe) && recipe.kind !== "world") {
+    const needed = meshesNeeded(recipe, body.motions as MotionRecipe);
+    const limit = tierCaps(recipe.kind, "high").meshes;
+    if (needed > limit) return `motions: ${needed} meshes is over the ${recipe.kind} limit of ${limit}`;
+  }
+  return null;
+}
+
+/**
+ * The most meshes a High build can make from these clips: one for the first joint (the root) and every joint that stands still (they share
+ * it), and one more for each other joint some clip has a track for, because a joint that moves needs a mesh of its own. A joint with no part
+ * on it makes none, so this is a bound, and it is the one the check and the repair both use.
+ */
+export function meshesNeeded(recipe: ModelRecipe, motions: MotionRecipe): number {
+  const root = jointsOf(recipe)[0];
+  const moved = new Set<string>();
+  for (const clip of CLIP_KEYS) for (const track of motions.motions[clip]?.tracks ?? []) if (track.joint !== root) moved.add(track.joint);
+  return 1 + moved.size;
 }
 
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;

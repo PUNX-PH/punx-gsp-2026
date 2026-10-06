@@ -67,6 +67,33 @@ describe("environmentKey", () => {
   });
 });
 
+describe("the quality in the keys", () => {
+  // A Standard step's keys are what they were before the Quality setting: the same lists, byte for byte, with nothing added.
+  it("leaves every Standard key exactly as it was, whether the quality is said or not", async () => {
+    const designList = [RECIPE_VERSION, "design", "claude-sonnet-5-5", "alice", "a fox in a scarf", "auto", "hero", null];
+    const motionList = [RECIPE_VERSION, "motion", "claude-sonnet-5-5", "alice", "biped", ["hips", "thigh_l"], { run: "gallops", jump: "" }];
+    const environmentList = [RECIPE_VERSION, "environment", "claude-sonnet-5-5", "alice", "a snowy night"];
+    for (const quality of [undefined, "standard" as const]) {
+      expect(await designKey({ ...design, quality })).toBe(await hashKey(designList));
+      expect(await motionKey({ ...motion, quality })).toBe(await hashKey(motionList));
+      expect(await environmentKey({ ...environment, quality })).toBe(await hashKey(environmentList));
+    }
+  });
+
+  it("gives High its own key for the same words, for the look, the motions and the world", async () => {
+    expect(await designKey({ ...design, quality: "high" })).not.toBe(await designKey(design));
+    expect(await motionKey({ ...motion, quality: "high" })).not.toBe(await motionKey(motion));
+    expect(await environmentKey({ ...environment, quality: "high" })).not.toBe(await environmentKey(environment));
+    expect(await designKey({ ...design, quality: "high" })).toBe(await hashKey([RECIPE_VERSION, "design", "claude-sonnet-5-5", "alice", "a fox in a scarf", "auto", "hero", null, "high"]));
+  });
+
+  it("still changes with everything else when the quality is High", async () => {
+    expect(await designKey({ ...design, quality: "high", description: "a fox in a hat" })).not.toBe(await designKey({ ...design, quality: "high" }));
+    expect(await motionKey({ ...motion, quality: "high", kind: "blob" })).not.toBe(await motionKey({ ...motion, quality: "high" }));
+    expect(await environmentKey({ ...environment, quality: "high", theme: "a desert" })).not.toBe(await environmentKey({ ...environment, quality: "high" }));
+  });
+});
+
 describe("the three kinds of key", () => {
   it("never collide for look-alike inputs, because the word for the kind of answer is in each", async () => {
     const same = "x";

@@ -12,6 +12,8 @@ export interface CachedJob {
   /** A build also keeps how many parts it has and which clips; a prepare or shape job has neither. */
   parts?: number;
   clips?: ClipName[];
+  /** A High build also keeps the shared vertices its GLB holds. */
+  vertices?: number;
   createdAt: number; // milliseconds since the epoch
 }
 

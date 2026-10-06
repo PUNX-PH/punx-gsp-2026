@@ -200,3 +200,102 @@ describe("Build Environment played through the graph service", () => {
     expect(played.result.nodes.n3.state).toBe("skipped");
   });
 });
+
+// ---- the Quality setting: the same steps at High, with the real High files ----
+
+describe("Build Model and Build Environment at High quality, played through the graph service", () => {
+  const fixture = (name: string) => new Uint8Array(readFileSync(new URL(`../blender/fixtures/high/${name}`, import.meta.url)));
+  const stats = (name: string) => JSON.parse(readFileSync(new URL(`../blender/fixtures/high/${name}.stats.json`, import.meta.url), "utf8")) as { triangles: number; vertices: number; parts: number; clips: string[] };
+  const HERO = fixture("built-biped-high.glb");
+  const SCENERY = fixture("built-lamp-high.glb");
+  const WORLD = { terrain: fixture("world-terrain-desert.glb"), road: fixture("world-road-desert.glb"), backdrop: fixture("world-backdrop-desert.glb") };
+
+  /** A fake Blender service whose builds are the real High files, picked by what the recipe asks for, and which remembers what it was asked. */
+  function highBlender() {
+    const asked: { label: string; kind: string; quality: string | undefined; piece?: string; style?: string }[] = [];
+    const blender: BlenderService = {
+      async prepare() {
+        throw new Error("not used");
+      },
+      async shape() {
+        throw new Error("not used");
+      },
+      async build(job, input) {
+        const { recipe } = input.body;
+        const build = recipe.build as { piece?: string; style?: string };
+        asked.push({ label: input.label, kind: recipe.kind, quality: recipe.quality, piece: build.piece, style: build.style });
+        const [bytes, real] =
+          recipe.kind === "world"
+            ? [WORLD[build.piece as keyof typeof WORLD], stats(`world-${build.piece}-desert`)]
+            : recipe.kind === "scenery"
+              ? [SCENERY, stats("built-lamp-high")]
+              : [HERO, stats("built-biped-high")];
+        const sha256 = await job.derived.put(bytes);
+        return { sha256, size: bytes.length, triangles: real.triangles, parts: real.parts, vertices: real.vertices, clips: real.clips as never, reused: false };
+      },
+    };
+    return { blender, asked };
+  }
+
+  const highGraph = (): Graph => ({
+    schemaVersion: 1,
+    nodes: [
+      node("n1", "build-model", { role: "hero", kind: "biped", description: "", run: "", jump: "", loop: "", quality: "high" }),
+      node("n2", "game-template", { tuning }),
+      node("n3", "preview"),
+      node("n4", "build-environment", { theme: "", density: "some", quality: "high" }),
+    ],
+    edges: [wire("n1", "model", "n2", "hero"), wire("n4", "environment", "n2", "environment"), wire("n2", "settings", "n3", "settings")],
+  });
+
+  it("builds a High hero and a High world with no AI, and the game plays with the real files", async () => {
+    const { blender, asked } = highBlender();
+    const { service, runs } = setup(blender);
+    const made = await service.createGraph(alice, {});
+    await service.saveGraph(alice, made.id, { graph: highGraph() });
+
+    const played = await service.play(alice, made.id);
+
+    expect(played.kind).toBe("ran");
+    if (played.kind !== "ran") return;
+    expect(played.result.state).toBe("done");
+    // the hero, then the scenery of the meadow in High, then the desert world's three pieces
+    expect(asked).toEqual([
+      { label: "Build Model", kind: "biped", quality: "high" },
+      { label: "Build Environment", kind: "scenery", quality: "high" },
+      { label: "Build Environment", kind: "scenery", quality: "high" },
+      { label: "Build Environment", kind: "scenery", quality: "high" },
+      { label: "Build Environment", kind: "world", quality: "high", piece: "terrain", style: "desert" },
+      { label: "Build Environment", kind: "world", quality: "high", piece: "road", style: "desert" },
+      { label: "Build Environment", kind: "world", quality: "high", piece: "backdrop", style: "desert" },
+    ]);
+    const hero = stats("built-biped-high");
+    expect(played.result.nodes.n1.result).toMatchObject({ role: "hero", kind: "biped", quality: "high", parts: hero.parts, triangles: hero.triangles, vertices: hero.vertices, skipped: [] });
+    expect(played.result.nodes.n4.result).toMatchObject({ quality: "high", world: "desert", scenery: ["tree", "windmill", "rock"] });
+    expect((await runs.readFile(alice, played.runId!, "hero.glb")).bytes).toEqual(HERO);
+    for (const name of ["scenery1.glb", "scenery2.glb", "scenery3.glb"]) expect((await runs.readFile(alice, played.runId!, name)).bytes).toEqual(SCENERY);
+  });
+
+  it("plays a graph saved before the Quality setting exactly as a Standard one", async () => {
+    const { blender, asked } = fakeBlender();
+    const { service } = setup(blender);
+    const made = await service.createGraph(alice, {});
+    const graph = highGraph();
+    for (const n of graph.nodes) delete n.params.quality;
+    await service.saveGraph(alice, made.id, { graph });
+
+    const played = await service.play(alice, made.id);
+
+    expect(played.kind === "ran" && played.result.state).toBe("done");
+    expect(asked.every((a) => a.recipeKind !== "world")).toBe(true);
+    expect(asked).toHaveLength(4); // the hero and the three pieces of scenery
+  });
+
+  it("refuses to save a quality that is not standard or high", async () => {
+    const { service } = setup(highBlender().blender);
+    const made = await service.createGraph(alice, {});
+    const graph = highGraph();
+    graph.nodes[0].params.quality = "ultra";
+    await expect(service.saveGraph(alice, made.id, { graph })).rejects.toThrow(/the quality must be standard or high\./);
+  });
+});

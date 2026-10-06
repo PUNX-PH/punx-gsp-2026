@@ -38,6 +38,72 @@ function context(reply: () => Promise<BuiltEnvironment> = async () => built) {
 }
 const failure = (run: Promise<unknown>) => run.then(() => null, (e: unknown) => e);
 
+const TERRAIN_SHA = "c".repeat(64);
+const ROAD_SHA = "d".repeat(64);
+const BACKDROP_SHA = "e".repeat(64);
+const highBuilt: BuiltEnvironment = {
+  ...built,
+  quality: "high",
+  scenery: [
+    { kind: "tree", sha256: TREE_SHA, size: 17_368, triangles: 804, vertices: 430 },
+    { kind: "rock", sha256: ROCK_SHA, size: 9_000, triangles: 336, vertices: 174 },
+  ],
+  world: {
+    style: "desert",
+    terrain: { sha256: TERRAIN_SHA, size: 181_412, triangles: 8000, vertices: 4131 },
+    road: { sha256: ROAD_SHA, size: 27_232, triangles: 868, vertices: 595 },
+    backdrop: { sha256: BACKDROP_SHA, size: 22_880, triangles: 340, vertices: 612 },
+  },
+};
+
+describe("the Build Environment node and the Quality setting", () => {
+  it("tells the builder only when it is High, so a Standard step asks exactly what it always did", async () => {
+    const standard = context();
+    await buildEnvironment({}, params({ quality: "standard" }), standard.ctx);
+    await buildEnvironment({}, params(), standard.ctx);
+    for (const call of standard.asked) expect(Object.keys(call.input)).not.toContain("quality");
+
+    const wanted = context();
+    await buildEnvironment({}, params({ quality: "high" }), wanted.ctx);
+    expect(wanted.asked[0].input.quality).toBe("high");
+  });
+
+  it("hands on the quality and the three files of the world on the wire, and a result with the style and the numbers, when it is High", async () => {
+    const { ctx } = context(async () => highBuilt);
+    const done = await buildEnvironment({}, params({ quality: "high" }), ctx);
+
+    expect(done.output).toEqual({
+      type: "environment",
+      sky: 1,
+      field: 2,
+      stripe: 4,
+      density: "some",
+      scenery: [
+        { kind: "tree", sha256: TREE_SHA },
+        { kind: "rock", sha256: ROCK_SHA },
+      ],
+      quality: "high",
+      world: { style: "desert", terrain: TERRAIN_SHA, road: ROAD_SHA, backdrop: BACKDROP_SHA },
+    });
+    expect(done.result).toMatchObject({
+      quality: "high",
+      world: "desert",
+      // every piece together: the scenery and the world
+      triangles: 804 + 336 + 8000 + 868 + 340,
+      vertices: 430 + 174 + 4131 + 595 + 612,
+      size: 17_368 + 9_000 + 181_412 + 27_232 + 22_880,
+    });
+  });
+
+  it("says nothing of quality or a world for a Standard environment", async () => {
+    const { ctx } = context();
+    const done = await buildEnvironment({}, params(), ctx);
+    expect(Object.keys(done.output as object)).not.toContain("quality");
+    expect(Object.keys(done.output as object)).not.toContain("world");
+    expect(Object.keys(done.result as object)).not.toContain("quality");
+  });
+});
+
 describe("the Build Environment node", () => {
   it("is registered", () => {
     expect(EXECUTORS["build-environment"]).toBe(buildEnvironment);

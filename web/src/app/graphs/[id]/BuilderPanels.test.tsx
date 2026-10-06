@@ -119,6 +119,49 @@ describe("the Build Model panel", () => {
   });
 });
 
+describe("the Quality setting in the Build Model panel", () => {
+  it("offers Standard and High, with Standard pressed when nothing was chosen, and says what High is for", () => {
+    const html = panel();
+    expect(html).toContain("Quality");
+    for (const name of ["Standard", "High"]) expect(buttons(html, new RegExp(`>${name}<`)), name).toHaveLength(1);
+    expect(pressedNames(html, ["Standard", "High"])).toEqual(["Standard"]);
+    expect(html.match(/High looks best on a computer\. On a slow device the game lowers its own detail\./g)).toHaveLength(1);
+  });
+
+  it("shows the saved quality as pressed, and a graph saved before the setting as Standard", () => {
+    expect(pressedNames(panel({ quality: "high" }), ["Standard", "High"])).toEqual(["High"]);
+    expect(pressedNames(panel({ quality: "standard" }), ["Standard", "High"])).toEqual(["Standard"]);
+    const old = graph();
+    delete old.nodes[0].params.quality;
+    const html = renderToString(
+      <SettingsPanel node={old.nodes[0]} data={dataFor(old)} assets={{}} graphId="g1" uploading={false} error={null} onChooseFile={() => {}} onTune={() => {}} onPrompt={() => {}} onSettings={() => {}} />,
+    );
+    expect(pressedNames(html, ["Standard", "High"])).toEqual(["Standard"]);
+  });
+
+  it("still says exactly once what is sent to Anthropic", () => {
+    expect(panel({ quality: "high" }).match(/Anthropic/g)).toHaveLength(1);
+  });
+});
+
+describe("a High Build Model card", () => {
+  const high = { ...built, parts: 76, triangles: 7_880, vertices: 5_644, size: 254_528, quality: "high" };
+
+  it("says High quality in a chip of its own, beside the line with the vertices", () => {
+    const html = card(done(high));
+    expect(html).toMatch(/<span class="[^"]*chip[^"]*">High quality<\/span>/);
+    expect(html).toMatch(/<span class="[^"]*chip[^"]*">Two-legged character, 76 parts, 7,880 triangles, 5,644 vertices, 248\.6 KB<\/span>/);
+  });
+
+  it("says what was dropped for the model's limit", () => {
+    expect(card(done({ ...high, skipped: [{ clip: "Jump", joint: "foot_r", why: "budget" }] }))).toContain("Skipped, over the model&#x27;s limit: foot_r (Jump)");
+  });
+
+  it("says nothing of High quality for a Standard card", () => {
+    expect(card(done(built))).not.toContain("High quality");
+  });
+});
+
 describe("the Build Model card", () => {
   it("shows the line in a chip, the clips, and the summary as text, with nothing else when nothing was skipped or reused", () => {
     const html = card(done(built));
@@ -213,6 +256,39 @@ describe("the Build Environment panel", () => {
     const html = worldPanel({ theme: "<script>alert(1)</script>" });
     expect(html).not.toContain("<script>alert(1)");
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+});
+
+describe("the Quality setting in the Build Environment panel", () => {
+  it("offers Standard and High, with Standard pressed when nothing was chosen, and says what High is for", () => {
+    const html = worldPanel();
+    expect(html).toContain("Quality");
+    for (const name of ["Standard", "High"]) expect(buttons(html, new RegExp(`>${name}<`)), name).toHaveLength(1);
+    expect(pressedNames(html, ["Standard", "High"])).toEqual(["Standard"]);
+    expect(html.match(/High looks best on a computer\. On a slow device the game lowers its own detail\./g)).toHaveLength(1);
+  });
+
+  it("shows the saved quality as pressed", () => {
+    expect(pressedNames(worldPanel({ quality: "high" }), ["Standard", "High"])).toEqual(["High"]);
+  });
+
+  it("still says exactly once what is sent to Anthropic", () => {
+    expect(worldPanel({ quality: "high" }).match(/Anthropic/g)).toHaveLength(1);
+  });
+});
+
+describe("a High Build Environment card", () => {
+  const high = { ...world, quality: "high", world: "desert", triangles: 10_348, vertices: 5_942, size: 258_000 };
+
+  it("says High quality and what the world came to, each in a chip", () => {
+    const html = worldCard(doneWorld(high));
+    expect(html).toMatch(/<span class="[^"]*chip[^"]*">High quality<\/span>/);
+    expect(html).toMatch(/<span class="[^"]*chip[^"]*">Desert world, 10,348 triangles, 5,942 vertices, 252\.0 KB<\/span>/);
+    expect(html).toMatch(/<span class="[^"]*chip[^"]*">Tree, Windmill, Rock<\/span>/);
+  });
+
+  it("says nothing of High quality for a Standard card", () => {
+    expect(worldCard(doneWorld(world))).not.toContain("High quality");
   });
 });
 

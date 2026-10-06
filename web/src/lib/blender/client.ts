@@ -96,7 +96,11 @@ export function makeBlenderWorker(deps: BlenderClientDeps): BlenderWorker {
       const parts = count(headers.get("x-parts"));
       const clips = clipNames(headers.get("x-clips"));
       if (triangles === null || parts === null || clips === null) throw new BlenderUnavailableError(200);
-      return { bytes, triangles, parts, clips };
+      // A High build also says how many shared vertices the GLB holds, and an answer without it is not usable; a Standard build has none.
+      if (input.body.recipe.quality !== "high") return { bytes, triangles, parts, clips };
+      const vertices = count(headers.get("x-vertices"));
+      if (vertices === null) throw new BlenderUnavailableError(200);
+      return { bytes, triangles, parts, clips, vertices };
     },
   };
 }

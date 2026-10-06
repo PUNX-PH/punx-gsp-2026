@@ -2,7 +2,7 @@
 // name node types by id only, so nothing in a graph can add behavior. The plain names and one-line help are here so
 // that every screen (and every error message) uses the same words.
 import { SHAPES, TRIANGLES } from "@/lib/blender/types";
-import { MODEL_KINDS } from "@/lib/builder/kinds";
+import { MODEL_KINDS, QUALITIES } from "@/lib/builder/kinds";
 import { ROLE_FILES, type WireType } from "@/lib/graph/types";
 import { DENSITIES } from "@/lib/settings";
 
@@ -37,6 +37,17 @@ const SHA256_HEX = /^[0-9a-f]{64}$/;
 
 const hasExactly = (params: Record<string, unknown>, keys: string[]) =>
   Object.keys(params).length === keys.length && keys.every((k) => Object.hasOwn(params, k));
+
+/** Whether the settings have these keys, and perhaps `quality` too: a graph saved before the Quality setting has none, and means Standard. */
+const hasExactlyAndMaybeQuality = (params: Record<string, unknown>, keys: string[]) => {
+  const rest = { ...params };
+  delete rest.quality;
+  return hasExactly(rest, keys);
+};
+
+const QUALITY_PROBLEM = "the quality must be standard or high.";
+const qualityProblem = (params: Record<string, unknown>): string | null =>
+  !Object.hasOwn(params, "quality") || (typeof params.quality === "string" && (QUALITIES as readonly string[]).includes(params.quality)) ? null : QUALITY_PROBLEM;
 
 const noParams = (params: Record<string, unknown>) => (Object.keys(params).length === 0 ? null : "takes no settings.");
 
@@ -95,8 +106,8 @@ const MOTION_BOXES = [
 ] as const;
 
 function buildModelParams(params: Record<string, unknown>): string | null {
-  if (!hasExactly(params, ["role", "kind", "description", "run", "jump", "loop"])) {
-    return "role, kind, description, run, jump and loop are the only settings a Build Model step has.";
+  if (!hasExactlyAndMaybeQuality(params, ["role", "kind", "description", "run", "jump", "loop"])) {
+    return "role, kind, description, run, jump, loop and quality are the only settings a Build Model step has.";
   }
   const { role, kind, description } = params;
   if (typeof role !== "string" || !Object.hasOwn(ROLE_FILES, role)) return "role must be hero, obstacle or collectible.";
@@ -110,17 +121,18 @@ function buildModelParams(params: Record<string, unknown>): string | null {
     if (typeof text !== "string") return `${key} must be text.`;
     if (Array.from(text).length > MAX_MOTION_CHARACTERS) return `the ${name} box is longer than ${MAX_MOTION_CHARACTERS} characters.`;
   }
-  return null;
+  return qualityProblem(params);
 }
 
 export const MAX_THEME_CHARACTERS = 200;
 
 function buildEnvironmentParams(params: Record<string, unknown>): string | null {
-  if (!hasExactly(params, ["theme", "density"])) return "theme and density are the only settings a Build Environment step has.";
+  if (!hasExactlyAndMaybeQuality(params, ["theme", "density"])) return "theme, density and quality are the only settings a Build Environment step has.";
   const { theme, density } = params;
   if (typeof theme !== "string") return "theme must be text.";
   if (Array.from(theme).length > MAX_THEME_CHARACTERS) return `the theme is longer than ${MAX_THEME_CHARACTERS} characters.`;
-  return typeof density === "string" && (DENSITIES as readonly string[]).includes(density) ? null : "density must be few, some or lots.";
+  if (typeof density !== "string" || !(DENSITIES as readonly string[]).includes(density)) return "density must be few, some or lots.";
+  return qualityProblem(params);
 }
 
 const port = (name: string, label: string, help: string, type: WireType, required = false, missing?: string): PortSpec => ({
@@ -190,7 +202,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
       port("image", "picture", "A picture to take the look from. Optional.", "image"),
     ],
     outputs: [port("model", "3D model", "The model, with its motions.", "model")],
-    defaultParams: () => ({ role: "hero", kind: "auto", description: "", run: "", jump: "", loop: "" }),
+    defaultParams: () => ({ role: "hero", kind: "auto", description: "", run: "", jump: "", loop: "", quality: "standard" }),
     shapeProblem: buildModelParams,
     incompleteProblem: (params) =>
       params.kind === "auto" && typeof params.description === "string" && params.description.trim() === "" ? "describe it first, or pick a kind." : null,
@@ -202,7 +214,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     final: false,
     inputs: [port("palette", "palette", "Colors for the world. Without one, a sample palette is used.", "palette")],
     outputs: [port("environment", "environment", "The sky, the field, the edge stripes and the scenery.", "environment")],
-    defaultParams: () => ({ theme: "", density: "some" }),
+    defaultParams: () => ({ theme: "", density: "some", quality: "standard" }),
     shapeProblem: buildEnvironmentParams,
     incompleteProblem: () => null,
   },

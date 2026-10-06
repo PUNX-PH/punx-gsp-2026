@@ -1,7 +1,7 @@
 // The vocabulary of the AI steps: what Describe Game gives back, the service the step calls, the model behind it, the designer
 // behind Build Model, and the two ways the model can fail. The rules (limits, cache, checking the answer) live in the other files of lib/ai.
 import type { User } from "@/lib/auth/ports";
-import type { ClipKey, ModelKind } from "@/lib/builder/kinds";
+import type { ClipKey, ModelKind, Quality } from "@/lib/builder/kinds";
 import type { Role, Tuning } from "@/lib/graph/types";
 
 /** What Describe Game gives the graph. The palette is in the template's slot order and already readable; the numbers are playable. */
@@ -39,9 +39,10 @@ export interface DesignReply {
  * words. Every answer is untrusted until `lib/builder/repair.ts` has checked it. Failures are `AiRefusedError` and `AiUnavailableError`.
  */
 export interface Designer {
-  designModel(request: { description: string; role: Role; kind: ModelKind | null; picture: Uint8Array | null; timeoutMs?: number }): Promise<DesignReply>;
-  designMotion(request: { kind: ModelKind; joints: string[]; texts: Partial<Record<ClipKey, string>>; timeoutMs?: number }): Promise<DesignReply>;
-  designEnvironment(request: { theme: string; timeoutMs?: number }): Promise<DesignReply>;
+  // `quality` is there only for High: a Standard request is what it always was.
+  designModel(request: { description: string; role: Role; kind: ModelKind | null; picture: Uint8Array | null; quality?: Quality; timeoutMs?: number }): Promise<DesignReply>;
+  designMotion(request: { kind: ModelKind; joints: string[]; texts: Partial<Record<ClipKey, string>>; quality?: Quality; timeoutMs?: number }): Promise<DesignReply>;
+  designEnvironment(request: { theme: string; quality?: Quality; timeoutMs?: number }): Promise<DesignReply>;
 }
 
 /** The model declined to answer (its own safety rules). Carries no detail on purpose. */

@@ -79,6 +79,49 @@ describe("the Build Model node", () => {
     });
   });
 
+  describe("the Quality setting", () => {
+    const high: BuiltModel = { ...built, quality: "high", parts: 76, triangles: 7880, vertices: 5644, skipped: [{ clip: "Jump", joint: "foot_r", why: "budget" }] };
+
+    it("tells the builder only when it is High, so a Standard step asks exactly what it always did", async () => {
+      const standard = context();
+      await buildModel({}, params({ quality: "standard" }), standard.ctx);
+      await buildModel({}, params(), standard.ctx);
+      for (const call of standard.asked) expect(Object.keys(call.input)).not.toContain("quality");
+
+      const wanted = context();
+      await buildModel({}, params({ quality: "high" }), wanted.ctx);
+      expect(wanted.asked[0].input.quality).toBe("high");
+    });
+
+    it("hands on the quality on the wire and in the result, with the vertices, when the model is High", async () => {
+      const { ctx } = context(undefined, async () => high);
+      const done = await buildModel({}, params({ quality: "high" }), ctx);
+
+      expect(done.output).toEqual({ type: "model", sha256: BUILT_SHA, name: "biped.glb", size: 24_824, format: "glb", role: "hero", clips: ["Run", "Jump"], quality: "high" });
+      expect(done.result).toEqual({
+        role: "hero",
+        kind: "biped",
+        parts: 76,
+        triangles: 7880,
+        size: 24_824,
+        clips: ["Run", "Jump"],
+        summary: "A blocky two-legged character.",
+        skipped: [{ clip: "Jump", joint: "foot_r", why: "budget" }],
+        reused: false,
+        quality: "high",
+        vertices: 5644,
+      });
+    });
+
+    it("says nothing of quality for a Standard model, on the wire or in the result", async () => {
+      const { ctx } = context();
+      const done = await buildModel({}, params({ quality: "standard" }), ctx);
+      expect(Object.keys(done.output as object)).not.toContain("quality");
+      expect(Object.keys(done.result as object)).not.toContain("quality");
+      expect(Object.keys(done.result as object)).not.toContain("vertices");
+    });
+  });
+
   it("names the file after the kind that was built, whatever the settings said", async () => {
     const { ctx } = context(undefined, async () => ({ ...built, kind: "vehicle", clips: ["Loop"] }));
     const done = await buildModel({}, params({ kind: "auto", role: "obstacle" }), ctx);

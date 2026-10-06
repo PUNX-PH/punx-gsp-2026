@@ -11,8 +11,12 @@ export const buildEnvironment: Executor = async (inputs, params, ctx) => {
 
   const built = await ctx.builder.buildEnvironment(
     { user: ctx.user, graphId: ctx.graphId, derived: ctx.derived, deadline: ctx.deadline },
-    { theme: params.theme as string, density, palette },
+    { theme: params.theme as string, density, palette, ...(params.quality === "high" ? { quality: "high" as const } : {}) },
   );
+  // A High environment has a world: its three files go on the wire, and the card shows what all the pieces came to.
+  const world = built.quality === "high" ? built.world : undefined;
+  const pieces = [...built.scenery, ...(world ? [world.terrain, world.road, world.backdrop] : [])];
+  const total = (key: "triangles" | "vertices" | "size") => pieces.reduce((sum, piece) => sum + (piece[key] ?? 0), 0);
   return {
     output: {
       type: "environment",
@@ -21,6 +25,7 @@ export const buildEnvironment: Executor = async (inputs, params, ctx) => {
       stripe: built.stripe,
       density: built.density,
       scenery: built.scenery.map(({ kind, sha256 }) => ({ kind, sha256 })),
+      ...(world ? { quality: "high" as const, world: { style: world.style, terrain: world.terrain.sha256, road: world.road.sha256, backdrop: world.backdrop.sha256 } } : {}),
     },
     // The picks are shown as the colors they stand for in the palette this step painted with.
     result: {
@@ -30,6 +35,7 @@ export const buildEnvironment: Executor = async (inputs, params, ctx) => {
       density: built.density,
       scenery: built.scenery.map((piece) => piece.kind),
       reused: built.reused,
+      ...(world ? { quality: "high" as const, world: world.style, triangles: total("triangles"), vertices: total("vertices"), size: total("size") } : {}),
     },
   };
 };

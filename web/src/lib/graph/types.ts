@@ -4,7 +4,7 @@ import type { DescribeGameService } from "@/lib/ai/types";
 import type { User } from "@/lib/auth/ports";
 import type { BlenderService, ModelFormat } from "@/lib/blender/types";
 import type { BuilderService } from "@/lib/builder/types";
-import type { ClipName, SceneryKind } from "@/lib/builder/kinds";
+import type { ClipName, Quality, SceneryKind, WorldStyle } from "@/lib/builder/kinds";
 import type { RunService } from "@/lib/runs/types";
 import type { Density } from "@/lib/settings";
 
@@ -109,11 +109,22 @@ export type WireValue =
   | { type: "image"; sha256: string; name: string; width: number; height: number }
   // `role` and `clips` come only from Build Model (the role it was built for, and the clips it carries); an upload, a prepared model and a
   // shape have neither.
-  | { type: "model"; sha256: string; name: string; size: number; format: ModelFormat; role?: Role; clips?: ClipName[] }
+  // `quality` is there only when Build Model made a High model (a missing one means Standard).
+  | { type: "model"; sha256: string; name: string; size: number; format: ModelFormat; role?: Role; clips?: ClipName[]; quality?: Quality }
   | { type: "palette"; colors: string[] }
   | { type: "feel"; tuning: Tuning }
   // `sky`, `field` and `stripe` are palette indices 0 to 4; each piece of scenery is a GLB stored in the graph's folder.
-  | { type: "environment"; sky: number; field: number; stripe: number; density: Density; scenery: { kind: SceneryKind; sha256: string }[] }
+  // A High environment also says so and carries the three files of its world (`style` is the look of the land, the road and the far hills).
+  | {
+      type: "environment";
+      sky: number;
+      field: number;
+      stripe: number;
+      density: Density;
+      scenery: { kind: SceneryKind; sha256: string }[];
+      quality?: Quality;
+      world?: { style: WorldStyle; terrain: string; road: string; backdrop: string };
+    }
   // `scenery` is there only when an environment was wired: the files, in the order the settings name them.
   | { type: "settings"; settingsText: string; tuning: Tuning; models: Record<Role, ModelSource>; scenery?: { file: string; sha256: string }[] };
 

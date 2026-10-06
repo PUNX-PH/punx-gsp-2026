@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CLIPS_FOR_ROLE, type ClipKey, KIT, type ModelKind } from "@/lib/builder/kinds";
-import { checkBuildBody, DEFAULT_ENVIRONMENT, defaultMotions, defaultRecipe, estimate, type ModelRecipe } from "@/lib/builder/recipes";
-import { enforceCaps, repairEnvironment, repairModelRecipe, repairMotions } from "@/lib/builder/repair";
+import { checkBuildBody, DEFAULT_ENVIRONMENT, defaultHighRecipe, defaultMotions, defaultRecipe, estimate, jointsOf, meshesNeeded, type ModelRecipe, type MotionRecipe } from "@/lib/builder/recipes";
+import { enforceCaps, fitMotionsToMeshes, repairEnvironment, repairModelRecipe, repairMotions } from "@/lib/builder/repair";
 import { SAMPLE_PALETTE } from "@/lib/graph/palette";
 
 const ALL: ClipKey[] = ["run", "jump", "loop"];
@@ -323,5 +323,127 @@ describe("repairModelRecipe in the High tier", () => {
   it("never changes what it was given", () => {
     const raw = Object.freeze({ ...answer("biped"), details: Object.freeze(["seams", "bolts"]), finishes: Object.freeze({ head: "glow" }), extras: Object.freeze(["tail"]) });
     expect(() => repairModelRecipe(raw, { kind: "biped", quality: "high" })).not.toThrow();
+  });
+});
+
+describe("repairEnvironment at High quality", () => {
+  const raw = (world: unknown) => ({ sky: 1, field: 2, stripe: 0, scenery: ["pine"], world });
+
+  it("keeps the style of the world when it is one of ours", () => {
+    for (const world of ["desert", "meadow"]) {
+      const r = repairEnvironment(raw(world), { quality: "high" });
+      expect(r.ok && r.design.world).toBe(world);
+    }
+  });
+
+  it.each([
+    ["no style", undefined],
+    ["a style we do not have", "arctic"],
+    ["a number", 3],
+    ["a hostile key", "__proto__"],
+    ["an object", { style: "meadow" }],
+  ])("takes the desert for %s", (_label, world) => {
+    const r = repairEnvironment(raw(world), { quality: "high" });
+    expect(r.ok && r.design.world).toBe("desert");
+  });
+
+  it("gives a Standard design no world at all, whatever the answer says", () => {
+    for (const options of [undefined, {}, { quality: "standard" as const }]) {
+      const r = repairEnvironment(raw("meadow"), options);
+      expect(r.ok && Object.keys(r.design)).not.toContain("world");
+    }
+    expect(repairEnvironment(raw("meadow"))).toEqual({ ok: true, design: { version: 1, sky: 1, field: 2, stripe: 0, scenery: ["pine"] } });
+  });
+
+  it("still repairs the rest the same way", () => {
+    const r = repairEnvironment({ sky: 9, field: "x", stripe: -3, scenery: ["lamp", "lamp", "ufo", "tree", "rock", "cactus"], world: "meadow" }, { quality: "high" });
+    expect(r).toEqual({ ok: true, design: { version: 1, sky: 4, field: DEFAULT_ENVIRONMENT.field, stripe: 0, scenery: ["lamp", "tree", "rock"], world: "meadow" } });
+  });
+});
+
+describe("fitMotionsToMeshes: the motions of a High model within its mesh budget", () => {
+  const swing = (joint: string) => ({ joint, channel: "rotate" as const, axis: "x" as const, wave: "swing" as const, amplitude: 10, cycles: 1, phase: 0 });
+  const everyJoint = jointsOf(defaultHighRecipe("biped"));
+  const heavy = (): MotionRecipe => ({
+    version: 1,
+    motions: { run: { seconds: 1, tracks: everyJoint.slice(0, 12).map(swing) }, jump: { seconds: 1, tracks: everyJoint.slice(12).map(swing) } },
+  });
+
+  it("leaves motions that fit exactly as they are and drops nothing", () => {
+    const recipe = defaultHighRecipe("biped");
+    const motions = defaultMotions(recipe, ["run", "jump"]);
+    const fitted = fitMotionsToMeshes(recipe, motions);
+    expect(fitted.motions).toEqual(motions);
+    expect(fitted.skipped).toEqual([]);
+  });
+
+  it("drops the tracks of the joints at the end of the model's joint list until it fits, and names each one it dropped", () => {
+    const recipe = defaultHighRecipe("biped");
+    const fitted = fitMotionsToMeshes(recipe, heavy());
+
+    expect(meshesNeeded(recipe, fitted.motions)).toBe(14);
+    // the last three joints of the kit's order (thigh_r, shin_r, foot_r) are the ones that go, each once, in the model's joint order
+    const gone = everyJoint.slice(14);
+    expect(fitted.skipped).toEqual(gone.flatMap((joint) => (everyJoint.indexOf(joint) >= 12 ? [{ clip: "Jump", joint, why: "budget" }] : [{ clip: "Run", joint, why: "budget" }])));
+    expect(checkBuildBody({ recipe, motions: fitted.motions, palette: [...SAMPLE_PALETTE] })).toBeNull();
+  });
+
+  it("counts a joint once however many clips move it, and drops it from all of them", () => {
+    const recipe = defaultHighRecipe("biped");
+    const last = everyJoint[everyJoint.length - 1];
+    const motions = heavy();
+    motions.motions.run!.tracks.push(swing(last)); // the last joint also moves in Run
+    motions.motions.run!.tracks = motions.motions.run!.tracks.slice(-12);
+    const fitted = fitMotionsToMeshes(recipe, motions);
+    expect(fitted.skipped.filter((s) => s.joint === last).map((s) => s.clip).sort()).toEqual(["Jump", "Run"]);
+    for (const clip of Object.values(fitted.motions.motions)) expect(clip?.tracks.some((t) => t.joint === last)).toBe(false);
+  });
+
+  it("takes the extras' joints first, because they come last in the kit's order", () => {
+    const recipe = { ...defaultHighRecipe("blob"), extras: ["tail" as const, "ears" as const] };
+    const joints = jointsOf(recipe); // body, eye_l, eye_r, tail_1, tail_2, ear_l, ear_r
+    const motions: MotionRecipe = { version: 1, motions: { loop: { seconds: 1, tracks: joints.map(swing) } } };
+    expect(meshesNeeded(recipe, motions)).toBe(7);
+    const fitted = fitMotionsToMeshes(recipe, motions);
+    expect(meshesNeeded(recipe, fitted.motions)).toBe(6);
+    expect(fitted.skipped).toEqual([{ clip: "Loop", joint: "ear_r", why: "budget" }]);
+  });
+
+  it("gives a clip left with no track the kit's default motion for it, on joints that are still there", () => {
+    const recipe = defaultHighRecipe("biped");
+    const motions: MotionRecipe = {
+      version: 1,
+      motions: {
+        run: { seconds: 1, tracks: everyJoint.slice(1, 13).map(swing) },
+        loop: { seconds: 1, tracks: [swing(everyJoint[13])] },
+        jump: { seconds: 1, tracks: [swing("foot_r")] }, // the one joint that has to go: Jump would have nothing left
+      },
+    };
+    expect(meshesNeeded(recipe, motions)).toBe(15);
+    const fitted = fitMotionsToMeshes(recipe, motions);
+    expect(fitted.skipped).toEqual([{ clip: "Jump", joint: "foot_r", why: "budget" }]);
+    expect(meshesNeeded(recipe, fitted.motions)).toBe(14);
+    const jump = fitted.motions.motions.jump!;
+    expect(jump.tracks.length).toBeGreaterThan(0);
+    // and it moves nothing that was not already moving
+    const others = new Set([...fitted.motions.motions.run!.tracks, ...fitted.motions.motions.loop!.tracks].map((t) => t.joint));
+    for (const t of jump.tracks) expect(others.has(t.joint) || t.joint === everyJoint[0]).toBe(true);
+  });
+
+  it("leaves a Standard recipe alone, whatever it moves", () => {
+    const recipe = defaultRecipe("biped");
+    const motions = heavy();
+    const fitted = fitMotionsToMeshes(recipe, motions);
+    expect(fitted.motions).toEqual(motions);
+    expect(fitted.skipped).toEqual([]);
+  });
+
+  it("never changes what it was given, and gives the same answer twice", () => {
+    const recipe = defaultHighRecipe("biped");
+    const motions = heavy();
+    const before = JSON.stringify(motions);
+    const first = fitMotionsToMeshes(recipe, motions);
+    expect(JSON.stringify(motions)).toBe(before);
+    expect(fitMotionsToMeshes(recipe, motions)).toEqual(first);
   });
 });

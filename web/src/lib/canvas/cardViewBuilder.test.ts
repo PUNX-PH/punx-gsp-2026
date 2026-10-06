@@ -50,6 +50,44 @@ describe("a Build Model card", () => {
     });
   });
 
+  describe("at High quality", () => {
+    const high = { ...built, parts: 76, triangles: 7_880, vertices: 5_644, size: 254_528, quality: "high" };
+
+    it("says High quality and puts the vertices in the line, with the real numbers from the worker", () => {
+      expect(done(high).result).toEqual({
+        kind: "built",
+        line: "Two-legged character, 76 parts, 7,880 triangles, 5,644 vertices, 248.6 KB",
+        quality: "High quality",
+        clips: "Moves: Run, Jump",
+        summary: "A blocky two-legged character.",
+        skipped: null,
+        reused: false,
+      });
+    });
+
+    it("says what was dropped for the model's limit apart from what had no such part", () => {
+      const skipped = [{ clip: "Run", joint: "tail_1" }, { clip: "Jump", joint: "foot_r", why: "budget" }, { clip: "Jump", joint: "shin_r", why: "budget" }];
+      expect(done({ ...high, skipped }).result).toMatchObject({ skipped: "Skipped, no such part: tail_1 (Run). Skipped, over the model's limit: foot_r (Jump), shin_r (Jump)" });
+      expect(done({ ...high, skipped: [skipped[1]] }).result).toMatchObject({ skipped: "Skipped, over the model's limit: foot_r (Jump)" });
+    });
+
+    it("leaves a Standard card exactly as it was: no quality, no vertices", () => {
+      expect(Object.keys(done({ ...built, vertices: 99 }).result)).not.toContain("quality");
+      expect(done({ ...built, vertices: 99 }).result).toMatchObject({ line: "Two-legged character, 15 parts, 180 triangles, 31.2 KB" });
+      expect(done({ ...built, quality: "standard" }).result).toMatchObject({ line: "Two-legged character, 15 parts, 180 triangles, 31.2 KB" });
+    });
+
+    it.each([
+      ["a quality that is not ours", { ...high, quality: "ultra" }],
+      ["a quality that is not text", { ...high, quality: 1 }],
+      ["no vertex count", { ...high, vertices: undefined }],
+      ["a vertex count that is text", { ...high, vertices: "5644" }],
+      ["a skipped reason that is not ours", { ...high, skipped: [{ clip: "Run", joint: "hips", why: "because" }] }],
+    ])("shows nothing for a High result with %s", (_label, result) => {
+      expect(done(result).result).toEqual({ kind: "none" });
+    });
+  });
+
   it("names each kind in plain words and groups thousands", () => {
     expect(done({ ...built, kind: "vehicle", parts: 10, triangles: 1_232, clips: ["Loop"] }).result).toMatchObject({
       line: "Wheeled vehicle, 10 parts, 1,232 triangles, 31.2 KB",
@@ -142,6 +180,39 @@ describe("a Build Environment card", () => {
   it("says No scenery for none, and passes on that the result was reused", () => {
     expect(doneWorld({ ...world, scenery: [] }).result).toMatchObject({ scenery: "No scenery" });
     expect(doneWorld({ ...world, reused: true }).result).toMatchObject({ reused: true });
+  });
+
+  describe("at High quality", () => {
+    const high = { ...world, quality: "high", world: "desert", triangles: 10_348, vertices: 5_942, size: 258_000 };
+
+    it("says High quality and shows what the scenery and the world came to", () => {
+      expect(doneWorld(high).result).toEqual({
+        kind: "environment",
+        colors: ["#1b1f3b", "#06d6a0", "#ffffff"],
+        scenery: "Tree, Windmill, Rock",
+        reused: false,
+        quality: "High quality",
+        numbers: "Desert world, 10,348 triangles, 5,942 vertices, 252.0 KB",
+      });
+      expect(doneWorld({ ...high, world: "meadow" }).result).toMatchObject({ numbers: expect.stringMatching(/^Meadow world, /) });
+    });
+
+    it("leaves a Standard card exactly as it was", () => {
+      expect(doneWorld({ ...world, triangles: 5, world: "desert" }).result).toEqual({ kind: "environment", colors: ["#1b1f3b", "#06d6a0", "#ffffff"], scenery: "Tree, Windmill, Rock", reused: false });
+    });
+
+    it.each([
+      ["a quality that is not ours", { ...high, quality: "ultra" }],
+      ["a world that is not ours", { ...high, world: "arctic" }],
+      ["a world that is not text", { ...high, world: 3 }],
+      ["no world", { ...high, world: undefined }],
+      ["triangles that are text", { ...high, triangles: "10" }],
+      ["no vertex count", { ...high, vertices: undefined }],
+      ["a size that is text", { ...high, size: "258" }],
+      ["a world named like a prototype key", { ...high, world: "__proto__" }],
+    ])("shows nothing for a High result with %s", (_label, result) => {
+      expect(doneWorld(result).result).toEqual({ kind: "none" });
+    });
   });
 
   it("shows nothing before a run, or after a step that failed or was skipped", () => {

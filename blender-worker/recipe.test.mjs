@@ -112,6 +112,7 @@ const EXPECTED_HIGH_PROBLEM = {
   "invalid-high-unknown-detail.json": "recipe.details",
   "invalid-high-five-details.json": "recipe.details",
   "invalid-high-over-budget.json": "is over the biped limit",
+  "invalid-high-over-meshes.json": "17 meshes is over the biped limit of 14",
   "invalid-standard-with-finishes.json": "recipe.finishes",
   "invalid-quality-word.json": "recipe.quality",
   "invalid-world-standard.json": "recipe.kind",

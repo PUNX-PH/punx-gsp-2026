@@ -190,6 +190,33 @@ describe("build", () => {
     expect((error as BlenderUnavailableError).status).toBe(200);
   });
 
+  describe("a High body", () => {
+    const high = JSON.parse(readFileSync(new URL("../../../../blender-worker/fixtures/recipes/high/biped-high-default.json", import.meta.url), "utf8")) as BuildBody;
+    const headers = { "X-Triangles": "7880", "X-Parts": "76", "X-Clips": "Run,Jump", "X-Vertices": "5644" };
+
+    it("also reads the shared vertices the GLB holds", async () => {
+      const { worker } = setup(async () => built(headers));
+      expect(await worker.build({ body: high, timeoutMs: 5000 })).toEqual({ bytes: GLB, triangles: 7880, parts: 76, clips: ["Run", "Jump"], vertices: 5644 });
+    });
+
+    it.each([
+      ["no X-Vertices", { "X-Triangles": "7880", "X-Parts": "76", "X-Clips": "Run,Jump" }],
+      ["a vertex count of 0", { ...headers, "X-Vertices": "0" }],
+      ["a vertex count that is not a number", { ...headers, "X-Vertices": "many" }],
+      ["a vertex count with a decimal point", { ...headers, "X-Vertices": "5644.5" }],
+    ])("a 200 with %s is unavailable (a High build always says how many)", async (_label, bad) => {
+      const { worker } = setup(async () => built(bad));
+      const error = await failure(worker.build({ body: high, timeoutMs: 5000 }));
+      expect(error).toBeInstanceOf(BlenderUnavailableError);
+      expect((error as BlenderUnavailableError).status).toBe(200);
+    });
+
+    it("leaves a Standard body's answer as it was, even when the worker sends X-Vertices", async () => {
+      const { worker } = setup(async () => built({ "X-Triangles": "180", "X-Parts": "15", "X-Clips": "Run,Jump", "X-Vertices": "99" }));
+      expect(await worker.build({ body, timeoutMs: 5000 })).toEqual({ bytes: GLB, triangles: 180, parts: 15, clips: ["Run", "Jump"] });
+    });
+  });
+
   it("a 200 whose body is not a usable GLB is unavailable", async () => {
     const { worker } = setup(async () => ok({ "X-Triangles": "180", "X-Parts": "15", "X-Clips": "Run" }, new TextEncoder().encode("not a model")));
     const error = await failure(worker.build({ body, timeoutMs: 5000 }));

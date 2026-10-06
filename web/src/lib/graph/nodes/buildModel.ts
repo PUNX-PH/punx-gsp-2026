@@ -8,6 +8,8 @@ export const buildModel: Executor = async (inputs, params, ctx) => {
   // The settings' shape was checked when the graph was saved.
   const role = params.role as Role;
   const kind = params.kind as ModelKind | "auto";
+  // A graph saved before the Quality setting has none, and means Standard; only High is told to the builder.
+  const high = params.quality === "high";
 
   let picture: { sha256: string; bytes: Uint8Array } | null = null;
   if (inputs.image?.type === "image") {
@@ -28,10 +30,11 @@ export const buildModel: Executor = async (inputs, params, ctx) => {
       motions: { run: params.run as string, jump: params.jump as string, loop: params.loop as string },
       picture,
       palette,
+      ...(high ? { quality: "high" as const } : {}),
     },
   );
   return {
-    output: { type: "model", sha256: built.sha256, name: `${built.kind}.glb`, size: built.size, format: "glb", role, clips: built.clips },
+    output: { type: "model", sha256: built.sha256, name: `${built.kind}.glb`, size: built.size, format: "glb", role, clips: built.clips, ...(built.quality === "high" ? { quality: "high" as const } : {}) },
     result: {
       role,
       kind: built.kind,
@@ -42,6 +45,7 @@ export const buildModel: Executor = async (inputs, params, ctx) => {
       summary: built.summary,
       skipped: built.skipped,
       reused: built.reused,
+      ...(built.quality === "high" ? { quality: "high" as const, ...(built.vertices === undefined ? {} : { vertices: built.vertices }) } : {}),
     },
   };
 };

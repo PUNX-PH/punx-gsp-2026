@@ -331,6 +331,57 @@ describe("Build Model and Build Environment", () => {
     expect(t.count()).toBe(1);
   });
 
+  describe("a High build", () => {
+    const high = JSON.parse(readFileSync(new URL("../../../../blender-worker/fixtures/recipes/high/biped-high-default.json", import.meta.url), "utf8")) as BuildBody;
+    const highModel = { label: "Build Model" as const, body: high };
+    const answer = async (): Promise<BuiltGlb> => ({ bytes: MADE, triangles: 7880, parts: 76, clips: ["Run", "Jump"], vertices: 5644 });
+
+    it("keeps the shared vertices with the stored job, hands them on, and gives them back when it is reused", async () => {
+      const t = setup();
+      t.replyBuild(answer);
+      const sha = await sha256Hex(MADE);
+
+      const done = await t.service.build(t.job(), highModel);
+
+      expect(done).toEqual({ sha256: sha, size: 4, triangles: 7880, parts: 76, clips: ["Run", "Jump"], vertices: 5644, reused: false });
+      expect([...t.cache.jobs.values()]).toEqual([{ sha256: sha, size: 4, trianglesBefore: null, trianglesAfter: 7880, parts: 76, clips: ["Run", "Jump"], vertices: 5644, createdAt: START }]);
+      const again = await t.service.build(t.job(), highModel);
+      expect(again).toMatchObject({ reused: true, triangles: 7880, vertices: 5644 });
+      expect(t.calls).toHaveLength(1);
+      expect(t.count()).toBe(1); // one count for a High build, as for any other
+    });
+
+    it("treats a stored High job with no vertices as a miss", async () => {
+      const t = setup();
+      t.replyBuild(answer);
+      await t.service.build(t.job(), highModel);
+      const [key, record] = [...t.cache.jobs.entries()][0];
+      const withoutVertices = { ...record };
+      delete withoutVertices.vertices;
+      t.cache.jobs.set(key, withoutVertices);
+
+      expect((await t.service.build(t.job(), highModel)).reused).toBe(false);
+      expect(t.calls).toHaveLength(2);
+    });
+
+    it("hands on no vertices for a Standard build", async () => {
+      const t = setup();
+      const done = await t.service.build(t.job(), model);
+      expect(Object.keys(done)).not.toContain("vertices");
+      expect(Object.keys([...t.cache.jobs.values()][0])).not.toContain("vertices");
+    });
+
+    it("gives the count back when the worker refuses a High recipe as bad-recipe", async () => {
+      const t = setup();
+      t.replyBuild(async () => {
+        throw new BlenderRefusedError("bad-recipe");
+      });
+      const error = await failure(t.service.build(t.job(), highModel));
+      expect((error as Error).message).toBe("Build Model: The Blender service could not build this. Try different words.");
+      expect(t.count()).toBe(0);
+    });
+  });
+
   it("treats a cache record whose file is gone as a miss and builds again", async () => {
     const t = setup();
     await t.service.build(t.job(), model);

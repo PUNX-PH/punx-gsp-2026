@@ -43,6 +43,8 @@ export interface BuiltGlb {
   triangles: number;
   parts: number;
   clips: ClipName[];
+  /** The shared vertices the GLB holds. Only a High build says (it is what the game decodes, so it is what its budget counts). */
+  vertices?: number;
 }
 
 /** The Blender worker, one call per job. `color` is a `#rrggbb` color, or null to keep the model's own colors. */
@@ -109,6 +111,8 @@ export interface BuiltResult {
   triangles: number;
   parts: number;
   clips: ClipName[];
+  /** A High build's shared vertices; a Standard build has none. */
+  vertices?: number;
   reused: boolean;
 }
 

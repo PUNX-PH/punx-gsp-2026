@@ -245,5 +245,20 @@ export function checkBuildBody(body) {
   if (!Array.isArray(palette) || palette.length !== 5 || !palette.every((c) => typeof c === "string" && HEX.test(c))) return "palette: must be five #rrggbb colors";
   const recipeProblem = checkRecipe(body.recipe);
   if (recipeProblem) return recipeProblem;
-  return checkMotions(body.motions, body.recipe);
+  const motionsProblem = checkMotions(body.motions, body.recipe);
+  if (motionsProblem) return motionsProblem;
+  if (body.recipe.quality === "high" && body.recipe.kind !== "world") {
+    const needed = meshesNeeded(body.recipe, body.motions);
+    const limit = KIT.tiers.high.caps[body.recipe.kind].meshes;
+    if (needed > limit) return `motions: ${needed} meshes is over the ${body.recipe.kind} limit of ${limit}`;
+  }
+  return null;
+}
+
+/** The most meshes a High build can make from these clips (the same bound as web/src/lib/builder/recipes.ts meshesNeeded). */
+export function meshesNeeded(recipe, motions) {
+  const root = jointsOf(recipe)[0];
+  const moved = new Set();
+  for (const clip of CLIP_KEYS) for (const track of motions.motions[clip]?.tracks ?? []) if (track.joint !== root) moved.add(track.joint);
+  return 1 + moved.size;
 }

@@ -86,6 +86,7 @@ function Result({ result, onOpenGame }: { result: ResultView; onOpenGame?: () =>
     case "built":
       return (
         <div className={cx(styles.result, styles.described)}>
+          {result.quality !== undefined && <span className={styles.chip}>{result.quality}</span>}
           <span className={styles.chip}>{result.line}</span>
           <p className={styles.hint}>{result.clips}</p>
           <p className={styles.summary}>{result.summary}</p>
@@ -103,7 +104,9 @@ function Result({ result, onOpenGame }: { result: ResultView; onOpenGame?: () =>
                 <li key={`${color}-${i}`} className={styles.swatch} style={{ background: color }} title={color} />
               ))}
           </ul>
+          {result.quality !== undefined && <span className={styles.chip}>{result.quality}</span>}
           <span className={styles.chip}>{result.scenery}</span>
+          {result.numbers !== undefined && <span className={styles.chip}>{result.numbers}</span>}
           {result.reused && <p className={styles.reusedNote}>Reused your earlier result</p>}
         </div>
       );

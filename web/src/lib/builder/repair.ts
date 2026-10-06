@@ -4,6 +4,7 @@
 import {
   AXES,
   CHANNELS,
+  CLIP_KEYS,
   CLIP_NAMES,
   DETAILS,
   FINISHES,
@@ -11,7 +12,9 @@ import {
   MAX_SCENERY,
   MODEL_KINDS,
   SCENERY_KINDS,
+  tierCaps,
   WAVES,
+  WORLD_STYLES,
   type Axis,
   type BuildField,
   type Channel,
@@ -25,9 +28,12 @@ import {
 } from "@/lib/builder/kinds";
 import {
   DEFAULT_ENVIRONMENT,
+  DEFAULT_WORLD,
   defaultMotions,
   fitToBudget,
+  isHigh,
   jointsOf,
+  meshesNeeded,
   partCount,
   triangleEstimate,
   type EnvironmentDesign,
@@ -176,14 +182,64 @@ export function repairMotions(
   return { ok: true, motions: { version: 1, motions }, skipped };
 }
 
+/**
+ * A High model's motions within the meshes its kind may have. A joint a clip moves needs a mesh of its own, so when the clips together move
+ * more joints than the kind has meshes for, the joints at the end of the kit's order (the extras', then the last of the skeleton) lose all
+ * their tracks, one at a time, until it fits; each track dropped is reported as skipped for the budget. A clip left with no track at all takes
+ * the kit's default motion for it, on joints that are already moving, so nothing it does adds a mesh. Standard models, and motions that
+ * already fit, come back unchanged. Never changes what it is given.
+ */
+export function fitMotionsToMeshes(recipe: ModelRecipe, motions: MotionRecipe): { motions: MotionRecipe; skipped: Skipped[] } {
+  const fitted = clone(motions);
+  if (!isHigh(recipe) || recipe.kind === "world") return { motions: fitted, skipped: [] };
+  const limit = tierCaps(recipe.kind, "high").meshes;
+  const order = jointsOf(recipe);
+  const root = order[0];
+  const moves = (joint: string) => CLIP_KEYS.some((clip) => fitted.motions[clip]?.tracks.some((track) => track.joint === joint));
+
+  const dropped: string[] = [];
+  const emptied = new Set<ClipKey>();
+  while (meshesNeeded(recipe, fitted) > limit) {
+    const last = [...order].reverse().find((joint) => joint !== root && moves(joint));
+    if (last === undefined) break; // the root alone is one mesh, so this does not happen
+    for (const clip of CLIP_KEYS) {
+      const m = fitted.motions[clip];
+      if (!m || !m.tracks.some((track) => track.joint === last)) continue;
+      m.tracks = m.tracks.filter((track) => track.joint !== last);
+      if (m.tracks.length === 0) emptied.add(clip);
+    }
+    dropped.push(last);
+  }
+  if (dropped.length === 0) return { motions: fitted, skipped: [] };
+
+  // The report goes in the model's joint order, and within a joint in the order of the clips, whatever order they were dropped in.
+  const skipped: Skipped[] = [];
+  for (const joint of [...dropped].sort((a, b) => order.indexOf(a) - order.indexOf(b))) {
+    for (const clip of CLIP_KEYS) {
+      if (motions.motions[clip]?.tracks.some((track) => track.joint === joint)) skipped.push({ clip: CLIP_NAMES[clip], joint, why: "budget" });
+    }
+  }
+
+  // A clip with nothing left to do takes the default motion, restricted to joints that already move (or the root): no new mesh.
+  for (const clip of emptied) {
+    const fallback = defaultMotions(recipe, [clip]).motions[clip];
+    const standing = new Set<string>([root]);
+    for (const other of CLIP_KEYS) if (other !== clip) for (const track of fitted.motions[other]?.tracks ?? []) standing.add(track.joint);
+    const tracks = (fallback?.tracks ?? []).filter((track) => standing.has(track.joint));
+    if (fallback && tracks.length > 0) fitted.motions[clip] = { seconds: fallback.seconds, tracks: clone(tracks) };
+  }
+  return { motions: fitted, skipped };
+}
+
 /** A palette index from Claude's answer: rounded and kept within 0 to 4; anything that is not a number takes the meadow's. */
 const paletteIndex = (value: unknown, fallback: number): number => (isNumber(value) ? clamp(Math.round(value), 0, 4) : fallback);
 
 /**
  * Claude's environment, repaired: each index rounded and clamped, scenery cut to the kit's known pieces (each once, the first three), and
- * the meadow's pieces when none are left. Only a non-object fails.
+ * the meadow's pieces when none are left. At High the style of the world is kept when it is one of ours and is the desert otherwise; at
+ * Standard there is no world. Only a non-object fails.
  */
-export function repairEnvironment(raw: unknown): { ok: true; design: EnvironmentDesign } | { ok: false } {
+export function repairEnvironment(raw: unknown, options: { quality?: Quality } = {}): { ok: true; design: EnvironmentDesign } | { ok: false } {
   if (!isObject(raw)) return { ok: false };
   const named = Array.isArray(raw.scenery) ? raw.scenery : [];
   const scenery: SceneryKind[] = [];
@@ -199,6 +255,7 @@ export function repairEnvironment(raw: unknown): { ok: true; design: Environment
       field: paletteIndex(raw.field, DEFAULT_ENVIRONMENT.field),
       stripe: paletteIndex(raw.stripe, DEFAULT_ENVIRONMENT.stripe),
       scenery: kept.length > 0 ? kept : [...DEFAULT_ENVIRONMENT.scenery],
+      ...(options.quality === "high" ? { world: oneOf(WORLD_STYLES, raw.world) ? raw.world : DEFAULT_WORLD } : {}),
     },
   };
 }
