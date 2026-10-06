@@ -89,9 +89,10 @@ The first revision (`blender-worker-00001-xqf`) was built from the slice 5 branc
 cannot work against it, even with the Vercel variables set. A worker that is missing, private-and-refusing, or too old all show on the canvas as
 "The Blender service did not answer. Try again."; a site with no `BLENDER_WORKER_URL` or `BLENDER_WORKER_KEY` says "The Blender service is not set up on
 this site yet." (from the commit that follows `90e8c0e`). `main` already holds the worker code the website sends today (`/build` with Standard
-recipes and scenery), so redeploy from `main` in Cloud Shell:
+recipes and scenery), so redeploy from `main` **in Google Cloud Shell** (the `>_` icon in the Google Cloud console, project `punx-gsp`; not on the
+development machine, which has no `gcloud`, and whose PowerShell 5.1 has no `&&`):
 
-```bash
+```text
 git clone --depth 1 https://github.com/PUNX-PH/punx-gsp-2026.git && cd punx-gsp-2026   # or, if it is already there: cd punx-gsp-2026 && git pull
 gcloud run deploy blender-worker --source blender-worker --region us-east1 --no-allow-unauthenticated --service-account blender-runner@punx-gsp.iam.gserviceaccount.com --max-instances 2 --concurrency 1 --memory 2Gi --cpu 1 --timeout 120
 node blender-worker/smoke.mjs https://blender-worker-202701573550.us-east1.run.app "$(gcloud auth print-identity-token)"
