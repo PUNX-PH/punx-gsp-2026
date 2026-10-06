@@ -57,6 +57,16 @@ namespace Runner.View
         /// <summary>Every scenery wrapper, the left side's pool and then the right side's.</summary>
         public IReadOnlyList<Transform> Scenery => scenery;
 
+        /// <summary>How much of the scenery is drawn (the quality governor's choice): 0 all of it, 1 every other item of each side, 2 none.</summary>
+        public void SetSceneryDetail(int detail)
+        {
+            for (var i = 0; i < scenery.Count; i++)
+            {
+                var shown = detail == 0 || (detail == 1 && (i % poolSize) % 2 == 0);
+                if (scenery[i].gameObject.activeSelf != shown) scenery[i].gameObject.SetActive(shown);
+            }
+        }
+
         /// <summary>Moves the field and the stripes with the hero, and puts each wrapper in the slot it stands in for a hero at this z.</summary>
         public void Sync(float heroZ)
         {

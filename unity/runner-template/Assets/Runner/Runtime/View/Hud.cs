@@ -10,6 +10,7 @@ namespace Runner.View
         public int Score;
         public bool GameOver;
         public bool ShowFps;
+        public int QualityLevel; // shown beside the fps with debug=1
         public Color PanelColor = new Color(0.2f, 0.2f, 0.3f);
         public Color PanelTextColor = Color.white;
         public Color ScoreColor = Color.white;
@@ -59,7 +60,7 @@ namespace Runner.View
                 Fill(panel, PanelColor);
                 Label(panel, "Game over\nTap to restart", PanelTextColor);
             }
-            if (ShowFps) Label(new Rect(0f, screen.height * 0.9f, screen.width * 0.3f, screen.height * 0.1f), fps.ToString("0") + " fps", ScoreColor);
+            if (ShowFps) Label(new Rect(0f, screen.height * 0.9f, screen.width * 0.3f, screen.height * 0.1f), fps.ToString("0") + " fps, quality " + QualityLevel, ScoreColor);
         }
 
         static void Fill(Rect rect, Color color)

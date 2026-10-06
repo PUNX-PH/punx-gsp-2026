@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading.Tasks;
 using GLTFast.Materials;
 using Runner.Loading;
+using Runner.Quality;
 using Runner.Settings;
 using Runner.Sim;
 using UnityEngine;
@@ -37,6 +38,8 @@ namespace Runner.View
         RunnerView view;
         EnvironmentView environment; // null when the settings have no environment
         WorldView worldView; // null unless the settings have a High world
+        readonly QualityGovernor governor = new QualityGovernor(); // lowers the detail on a device that cannot keep up
+        int appliedLevel;
         // The three files of a High world (terrain.glb, road.glb, backdrop.glb), loaded and kept hidden until the world view takes them; empty without a world.
         readonly Dictionary<string, GameObject> worldModels = new Dictionary<string, GameObject>();
 
@@ -272,6 +275,16 @@ namespace Runner.View
             view.Sync(Sim);
             environment?.Sync(Sim.Z);
             worldView?.Sync(Sim.Z, Sim.HeroY, view.CameraPosition);
+
+            // The governor watches the frame times; a new level is done to the scene once.
+            governor.Add(Time.unscaledDeltaTime);
+            if (governor.Level != appliedLevel)
+            {
+                appliedLevel = governor.Level;
+                QualityLevels.Apply(appliedLevel, environment, worldView);
+                Debug.Log("RUNNER quality level " + appliedLevel);
+            }
+            hud.QualityLevel = appliedLevel;
             hud.Score = Sim.Score;
             hud.GameOver = Sim.GameOver;
         }
