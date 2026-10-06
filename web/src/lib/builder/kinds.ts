@@ -26,6 +26,9 @@ export const SCENERY_NAMES: Record<SceneryKind, string> = {
   lamp: "Lamp",
 };
 
+/** An environment has at most this many pieces of scenery. */
+export const MAX_SCENERY = 3;
+
 /** The seven Make Shape shapes plus two of ours. */
 export const PROP_SHAPES = ["cube", "sphere", "cone", "cylinder", "pyramid", "coin", "ring", "gem", "crate"] as const;
 export type PropShape = (typeof PROP_SHAPES)[number];

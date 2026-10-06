@@ -11,14 +11,19 @@ import type { Designer } from "@/lib/ai/types";
 import type { BlenderService } from "@/lib/blender/types";
 import { FirestoreRecipeCache } from "@/lib/builder/firebase";
 import type { RecipeCache } from "@/lib/builder/ports";
-import type { ModelRecipe, MotionRecipe, Skipped } from "@/lib/builder/recipes";
+import type { EnvironmentDesign, ModelRecipe, MotionRecipe, Skipped } from "@/lib/builder/recipes";
 import { makeBuilderService } from "@/lib/builder/service";
 import type { BuilderService } from "@/lib/builder/types";
 
 /** The service Play uses. The stores can be handed in for a test; in production they are Firestore's. */
 export function getBuilderService(
   blender: BlenderService,
-  stores: { designs?: RecipeCache<ModelRecipe>; motions?: RecipeCache<{ motions: MotionRecipe; skipped: Skipped[] }>; limits?: UsageLimits } = {},
+  stores: {
+    designs?: RecipeCache<ModelRecipe>;
+    motions?: RecipeCache<{ motions: MotionRecipe; skipped: Skipped[] }>;
+    environments?: RecipeCache<EnvironmentDesign>;
+    limits?: UsageLimits;
+  } = {},
 ): BuilderService {
   const config = aiConfigFromEnv(process.env);
   // The Claude client, which needs the key, is only made when Claude has to be asked (a cache hit never needs it). A missing key is the
@@ -36,6 +41,7 @@ export function getBuilderService(
       designer,
       designs: stores.designs ?? new FirestoreRecipeCache<ModelRecipe>("builderDesigns"),
       motions: stores.motions ?? new FirestoreRecipeCache<{ motions: MotionRecipe; skipped: Skipped[] }>("builderMotions"),
+      environments: stores.environments ?? new FirestoreRecipeCache<EnvironmentDesign>("builderEnvironments"),
       limits: stores.limits ?? new FirestoreUsageLimits(),
       modelId: config.modelId,
       perPerson: config.perPerson,

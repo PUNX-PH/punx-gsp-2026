@@ -53,6 +53,21 @@ export interface BuildBody {
   motions: MotionRecipe;
   palette: string[];
 }
+/**
+ * The world around the track as Claude designs it: three palette indices (0 to 4) and up to three pieces of scenery from the kit. The
+ * density is the person's setting, not Claude's, so it is not here.
+ */
+export interface EnvironmentDesign {
+  version: 1;
+  sky: number;
+  field: number;
+  stripe: number;
+  scenery: SceneryKind[];
+}
+
+/** The meadow: what an empty theme gives, and what takes the place of anything Claude's answer leaves out. */
+export const DEFAULT_ENVIRONMENT: EnvironmentDesign = { version: 1, sky: 0, field: 3, stripe: 4, scenery: ["tree", "windmill", "rock"] };
+
 /** A track Claude asked for on a joint the model does not have. */
 export interface Skipped {
   clip: ClipName;

@@ -9,11 +9,22 @@ import type { UsageLimits } from "@/lib/ai/ports";
 import { AiRefusedError, AiUnavailableError, type DesignReply, type Designer } from "@/lib/ai/types";
 import type { BlenderService } from "@/lib/blender/types";
 import { CLIPS_FOR_ROLE, KIT, type ClipKey, type ModelKind } from "@/lib/builder/kinds";
-import { designKey, motionKey } from "@/lib/builder/keys";
+import { designKey, environmentKey, motionKey } from "@/lib/builder/keys";
 import type { RecipeCache } from "@/lib/builder/ports";
-import { defaultMotions, defaultRecipe, jointsOf, type ModelRecipe, type MotionRecipe, type Skipped } from "@/lib/builder/recipes";
-import { repairModelRecipe, repairMotions } from "@/lib/builder/repair";
-import type { BuildModelInput, BuilderService } from "@/lib/builder/types";
+import {
+  DEFAULT_ENVIRONMENT,
+  defaultMotions,
+  defaultRecipe,
+  type EnvironmentDesign,
+  jointsOf,
+  type ModelRecipe,
+  type MotionRecipe,
+  sceneryMotions,
+  sceneryRecipe,
+  type Skipped,
+} from "@/lib/builder/recipes";
+import { repairEnvironment, repairModelRecipe, repairMotions } from "@/lib/builder/repair";
+import type { BuildEnvironmentInput, BuildModelInput, BuilderService, BuiltEnvironment } from "@/lib/builder/types";
 import { pictureForModel } from "@/lib/graph/image";
 import { MIN_START_MS, RAN_OUT_OF_TIME, timeLeft } from "@/lib/graph/playTime";
 import { NodeError } from "@/lib/graph/types";
@@ -23,6 +34,7 @@ export interface BuilderAi {
   designer: Designer;
   designs: RecipeCache<ModelRecipe>;
   motions: RecipeCache<{ motions: MotionRecipe; skipped: Skipped[] }>;
+  environments: RecipeCache<EnvironmentDesign>;
   limits: UsageLimits;
   /** Claude's model name: part of every cache key and stored with every answer. */
   modelId: string;
@@ -41,6 +53,11 @@ export interface BuilderDeps {
 const STEP = "build-model";
 const NO_ANSWER = "The AI service did not answer. Try again.";
 
+type Call = "design" | "motion" | "environment";
+// Each call belongs to a step, which is how its failures are logged and what every sentence it says starts with.
+const STEP_OF: Record<Call, string> = { design: STEP, motion: STEP, environment: "build-environment" };
+const LABEL_OF: Record<Call, string> = { design: "Build Model", motion: "Build Model", environment: "Build Environment" };
+
 export function makeBuilderService(deps: BuilderDeps): BuilderService {
   const log = deps.log ?? (() => {});
   const say = (message: string) => new NodeError(`Build Model: ${message}`);
@@ -54,22 +71,24 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
   async function askClaude<T>(
     ai: BuilderAi,
     job: { user: { uid: string }; deadline: number },
-    call: "design" | "motion",
+    call: Call,
     request: (timeoutMs: number) => Promise<DesignReply>,
     repair: (raw: unknown) => T | null,
   ): Promise<{ value: T; usage: DesignReply["usage"] }> {
+    const step = STEP_OF[call];
+    const problem = (message: string) => new NodeError(`${LABEL_OF[call]}: ${message}`);
     const left = timeLeft(job.deadline, deps.now());
     if (left < MIN_START_MS) {
-      log({ step: STEP, call, outcome: "no-time" });
-      throw say(RAN_OUT_OF_TIME);
+      log({ step, call, outcome: "no-time" });
+      throw problem(RAN_OUT_OF_TIME);
     }
     const timeoutMs = Math.min(DEFAULT_TIMEOUT_MS, Math.floor(left / (MAX_RETRIES + 1)));
 
     const day = dayOf(deps.now());
     const taken = await ai.limits.take(job.user.uid, day, { perPerson: ai.perPerson, total: ai.total });
     if (taken !== "ok") {
-      log({ step: STEP, call, outcome: taken });
-      throw say(taken === "person-limit" ? "You have used today's AI answers. Try again tomorrow." : "The AI is busy today. Try again tomorrow.");
+      log({ step, call, outcome: taken });
+      throw problem(taken === "person-limit" ? "You have used today's AI answers. Try again tomorrow." : "The AI is busy today. Try again tomorrow.");
     }
 
     let reply: DesignReply;
@@ -77,23 +96,23 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
       reply = await request(timeoutMs);
     } catch (error) {
       if (error instanceof AiRefusedError) {
-        log({ step: STEP, call, outcome: "refused" });
-        throw say("The AI declined this request. Try different words.");
+        log({ step, call, outcome: "refused" });
+        throw problem("The AI declined this request. Try different words.");
       }
       await ai.limits.give(job.user.uid, day);
       if (error instanceof NodeError) {
-        log({ step: STEP, call, outcome: "picture" });
+        log({ step, call, outcome: "picture" });
         throw error;
       }
-      if (error instanceof AiUnavailableError) log({ step: STEP, call, outcome: "unavailable", ...(error.status === undefined ? {} : { status: error.status }) });
-      else log({ step: STEP, call, outcome: "unexpected", kind: error instanceof Error ? error.name : typeof error });
-      throw say(NO_ANSWER);
+      if (error instanceof AiUnavailableError) log({ step, call, outcome: "unavailable", ...(error.status === undefined ? {} : { status: error.status }) });
+      else log({ step, call, outcome: "unexpected", kind: error instanceof Error ? error.name : typeof error });
+      throw problem(NO_ANSWER);
     }
 
     const value = repair(reply.raw);
     if (value === null) {
-      log({ step: STEP, call, outcome: "bad-answer", ...reply.usage });
-      throw say("The AI could not build this. Try different words.");
+      log({ step, call, outcome: "bad-answer", ...reply.usage });
+      throw problem("The AI could not build this. Try different words.");
     }
     return { value, usage: reply.usage };
   }
@@ -203,6 +222,36 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
     return { motions: merged, skipped: answered.skipped, asked };
   }
 
+  /** The world from Claude, or from the cache. `asked` is true when Claude was asked. */
+  async function designWorld(ai: BuilderAi, job: Parameters<BuilderService["buildEnvironment"]>[0], theme: string): Promise<{ design: EnvironmentDesign; asked: boolean }> {
+    const step = STEP_OF.environment;
+    const key = await environmentKey({ model: ai.modelId, uid: job.user.uid, theme });
+    const found = await ai.environments.get(key);
+    if (found) {
+      log({ step, call: "environment", outcome: "reused" });
+      return { design: found.value, asked: false };
+    }
+
+    const { value: design, usage } = await askClaude(
+      ai,
+      job,
+      "environment",
+      (timeoutMs) => ai.designer.designEnvironment({ theme, timeoutMs }),
+      (raw) => {
+        const repaired = repairEnvironment(raw);
+        return repaired.ok ? repaired.design : null;
+      },
+    );
+
+    try {
+      await ai.environments.put(key, { value: design, model: ai.modelId, createdAt: deps.now(), inputTokens: usage.inputTokens, outputTokens: usage.outputTokens });
+    } catch {
+      log({ step, call: "environment", outcome: "cache-write-failed" });
+    }
+    log({ step, call: "environment", outcome: "answered", ...usage });
+    return { design, asked: true };
+  }
+
   return {
     async buildModel(job, input) {
       const description = cleanPrompt(input.description);
@@ -246,6 +295,28 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
         skipped,
         reused: !askedLook && !askedMotion && built.reused,
       };
+    },
+
+    async buildEnvironment(job, input: BuildEnvironmentInput): Promise<BuiltEnvironment> {
+      const theme = cleanPrompt(input.theme);
+
+      // An empty theme builds the meadow with no AI at all.
+      let design: EnvironmentDesign = DEFAULT_ENVIRONMENT;
+      let asked = false;
+      if (theme !== "") {
+        if (!deps.ai) throw new NodeError(`Build Environment: ${NO_ANSWER}`);
+        ({ design, asked } = await designWorld(deps.ai, job, theme));
+      }
+
+      // One worker job for each piece, one after another; the first that fails fails the step with its own sentence.
+      const scenery: BuiltEnvironment["scenery"] = [];
+      let everyPieceReused = true;
+      for (const kind of design.scenery) {
+        const built = await deps.blender.build(job, { label: "Build Environment", body: { recipe: sceneryRecipe(kind), motions: sceneryMotions(kind), palette: [...input.palette] } });
+        scenery.push({ kind, sha256: built.sha256, size: built.size, triangles: built.triangles });
+        everyPieceReused &&= built.reused;
+      }
+      return { sky: design.sky, field: design.field, stripe: design.stripe, density: input.density, scenery, reused: !asked && everyPieceReused };
     },
   };
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CLIPS_FOR_ROLE, type ClipKey, type ModelKind } from "@/lib/builder/kinds";
-import { checkBuildBody, defaultMotions, defaultRecipe, type ModelRecipe } from "@/lib/builder/recipes";
-import { enforceCaps, repairModelRecipe, repairMotions } from "@/lib/builder/repair";
+import { checkBuildBody, DEFAULT_ENVIRONMENT, defaultMotions, defaultRecipe, type ModelRecipe } from "@/lib/builder/recipes";
+import { enforceCaps, repairEnvironment, repairModelRecipe, repairMotions } from "@/lib/builder/repair";
 import { SAMPLE_PALETTE } from "@/lib/graph/palette";
 
 const ALL: ClipKey[] = ["run", "jump", "loop"];
@@ -183,5 +183,61 @@ describe("repairMotions", () => {
       const r = motionsOf(biped, messy, clips);
       expect(checkBuildBody({ recipe: biped, motions: r.motions, palette: [...SAMPLE_PALETTE] }), role).toBeNull();
     }
+  });
+});
+
+describe("repairEnvironment", () => {
+  const meadow = { version: 1, sky: 0, field: 3, stripe: 4, scenery: ["tree", "windmill", "rock"] };
+  const design = (raw: unknown) => {
+    const r = repairEnvironment(raw);
+    if (!r.ok) throw new Error("repair failed");
+    return r.design;
+  };
+
+  it("has the meadow as its default", () => {
+    expect(DEFAULT_ENVIRONMENT).toEqual(meadow);
+  });
+
+  it("keeps a good answer and adds the version", () => {
+    expect(design({ sky: 1, field: 2, stripe: 0, scenery: ["pine", "lamp"] })).toEqual({ version: 1, sky: 1, field: 2, stripe: 0, scenery: ["pine", "lamp"] });
+  });
+
+  it.each([
+    ["sky: 7", { sky: 7 }, "sky", 4],
+    ["field: 1.6", { field: 1.6 }, "field", 2],
+    ["stripe: -3", { stripe: -3 }, "stripe", 0],
+    ["sky: 0.4", { sky: 0.4 }, "sky", 0],
+    ["sky as text", { sky: "red" }, "sky", 0],
+    ["field as null", { field: null }, "field", 3],
+    ["stripe missing", {}, "stripe", 4],
+    ["sky: NaN", { sky: Number.NaN }, "sky", 0],
+    ["sky: Infinity", { sky: Number.POSITIVE_INFINITY }, "sky", 0],
+  ] as const)("clamps and rounds each index, and a non-number takes the meadow's (%s)", (_label, patch, key, wanted) => {
+    expect(design({ scenery: ["tree"], ...patch })[key]).toBe(wanted);
+  });
+
+  it.each([
+    ["unknown kinds and repeats are dropped and the first three kept", ["tree", "castle", "tree", "rock", "lamp", "pine"], ["tree", "rock", "lamp"]],
+    ["only unknown kinds takes the meadow's three", ["castle"], ["tree", "windmill", "rock"]],
+    ["an empty list takes the meadow's three", [], ["tree", "windmill", "rock"]],
+    ["no list takes the meadow's three", undefined, ["tree", "windmill", "rock"]],
+    ["a list that is not a list takes the meadow's three", "tree", ["tree", "windmill", "rock"]],
+    ["names that are not kinds, however hostile, are just dropped", ["__proto__", "constructor", "toString", "pine", 7, null], ["pine"]],
+    ["a kind in the wrong case is not a kind", ["Tree", "TREE", "cactus"], ["cactus"]],
+  ])("scenery: %s", (_label, scenery, wanted) => {
+    expect(design({ sky: 0, field: 3, stripe: 4, scenery }).scenery).toEqual(wanted);
+  });
+
+  it("fails for what is not an object", () => {
+    for (const raw of [null, undefined, "meadow", 4, ["tree"]]) expect(repairEnvironment(raw)).toEqual({ ok: false });
+  });
+
+  it("takes an object with nothing useful in it to the whole meadow", () => {
+    expect(design({})).toEqual(meadow);
+  });
+
+  it("never changes what it was given", () => {
+    const raw = Object.freeze({ sky: 9, field: 1, stripe: 1, scenery: Object.freeze(["tree", "x"]) });
+    expect(() => repairEnvironment(raw)).not.toThrow();
   });
 });

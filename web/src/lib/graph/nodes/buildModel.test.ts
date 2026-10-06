@@ -29,6 +29,9 @@ function context(files: Record<string, Uint8Array> = { [PICTURE_SHA]: new Uint8A
       asked.push({ job, input });
       return reply();
     },
+    async buildEnvironment() {
+      throw new Error("not used");
+    },
   };
   const ctx = { user, graphId: "g1", derived, deadline: 55, builder, readAsset: async (sha: string) => files[sha] ?? null } as unknown as ExecutorContext;
   return { ctx, asked };

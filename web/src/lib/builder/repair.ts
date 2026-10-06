@@ -6,7 +6,9 @@ import {
   CHANNELS,
   CLIP_NAMES,
   KIT,
+  MAX_SCENERY,
   MODEL_KINDS,
+  SCENERY_KINDS,
   WAVES,
   type Axis,
   type BuildField,
@@ -14,9 +16,21 @@ import {
   type ClipKey,
   type Extra,
   type ModelKind,
+  type SceneryKind,
   type Wave,
 } from "@/lib/builder/kinds";
-import { defaultMotions, jointsOf, partCount, triangleEstimate, type ModelRecipe, type MotionRecipe, type Skipped, type Track } from "@/lib/builder/recipes";
+import {
+  DEFAULT_ENVIRONMENT,
+  defaultMotions,
+  jointsOf,
+  partCount,
+  triangleEstimate,
+  type EnvironmentDesign,
+  type ModelRecipe,
+  type MotionRecipe,
+  type Skipped,
+  type Track,
+} from "@/lib/builder/recipes";
 
 const CONTROL = /[\u0000-\u001f\u007f]/g;
 
@@ -132,4 +146,31 @@ export function repairMotions(
     motions[clip] = tracks.length > 0 ? { seconds, tracks: tracks.slice(0, KIT.caps.tracks) } : clone(fallback);
   }
   return { ok: true, motions: { version: 1, motions }, skipped };
+}
+
+/** A palette index from Claude's answer: rounded and kept within 0 to 4; anything that is not a number takes the meadow's. */
+const paletteIndex = (value: unknown, fallback: number): number => (isNumber(value) ? clamp(Math.round(value), 0, 4) : fallback);
+
+/**
+ * Claude's environment, repaired: each index rounded and clamped, scenery cut to the kit's known pieces (each once, the first three), and
+ * the meadow's pieces when none are left. Only a non-object fails.
+ */
+export function repairEnvironment(raw: unknown): { ok: true; design: EnvironmentDesign } | { ok: false } {
+  if (!isObject(raw)) return { ok: false };
+  const named = Array.isArray(raw.scenery) ? raw.scenery : [];
+  const scenery: SceneryKind[] = [];
+  for (const piece of named) {
+    if (oneOf(SCENERY_KINDS, piece) && !scenery.includes(piece)) scenery.push(piece);
+  }
+  const kept = scenery.slice(0, MAX_SCENERY);
+  return {
+    ok: true,
+    design: {
+      version: 1,
+      sky: paletteIndex(raw.sky, DEFAULT_ENVIRONMENT.sky),
+      field: paletteIndex(raw.field, DEFAULT_ENVIRONMENT.field),
+      stripe: paletteIndex(raw.stripe, DEFAULT_ENVIRONMENT.stripe),
+      scenery: kept.length > 0 ? kept : [...DEFAULT_ENVIRONMENT.scenery],
+    },
+  };
 }

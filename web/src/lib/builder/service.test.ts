@@ -8,9 +8,21 @@ import { buildKey } from "@/lib/blender/key";
 import type { BlenderJob, BlenderService, BuiltResult } from "@/lib/blender/types";
 import type { ModelKind } from "@/lib/builder/kinds";
 import { MemoryRecipeCache } from "@/lib/builder/memory";
-import { type BuildBody, clipsOf, defaultRecipe, type ModelRecipe, type MotionRecipe, type Skipped } from "@/lib/builder/recipes";
+import {
+  type BuildBody,
+  clipsOf,
+  defaultRecipe,
+  type EnvironmentDesign,
+  type ModelRecipe,
+  type MotionRecipe,
+  partCount,
+  sceneryMotions,
+  sceneryRecipe,
+  type Skipped,
+  triangleEstimate,
+} from "@/lib/builder/recipes";
 import { makeBuilderService } from "@/lib/builder/service";
-import type { BuildModelInput } from "@/lib/builder/types";
+import type { BuildEnvironmentInput, BuildModelInput } from "@/lib/builder/types";
 import { SAMPLE_PALETTE } from "@/lib/graph/palette";
 import { RAN_OUT_OF_TIME } from "@/lib/graph/playTime";
 import { type DerivedFiles, NodeError } from "@/lib/graph/types";
@@ -190,8 +202,17 @@ const track = (joint: string, change: Record<string, unknown> = {}) => ({ joint,
 /** What Claude might say for motions: the clips it was asked for, each a length and tracks. */
 const rawMotions = (clips: Record<string, unknown[]>) => ({ motions: Object.fromEntries(Object.entries(clips).map(([clip, tracks]) => [clip, { seconds: 0.6, tracks }])) });
 const everyClip = () => rawMotions({ run: [track("thigh_l", { amplitude: 55 })], jump: [track("thigh_l", { amplitude: -55 })], loop: [track("body", { axis: "y" })] });
-const scriptedDesigner = (raw: () => unknown = () => rawModel(), motion: () => unknown = everyClip) =>
-  new ScriptedDesigner({ designModel: async () => ({ raw: raw(), usage: USAGE }), designMotion: async () => ({ raw: motion(), usage: USAGE }) });
+const rawWorld = (change: (raw: any) => void = () => {}) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const raw = { sky: 1, field: 2, stripe: 0, scenery: ["pine", "lamp"] };
+  change(raw);
+  return raw;
+};
+const scriptedDesigner = (raw: () => unknown = () => rawModel(), motion: () => unknown = everyClip, world: () => unknown = () => rawWorld()) =>
+  new ScriptedDesigner({
+    designModel: async () => ({ raw: raw(), usage: USAGE }),
+    designMotion: async () => ({ raw: motion(), usage: USAGE }),
+    designEnvironment: async () => ({ raw: world(), usage: USAGE }),
+  });
 const designCalls = (designer: ScriptedDesigner) => designer.calls.filter((call) => call.method === "designModel");
 const motionCalls = (designer: ScriptedDesigner) => designer.calls.filter((call) => call.method === "designMotion");
 
@@ -201,15 +222,26 @@ class FailingCache<T> extends MemoryRecipeCache<T> {
   }
 }
 
-function setupAi(options: { designer?: ScriptedDesigner; perPerson?: number; total?: number; reverseKeys?: boolean; failingDesignCache?: boolean } = {}) {
+function setupAi(
+  options: {
+    designer?: ScriptedDesigner;
+    perPerson?: number;
+    total?: number;
+    reverseKeys?: boolean;
+    failingDesignCache?: boolean;
+    /** The build with this number (counting from 1) fails with this error. */
+    failBuild?: { at: number; error: Error };
+  } = {},
+) {
   const designs = options.failingDesignCache ? new FailingCache<ModelRecipe>() : new MemoryRecipeCache<ModelRecipe>({ reverseKeys: options.reverseKeys });
   const motions = new MemoryRecipeCache<{ motions: MotionRecipe; skipped: Skipped[] }>();
+  const environments = new MemoryRecipeCache<EnvironmentDesign>({ reverseKeys: options.reverseKeys });
   const limits = new MemoryUsageLimits();
   const designer = options.designer ?? scriptedDesigner();
   const clock = { ms: Date.UTC(2026, 9, 6, 12) };
   const logs: object[] = [];
   const seen = new Set<string>();
-  const builds: { job: BlenderJob; body: BuildBody; key: string }[] = [];
+  const builds: { job: BlenderJob; label: string; body: BuildBody; key: string }[] = [];
   const blender: BlenderService = {
     async prepare() {
       throw new Error("not used");
@@ -219,21 +251,26 @@ function setupAi(options: { designer?: ScriptedDesigner; perPerson?: number; tot
     },
     async build(j, request) {
       const key = await buildKey({ graphId: j.graphId, body: request.body });
+      if (options.failBuild?.at === builds.length + 1) {
+        builds.push({ job: j, label: request.label, body: request.body, key });
+        throw options.failBuild.error;
+      }
       const reused = seen.has(key);
       seen.add(key);
-      builds.push({ job: j, body: request.body, key });
-      return { sha256: SHA, size: 24_824, triangles: 180, parts: 15, clips: clipsOf(request.body.motions), reused };
+      builds.push({ job: j, label: request.label, body: request.body, key });
+      // the hash of the body stands for the stored file; the counts are the kit's
+      return { sha256: key, size: 24_824, triangles: triangleEstimate(request.body.recipe), parts: partCount(request.body.recipe), clips: clipsOf(request.body.motions), reused };
     },
   };
   const service = makeBuilderService({
     blender,
     now: () => clock.ms,
     log: (info) => logs.push(info),
-    ai: { designer, designs, motions, limits, modelId: "claude-sonnet-5-5", perPerson: options.perPerson ?? 30, total: options.total ?? 300 },
+    ai: { designer, designs, motions, environments, limits, modelId: "claude-sonnet-5-5", perPerson: options.perPerson ?? 30, total: options.total ?? 300 },
   });
   const jobFor = (left = 200_000, user = job.user): BlenderJob => ({ ...job, user, deadline: clock.ms + left });
   const aiCount = () => limits.counts.get(`site_${dayOf(clock.ms)}`) ?? 0;
-  return { service, designer, designs, limits, logs, builds, clock, jobFor, aiCount };
+  return { service, designer, designs, environments, limits, logs, builds, clock, jobFor, aiCount };
 }
 
 const words = (description: string, extra: Partial<BuildModelInput> = {}): BuildModelInput => input({ kind: "auto", description, ...extra });
@@ -649,5 +686,241 @@ describe("the motion call", () => {
     await t.service.buildModel(t.jobFor(), gallop({ motions: { run: "a very private gallop", jump: "", loop: "" } }));
     const text = JSON.stringify(t.logs);
     for (const secret of ["private", "gallop", "thigh", "amplitude", "tracks"]) expect(text).not.toContain(secret);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// The environment: Claude picks colors and scenery, and one worker job builds each piece.
+
+const NO_ANSWER_WORLD = "Build Environment: The AI service did not answer. Try again.";
+const COULD_NOT_WORLD = "Build Environment: The AI could not build this. Try different words.";
+const DECLINED_WORLD = "Build Environment: The AI declined this request. Try different words.";
+const PERSON_WORLD = "Build Environment: You have used today's AI answers. Try again tomorrow.";
+const SITE_WORLD = "Build Environment: The AI is busy today. Try again tomorrow.";
+const OUT_OF_TIME_WORLD = `Build Environment: ${RAN_OUT_OF_TIME}`;
+const STEP_WORLD = "build-environment";
+
+const theme = (text: string, extra: Partial<BuildEnvironmentInput> = {}): BuildEnvironmentInput => ({ theme: text, density: "some", palette: SAMPLE_PALETTE, ...extra });
+const environmentCalls = (designer: ScriptedDesigner) => designer.calls.filter((call) => call.method === "designEnvironment");
+const piecesBuilt = (t: ReturnType<typeof setupAi>) => t.builds.map((b) => (b.body.recipe.build as { scenery: string }).scenery);
+
+describe("the environment", () => {
+  it("builds the meadow's three pieces for an empty theme, with no AI call and no AI count", async () => {
+    const t = setupAi();
+    const built = await t.service.buildEnvironment(t.jobFor(), theme(""));
+
+    expect(t.designer.calls).toHaveLength(0);
+    expect(t.aiCount()).toBe(0);
+    expect(piecesBuilt(t)).toEqual(["tree", "windmill", "rock"]);
+    expect(t.builds.map((b) => b.label)).toEqual(["Build Environment", "Build Environment", "Build Environment"]);
+    expect(built).toMatchObject({ sky: 0, field: 3, stripe: 4, density: "some", reused: false });
+    expect(built.scenery.map((piece) => piece.kind)).toEqual(["tree", "windmill", "rock"]);
+    expect(built.scenery[0]).toEqual({ kind: "tree", sha256: t.builds[0].key, size: 24_824, triangles: 188 });
+  });
+
+  it("sends each piece as the kit's recipe and motions with the palette", async () => {
+    const t = setupAi();
+    await t.service.buildEnvironment(t.jobFor(), theme("", { palette: ["#000001", "#000002", "#000003", "#000004", "#000005"] }));
+    for (const [index, kind] of (["tree", "windmill", "rock"] as const).entries()) {
+      expect(t.builds[index].body).toEqual({ recipe: sceneryRecipe(kind), motions: sceneryMotions(kind), palette: ["#000001", "#000002", "#000003", "#000004", "#000005"] });
+    }
+  });
+
+  it("counts a theme of only spaces and control characters as empty: no AI call, no count (Review Focus 2)", async () => {
+    const t = setupAi();
+    await t.service.buildEnvironment(t.jobFor(), theme(" \u0007\u0000 \t\n "));
+    expect(t.designer.calls).toHaveLength(0);
+    expect(t.aiCount()).toBe(0);
+    expect(piecesBuilt(t)).toEqual(["tree", "windmill", "rock"]);
+  });
+
+  it("designs a theme once: a repeat makes no call, takes no count, builds nothing new, and says it reused the result", async () => {
+    const t = setupAi();
+    const first = await t.service.buildEnvironment(t.jobFor(), theme("a snowy night"));
+    expect(first).toMatchObject({ sky: 1, field: 2, stripe: 0, reused: false });
+    expect(first.scenery.map((piece) => piece.kind)).toEqual(["pine", "lamp"]);
+    expect(environmentCalls(t.designer)).toHaveLength(1);
+    expect(t.aiCount()).toBe(1);
+    expect(t.designer.calls[0].request).toMatchObject({ theme: "a snowy night" });
+
+    const again = await t.service.buildEnvironment(t.jobFor(), theme("a snowy night"));
+    expect(environmentCalls(t.designer)).toHaveLength(1);
+    expect(t.aiCount()).toBe(1);
+    expect(again.reused).toBe(true);
+    expect(t.builds.slice(2).map((b) => b.key)).toEqual(t.builds.slice(0, 2).map((b) => b.key)); // the same builds, which the Blender service has
+  });
+
+  it("reuses the builds for a repeat whose design came back from the cache with its keys in another order", async () => {
+    const t = setupAi({ reverseKeys: true });
+    await t.service.buildEnvironment(t.jobFor(), theme("a snowy night"));
+    const again = await t.service.buildEnvironment(t.jobFor(), theme("a snowy night"));
+    expect(environmentCalls(t.designer)).toHaveLength(1);
+    expect(again.reused).toBe(true);
+  });
+
+  it("keeps the density out of every key: changing it makes no AI call and asks for no new build", async () => {
+    const t = setupAi();
+    await t.service.buildEnvironment(t.jobFor(), theme("a snowy night", { density: "some" }));
+    const lots = await t.service.buildEnvironment(t.jobFor(), theme("a snowy night", { density: "lots" }));
+
+    expect(environmentCalls(t.designer)).toHaveLength(1);
+    expect(lots.density).toBe("lots");
+    expect(t.builds.slice(2).map((b) => b.key)).toEqual(t.builds.slice(0, 2).map((b) => b.key));
+    expect(lots.reused).toBe(true);
+  });
+
+  it("rebuilds the scenery for another palette with no AI call", async () => {
+    const t = setupAi();
+    await t.service.buildEnvironment(t.jobFor(), theme("a snowy night"));
+    const other = await t.service.buildEnvironment(t.jobFor(), theme("a snowy night", { palette: ["#000001", "#000002", "#000003", "#000004", "#000005"] }));
+
+    expect(environmentCalls(t.designer)).toHaveLength(1);
+    expect(t.aiCount()).toBe(1);
+    expect(new Set(t.builds.map((b) => b.key)).size).toBe(4); // two pieces in two palettes
+    expect(other.reused).toBe(false);
+  });
+
+  it("designs again for another theme or another person", async () => {
+    const t = setupAi();
+    await t.service.buildEnvironment(t.jobFor(), theme("a snowy night"));
+    await t.service.buildEnvironment(t.jobFor(), theme("a hot desert"));
+    await t.service.buildEnvironment(t.jobFor(200_000, BOB), theme("a snowy night"));
+    expect(environmentCalls(t.designer)).toHaveLength(3);
+  });
+
+  it("clamps an out-of-range answer, and the repaired design is what is cached and built", async () => {
+    const t = setupAi({ designer: scriptedDesigner(undefined, undefined, () => rawWorld((raw) => ((raw.sky = 7), (raw.scenery = ["tree", "castle", "tree", "rock", "lamp", "pine"])))) });
+    const built = await t.service.buildEnvironment(t.jobFor(), theme("a wild place"));
+
+    expect(built.sky).toBe(4);
+    expect(built.scenery.map((piece) => piece.kind)).toEqual(["tree", "rock", "lamp"]);
+    const [stored] = [...t.environments.entries.values()];
+    expect(stored.value).toEqual({ version: 1, sky: 4, field: 2, stripe: 0, scenery: ["tree", "rock", "lamp"] });
+    expect(stored).toMatchObject({ model: "claude-sonnet-5-5", inputTokens: 3000, outputTokens: 300 });
+  });
+
+  it("builds the meadow's pieces when every piece Claude named is unknown", async () => {
+    const t = setupAi({ designer: scriptedDesigner(undefined, undefined, () => rawWorld((raw) => (raw.scenery = ["castle"]))) });
+    const built = await t.service.buildEnvironment(t.jobFor(), theme("a castle"));
+    expect(built.scenery.map((piece) => piece.kind)).toEqual(["tree", "windmill", "rock"]);
+  });
+
+  it("says the result was not reused whenever Claude was asked, even if every build was cached", async () => {
+    const t = setupAi();
+    await t.service.buildEnvironment(t.jobFor(), theme("a snowy night"));
+    const other = await t.service.buildEnvironment(t.jobFor(200_000, BOB), theme("a snowy night"));
+    expect(environmentCalls(t.designer)).toHaveLength(2);
+    expect(other.reused).toBe(false);
+  });
+
+  it("says the result was not reused when one build was new, though Claude was not asked", async () => {
+    const t = setupAi();
+    await t.service.buildEnvironment(t.jobFor(), theme("a snowy night"));
+    // the same design with a new palette: the design is cached, but both builds are new
+    const again = await t.service.buildEnvironment(t.jobFor(), theme("a snowy night", { palette: ["#0a0a0a", "#0b0b0b", "#0c0c0c", "#0d0d0d", "#0e0e0e"] }));
+    expect(again.reused).toBe(false);
+  });
+
+  it("says could-not-build, keeping the count and caching nothing, when the answer is not an object", async () => {
+    const t = setupAi({ designer: scriptedDesigner(undefined, undefined, () => "a nice meadow") });
+    expect(((await failure(t.service.buildEnvironment(t.jobFor(), theme("x")))) as Error).message).toBe(COULD_NOT_WORLD);
+    expect(t.aiCount()).toBe(1);
+    expect(t.environments.entries.size).toBe(0);
+    expect(t.builds).toHaveLength(0);
+    expect(t.logs).toEqual([{ step: STEP_WORLD, call: "environment", outcome: "bad-answer", ...USAGE }]);
+  });
+
+  it("refuses with the person's and the site's sentences, and calls no one", async () => {
+    const person = setupAi({ perPerson: 1 });
+    await person.service.buildEnvironment(person.jobFor(), theme("one"));
+    expect(((await failure(person.service.buildEnvironment(person.jobFor(), theme("two")))) as Error).message).toBe(PERSON_WORLD);
+    expect(environmentCalls(person.designer)).toHaveLength(1);
+
+    const site = setupAi({ total: 1 });
+    await site.service.buildEnvironment(site.jobFor(), theme("one"));
+    expect(((await failure(site.service.buildEnvironment(site.jobFor(200_000, BOB), theme("two")))) as Error).message).toBe(SITE_WORLD);
+    expect(environmentCalls(site.designer)).toHaveLength(1);
+  });
+
+  it("keeps the count for a refusal, and gives it back when the service did not answer or failed in some other way", async () => {
+    const make = (reject: () => Error) => setupAi({ designer: new ScriptedDesigner({ designEnvironment: async () => Promise.reject(reject()) }) });
+
+    const refused = make(() => new AiRefusedError());
+    expect(((await failure(refused.service.buildEnvironment(refused.jobFor(), theme("x")))) as Error).message).toBe(DECLINED_WORLD);
+    expect(refused.aiCount()).toBe(1);
+    expect(refused.logs).toEqual([{ step: STEP_WORLD, call: "environment", outcome: "refused" }]);
+
+    const unavailable = make(() => new AiUnavailableError(529));
+    expect(((await failure(unavailable.service.buildEnvironment(unavailable.jobFor(), theme("x")))) as Error).message).toBe(NO_ANSWER_WORLD);
+    expect(unavailable.aiCount()).toBe(0);
+    expect(unavailable.logs).toEqual([{ step: STEP_WORLD, call: "environment", outcome: "unavailable", status: 529 }]);
+
+    const unexpected = make(() => new TypeError("boom: secret"));
+    expect(((await failure(unexpected.service.buildEnvironment(unexpected.jobFor(), theme("x")))) as Error).message).toBe(NO_ANSWER_WORLD);
+    expect(unexpected.aiCount()).toBe(0);
+    expect(unexpected.logs).toEqual([{ step: STEP_WORLD, call: "environment", outcome: "unexpected", kind: "TypeError" }]);
+  });
+
+  it("says a theme needs the AI when none is wired, and builds nothing", async () => {
+    const bare = makeBuilderService({
+      blender: { prepare: async () => Promise.reject(new Error("no")), shape: async () => Promise.reject(new Error("no")), build: async () => Promise.reject(new Error("no")) },
+      now: () => 0,
+    });
+    expect(((await failure(bare.buildEnvironment(job, theme("a snowy night")))) as Error).message).toBe(NO_ANSWER_WORLD);
+  });
+
+  it("says Play ran out of time and takes no count for a miss with less than 10 seconds left, but a hit still builds", async () => {
+    const t = setupAi();
+    const error = await failure(t.service.buildEnvironment(t.jobFor(5_000), theme("a snowy night")));
+    expect((error as Error).message).toBe(OUT_OF_TIME_WORLD);
+    expect(t.designer.calls).toHaveLength(0);
+    expect(t.aiCount()).toBe(0);
+    expect(t.logs).toEqual([{ step: STEP_WORLD, call: "environment", outcome: "no-time" }]);
+
+    await t.service.buildEnvironment(t.jobFor(), theme("a snowy night"));
+    const hit = await t.service.buildEnvironment(t.jobFor(5_000), theme("a snowy night"));
+    expect(hit.reused).toBe(true);
+  });
+
+  it("gives Claude 60 seconds, or half the time left", async () => {
+    const t = setupAi();
+    await t.service.buildEnvironment(t.jobFor(200_000), theme("one"));
+    await t.service.buildEnvironment(t.jobFor(20_000), theme("two"));
+    expect(environmentCalls(t.designer).map((call) => (call.request as { timeoutMs: number }).timeoutMs)).toEqual([60_000, 10_000]);
+  });
+
+  it("fails the step with the Blender service's own sentence when a second piece cannot be built, and builds no more", async () => {
+    const sentence = "Build Environment: The Blender service did not answer. Try again.";
+    const t = setupAi({ failBuild: { at: 2, error: new NodeError(sentence) } });
+    const error = await failure(t.service.buildEnvironment(t.jobFor(), theme("")));
+
+    expect(error).toBeInstanceOf(NodeError);
+    expect((error as Error).message).toBe(sentence);
+    expect(piecesBuilt(t)).toEqual(["tree", "windmill"]); // the third was never asked for
+  });
+
+  it("builds the pieces one after another, in the order of the design", async () => {
+    const t = setupAi({ designer: scriptedDesigner(undefined, undefined, () => rawWorld((raw) => (raw.scenery = ["lamp", "cactus", "pine"]))) });
+    await t.service.buildEnvironment(t.jobFor(), theme("a street"));
+    expect(piecesBuilt(t)).toEqual(["lamp", "cactus", "pine"]);
+  });
+
+  it("still builds when the design cannot be cached", async () => {
+    const t = setupAi();
+    t.environments.put = async () => Promise.reject(new Error("firestore is down"));
+    expect((await t.service.buildEnvironment(t.jobFor(), theme("a snowy night"))).scenery).toHaveLength(2);
+    expect(t.logs).toContainEqual({ step: STEP_WORLD, call: "environment", outcome: "cache-write-failed" });
+  });
+
+  it("logs the step, the call, the outcome and the token counts, never the theme or the design", async () => {
+    const t = setupAi();
+    await t.service.buildEnvironment(t.jobFor(), theme("a very private snowy night"));
+    await t.service.buildEnvironment(t.jobFor(), theme("a very private snowy night"));
+    expect(t.logs).toEqual([
+      { step: STEP_WORLD, call: "environment", outcome: "answered", ...USAGE },
+      { step: STEP_WORLD, call: "environment", outcome: "reused" },
+    ]);
+    const text = JSON.stringify(t.logs);
+    for (const secret of ["private", "snowy", "pine", "lamp", "scenery"]) expect(text).not.toContain(secret);
   });
 });
