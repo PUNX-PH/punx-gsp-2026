@@ -1,19 +1,19 @@
 {
   "biped-high-default.json": {
-    "parts": 68,
-    "triangles": 9700,
-    "vertices": 7720,
-    "meshes": 9,
+    "parts": 76,
+    "triangles": 7880,
+    "vertices": 5644,
+    "meshes": 7,
     "clips": [
       "Run",
       "Jump"
     ]
   },
   "biped-high-stress.json": {
-    "parts": 73,
-    "triangles": 10920,
-    "vertices": 8700,
-    "meshes": 12,
+    "parts": 67,
+    "triangles": 8364,
+    "vertices": 5738,
+    "meshes": 7,
     "clips": [
       "Run",
       "Jump",
@@ -31,9 +31,9 @@
   },
   "vehicle-high-stress.json": {
     "parts": 36,
-    "triangles": 5810,
-    "vertices": 4650,
-    "meshes": 8,
+    "triangles": 5806,
+    "vertices": 4588,
+    "meshes": 7,
     "clips": [
       "Run",
       "Jump",
@@ -51,9 +51,9 @@
   },
   "blob-high-stress.json": {
     "parts": 15,
-    "triangles": 4220,
-    "vertices": 3300,
-    "meshes": 4,
+    "triangles": 3876,
+    "vertices": 2862,
+    "meshes": 1,
     "clips": [
       "Run",
       "Jump",

@@ -74,6 +74,29 @@ def flat_material(name, linear_rgb):
     return material
 
 
+def finish_material(name, linear_rgb, finish):
+    """A glTF-friendly material for a High finish ({ metallic, roughness, emission }): the slot color as the base color, multiplied by the
+    mesh's "Col" color attribute (the baked cavity shading) through a Color Attribute node linked straight into Base Color, which is what
+    makes the exporter write the attribute as COLOR_0 and keep the color as the base color factor. A finish with emission glows in its
+    own color."""
+    material = bpy.data.materials.new(name)
+    if material.node_tree is None:
+        material.use_nodes = True
+    tree = material.node_tree
+    bsdf = next((node for node in tree.nodes if node.type == "BSDF_PRINCIPLED"), None)
+    bsdf.inputs["Base Color"].default_value = (*linear_rgb, 1.0)
+    bsdf.inputs["Metallic"].default_value = finish["metallic"]
+    bsdf.inputs["Roughness"].default_value = finish["roughness"]
+    if finish["emission"] > 0:
+        bsdf.inputs["Emission Color"].default_value = (*linear_rgb, 1.0)
+        bsdf.inputs["Emission Strength"].default_value = finish["emission"]
+    shade = tree.nodes.new("ShaderNodeVertexColor")
+    shade.layer_name = "Col"
+    tree.links.new(shade.outputs["Color"], bsdf.inputs["Base Color"])
+    material.diffuse_color = (*linear_rgb, 1.0)
+    return material
+
+
 def base_color(material):
     """A material's base color (linear r, g, b): the Principled BSDF's, else the viewport color, else light grey."""
     if material is None:
@@ -103,10 +126,11 @@ def flatten_materials(obj, color):
         mesh.materials[index] = flat_material(f"flat{index}", base_color(material))
 
 
-def export_glb(path, animations=False):
+def export_glb(path, animations=False, vertex_colors=False):
     """The scene as a GLB: Y up, modifiers applied, and nothing a game of this kind has no use for (no cameras, lights, skins, morph
     targets, extras, texture coordinates, images or vertex colors). With `animations=True` each NLA track becomes one named
-    animation (build.py pushes a clip per joint onto a track named after the clip); without it there is no animation at all."""
+    animation (build.py pushes a clip per joint onto a track named after the clip); without it there is no animation at all. With
+    `vertex_colors=True` (the High tier) the "Col" color attribute (the baked cavity shading) is exported as COLOR_0."""
     options = dict(
         filepath=path,
         export_format="GLB",
@@ -115,7 +139,9 @@ def export_glb(path, animations=False):
         use_selection=False,
         export_materials="EXPORT",
         export_image_format="NONE",
-        export_vertex_color="NONE",
+        # NAME writes the one attribute called Col as COLOR_0 (16-bit, normalized); MATERIAL and ACTIVE also write a duplicate COLOR_1
+        export_vertex_color="NAME" if vertex_colors else "NONE",
+        export_vertex_color_name="Col",
         export_texcoords=False,
         export_normals=True,
         export_attributes=False,
@@ -129,6 +155,22 @@ def export_glb(path, animations=False):
     if animations:
         options["export_animation_mode"] = "NLA_TRACKS"
     bpy.ops.export_scene.gltf(**options)
+
+
+def glb_counts(path):
+    """What a GLB really holds, read from its JSON part: triangles (from the index counts), vertices (the POSITION accessors, so shared and
+    split vertices count as the game will decode them) and meshes (nodes that carry one)."""
+    with open(path, "rb") as handle:
+        data = handle.read()
+    length = int.from_bytes(data[12:16], "little")
+    gltf = json.loads(data[20 : 20 + length])
+    triangles = vertices = 0
+    for mesh in gltf.get("meshes", []):
+        for primitive in mesh["primitives"]:
+            vertices += gltf["accessors"][primitive["attributes"]["POSITION"]]["count"]
+            triangles += gltf["accessors"][primitive["indices"]]["count"] // 3
+    meshes = sum(1 for node in gltf.get("nodes", []) if "mesh" in node)
+    return {"triangles": triangles, "vertices": vertices, "meshes": meshes}
 
 
 def write_stats(path, after, before=None):

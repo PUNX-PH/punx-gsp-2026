@@ -32,11 +32,10 @@
       "arms": "painted",
       "legs": "metal",
       "feet": "rubber",
-      "extra": "glow"
+      "extra": "painted"
     },
     "details": [
       "seams",
-      "bolts",
       "lights"
     ]
   },

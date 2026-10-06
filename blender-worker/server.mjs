@@ -211,9 +211,14 @@ export function createWorker(options) {
         throw new Refusal(500, "failed"); // Blender said it was done but left nothing usable
       }
       if (job.recipe) {
-        const { triangles, parts, clips } = counts ?? {};
+        const { triangles, parts, clips, vertices } = counts ?? {};
         const clipsOk = Array.isArray(clips) && new Set(clips).size === clips.length && clips.every((c) => BUILD_CLIPS.includes(c));
         if (glb.length === 0 || !Number.isInteger(triangles) || triangles < 1 || !Number.isInteger(parts) || parts < 1 || !clipsOk) throw new Refusal(500, "failed");
+        // A High build also reports how many shared vertices the GLB holds (it is what the game decodes); without it the answer is not usable.
+        if (job.recipe.recipe?.quality === "high") {
+          if (!Number.isInteger(vertices) || vertices < 1) throw new Refusal(500, "failed");
+          return { glb, triangles, parts, clips, vertices };
+        }
         return { glb, triangles, parts, clips };
       }
       const after = counts?.after;
@@ -235,13 +240,14 @@ export function createWorker(options) {
     res.end(glb);
   }
 
-  function sendBuild(res, { glb, triangles, parts, clips }) {
+  function sendBuild(res, { glb, triangles, parts, clips, vertices }) {
     res.writeHead(200, {
       "content-type": "model/gltf-binary",
       "content-length": glb.length,
       "x-triangles": String(triangles),
       "x-parts": String(parts),
       "x-clips": clips.join(","),
+      ...(vertices === undefined ? {} : { "x-vertices": String(vertices) }),
     });
     res.end(glb);
   }

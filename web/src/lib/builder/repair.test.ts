@@ -282,9 +282,11 @@ describe("repairModelRecipe in the High tier", () => {
   });
 
   it("brings a recipe over budget within it, dropping cables first", () => {
-    const recipe = high(answerWith("biped", { extras: ["backpack", "ears"], details: ["seams", "bolts", "cables", "lights"] }));
+    const recipe = high(answerWith("biped", { extras: ["hat"], details: ["seams", "bolts", "cables", "lights"] }));
     expect(recipe.details).toEqual(["seams", "bolts", "lights"]);
-    expect(recipe.extras).toEqual(["backpack", "ears"]);
+    expect(recipe.extras).toEqual(["hat"]);
+    const heavier = high(answerWith("biped", { extras: ["backpack", "ears"], details: ["seams", "bolts", "cables", "lights"] }));
+    expect(heavier.details).toEqual(["seams", "lights"]);
   });
 
   it("is not held to Standard caps: a default High biped has more than 24 parts and 2,000 triangles", () => {

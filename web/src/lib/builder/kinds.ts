@@ -817,41 +817,41 @@ export const KIT: Kit = {
         "glow": { "metallic": 0, "roughness": 0.5, "emission": 1 }
       },
       "extras": {
-        "tail": { "triangles": 420, "vertices": 340, "parts": 2, "meshes": 2 },
-        "ears": { "triangles": 700, "vertices": 560, "parts": 2, "meshes": 2 },
-        "antenna": { "triangles": 520, "vertices": 420, "parts": 3, "meshes": 1 },
-        "hat": { "triangles": 600, "vertices": 480, "parts": 1, "meshes": 1 },
-        "backpack": { "triangles": 900, "vertices": 700, "parts": 4, "meshes": 1 }
+        "tail": { "triangles": 360, "vertices": 184, "parts": 2, "meshes": 0 },
+        "ears": { "triangles": 360, "vertices": 184, "parts": 2, "meshes": 0 },
+        "antenna": { "triangles": 516, "vertices": 358, "parts": 3, "meshes": 0 },
+        "hat": { "triangles": 140, "vertices": 72, "parts": 1, "meshes": 0 },
+        "backpack": { "triangles": 432, "vertices": 384, "parts": 4, "meshes": 0 }
       },
       "details": {
         "seams": {
-          "biped": { "triangles": 800, "vertices": 640, "parts": 4, "meshes": 0 },
+          "biped": { "triangles": 228, "vertices": 264, "parts": 4, "meshes": 0 },
           "vehicle": { "triangles": 250, "vertices": 200, "parts": 3, "meshes": 0 },
           "blob": { "triangles": 200, "vertices": 160, "parts": 2, "meshes": 0 },
           "prop": { "triangles": 300, "vertices": 240, "parts": 3, "meshes": 0 }
         },
         "bolts": {
-          "biped": { "triangles": 1700, "vertices": 1360, "parts": 14, "meshes": 0 },
+          "biped": { "triangles": 392, "vertices": 448, "parts": 14, "meshes": 0 },
           "vehicle": { "triangles": 400, "vertices": 320, "parts": 8, "meshes": 0 },
           "prop": { "triangles": 500, "vertices": 400, "parts": 8, "meshes": 0 }
         },
         "cables": {
-          "biped": { "triangles": 1300, "vertices": 1040, "parts": 4, "meshes": 0 },
+          "biped": { "triangles": 288, "vertices": 336, "parts": 4, "meshes": 0 },
           "vehicle": { "triangles": 200, "vertices": 160, "parts": 2, "meshes": 0 }
         },
         "lights": {
-          "biped": { "triangles": 400, "vertices": 320, "parts": 6, "meshes": 0 },
+          "biped": { "triangles": 72, "vertices": 144, "parts": 6, "meshes": 0 },
           "vehicle": { "triangles": 240, "vertices": 190, "parts": 4, "meshes": 0 },
           "blob": { "triangles": 200, "vertices": 160, "parts": 2, "meshes": 0 }
         }
       },
       "defaults": {
         "biped": {
-          "finishes": { "head": "painted", "body": "painted", "arms": "painted", "legs": "metal", "feet": "rubber", "extra": "glow" },
+          "finishes": { "head": "painted", "body": "painted", "arms": "painted", "legs": "metal", "feet": "rubber", "extra": "painted" },
           "details": ["seams", "bolts", "lights"]
         },
         "vehicle": {
-          "finishes": { "body": "painted", "cab": "metal", "wheels": "rubber", "extra": "glow" },
+          "finishes": { "body": "painted", "cab": "metal", "wheels": "rubber", "extra": "painted" },
           "details": ["seams", "lights"]
         },
         "blob": {
@@ -887,7 +887,7 @@ export const KIT: Kit = {
         }
       },
       "base": {
-        "biped": { "triangles": 6800, "vertices": 5400, "parts": 44, "meshes": 9 },
+        "biped": { "triangles": 7188, "vertices": 4788, "parts": 52, "meshes": 7 },
         "vehicle": {
           "triangles": 1500,
           "vertices": 1200,

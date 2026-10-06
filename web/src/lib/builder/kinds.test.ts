@@ -312,14 +312,17 @@ describe("the High tier", () => {
     expect(Object.keys(high.base.scenery).sort()).toEqual([...SCENERY_KINDS].sort());
   });
 
-  it("can be over a cap only by piling on extras and details: the base alone and the default details always fit", () => {
+  it("can be over a cap only by piling on extras and details: the default biped always fits, and parts are what bind it", () => {
     const biped = high.base.biped;
     const defaults = high.defaults.biped.details.map((d) => high.details[d].biped!);
-    const biggest = (Object.keys(high.extras) as (keyof typeof high.extras)[]).sort((a, b) => high.extras[b].triangles - high.extras[a].triangles).slice(0, 2);
-    const triangles = biped.triangles + biggest.reduce((sum, e) => sum + high.extras[e].triangles, 0) + defaults.reduce((sum, d) => sum + d.triangles, 0);
-    expect(triangles).toBeLessThanOrEqual(high.caps.biped.triangles);
-    const everything = triangles - defaults.reduce((sum, d) => sum + d.triangles, 0) + DETAILS.reduce((sum, d) => sum + (high.details[d].biped?.triangles ?? 0), 0);
-    expect(everything, "two big extras and all four details is the case the budget fit exists for").toBeGreaterThan(high.caps.biped.triangles);
+    const biggest = (Object.keys(high.extras) as (keyof typeof high.extras)[]).sort((a, b) => high.extras[b].parts - high.extras[a].parts).slice(0, 2);
+    const withDefaults = biped.parts + biggest.slice(0, 1).reduce((sum, e) => sum + high.extras[e].parts, 0) + defaults.reduce((sum, d) => sum + d.parts, 0);
+    expect(withDefaults, "the biggest extra and the default details fit").toBeLessThanOrEqual(high.caps.biped.parts);
+    const everything = withDefaults + (high.extras[biggest[1]].parts) - defaults.reduce((sum, d) => sum + d.parts, 0) + DETAILS.reduce((sum, d) => sum + (high.details[d].biped?.parts ?? 0), 0);
+    expect(everything, "two big extras and all four details is the case the budget fit exists for").toBeGreaterThan(high.caps.biped.parts);
+    // and the models are lean: nothing but the parts cap is within reach of the triangle cap
+    const allTriangles = biped.triangles + biggest.reduce((sum, e) => sum + high.extras[e].triangles, 0) + DETAILS.reduce((sum, d) => sum + (high.details[d].biped?.triangles ?? 0), 0);
+    expect(allTriangles).toBeLessThan(high.caps.biped.triangles);
   });
 
   it("tierCaps gives the High caps, and Standard's own parts and triangles with no vertex or mesh limit", () => {

@@ -624,6 +624,206 @@ class BuildScript(unittest.TestCase):
             self.assertEqual(self.build(body).returncode, EXIT_BAD_RECIPE, name)
 
 
+def high_fixture(name):
+    with open(os.path.join(RECIPES, "high", name), encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def accessor_normalized(gltf, binary, index):
+    """A normalized unsigned integer accessor (a vertex color the exporter wrote as 8 or 16 bit) as tuples of floats 0 to 1."""
+    accessor = gltf["accessors"][index]
+    assert accessor.get("normalized") and accessor["componentType"] in (5121, 5123)
+    width = {"VEC3": 3, "VEC4": 4}[accessor["type"]]
+    code, size, top = {5121: ("B", 1, 255.0), 5123: ("H", 2, 65535.0)}[accessor["componentType"]]
+    view = gltf["bufferViews"][accessor["bufferView"]]
+    start = view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
+    stride = view.get("byteStride", width * size)
+    return [tuple(c / top for c in struct.unpack_from("<" + code * width, binary, start + i * stride)) for i in range(accessor["count"])]
+
+
+FINISH_VALUES = json.load(open(os.path.join(SCRIPTS, "kit.json")))["tiers"]["high"]["finishes"]
+HIGH_CAPS = json.load(open(os.path.join(SCRIPTS, "kit.json")))["tiers"]["high"]["caps"]
+
+
+class BuildHigh(unittest.TestCase):
+    """The High tier: lit, detailed models inside budgets, measured on the exported GLB itself."""
+
+    def setUp(self):
+        self._folder = tempfile.TemporaryDirectory()
+        self.dir = self._folder.name
+        self.out = os.path.join(self.dir, "out.glb")
+        self.stats_path = os.path.join(self.dir, "stats.json")
+
+    def tearDown(self):
+        self._folder.cleanup()
+
+    def build(self, body):
+        recipe_path = os.path.join(self.dir, "recipe.json")
+        with open(recipe_path, "w", encoding="utf-8") as handle:
+            json.dump(body, handle)
+        return run_script("build.py", "--recipe", recipe_path, "--out", self.out, "--stats", self.stats_path)
+
+    def built(self, name):
+        body = high_fixture(name)
+        result = self.build(body)
+        self.assertEqual(result.returncode, 0, result.stderr[-1500:] + result.stdout[-500:])
+        with open(self.stats_path, encoding="utf-8") as handle:
+            self.stats = json.load(handle)
+        gltf, binary = read_glb_with_binary(self.out)
+        return body, gltf, binary
+
+    @staticmethod
+    def glb_counts(gltf):
+        triangles = vertices = 0
+        for mesh in gltf["meshes"]:
+            for primitive in mesh["primitives"]:
+                vertices += gltf["accessors"][primitive["attributes"]["POSITION"]]["count"]
+                triangles += gltf["accessors"][primitive["indices"]]["count"] // 3
+        return triangles, vertices, sum(1 for node in gltf["nodes"] if "mesh" in node)
+
+    def test_the_default_high_biped_is_within_its_caps(self):
+        _, gltf, _ = self.built("biped-high-default.json")
+        triangles, vertices, meshes = self.glb_counts(gltf)
+        caps = HIGH_CAPS["biped"]
+        self.assertLessEqual(triangles, caps["triangles"])
+        self.assertLessEqual(vertices, caps["vertices"])
+        self.assertLessEqual(self.stats["parts"], caps["parts"])
+        self.assertLessEqual(meshes, caps["meshes"])
+        self.assertLessEqual(len(gltf["materials"]), HIGH_CAPS["materials"])
+
+    def test_the_stress_high_biped_is_within_its_caps(self):
+        _, gltf, _ = self.built("biped-high-stress.json")
+        triangles, vertices, meshes = self.glb_counts(gltf)
+        caps = HIGH_CAPS["biped"]
+        self.assertLessEqual(triangles, caps["triangles"])
+        self.assertLessEqual(vertices, caps["vertices"])
+        self.assertLessEqual(self.stats["parts"], caps["parts"])
+        self.assertLessEqual(meshes, caps["meshes"])
+        for joint in ("ear_l", "ear_r", "antenna"):
+            self.assertIn(joint, node_names(gltf))
+        self.assertEqual(sorted(a["name"] for a in gltf["animations"]), ["Jump", "Loop", "Run"])
+
+    def test_the_stats_match_the_glb(self):
+        _, gltf, _ = self.built("biped-high-default.json")
+        triangles, vertices, meshes = self.glb_counts(gltf)
+        self.assertEqual((self.stats["triangles"], self.stats["vertices"], self.stats["meshes"]), (triangles, vertices, meshes))
+        self.assertEqual(self.stats["clips"], ["Run", "Jump"])
+
+    def test_the_estimate_is_within_ten_percent_of_the_real_counts(self):
+        _, gltf, _ = self.built("biped-high-default.json")
+        triangles, vertices, _ = self.glb_counts(gltf)
+        expected = high_fixture("expected-high.json")["biped-high-default.json"]
+        self.assertAlmostEqual(triangles / expected["triangles"], 1.0, delta=0.10)
+        self.assertAlmostEqual(vertices / expected["vertices"], 1.0, delta=0.10)
+        self.assertEqual(self.stats["parts"], expected["parts"])
+
+    def test_finishes_become_pbr_values(self):
+        body, gltf, _ = self.built("biped-high-default.json")
+        self.assertGreaterEqual(len(gltf["materials"]), 4)
+        for material in gltf["materials"]:
+            finish = material["name"].split("_")[0]  # finish_material names a material "<finish>_<n>"
+            values = FINISH_VALUES[finish]
+            pbr = material["pbrMetallicRoughness"]
+            self.assertAlmostEqual(pbr.get("metallicFactor", 1.0), values["metallic"], delta=0.01, msg=material["name"])
+            self.assertAlmostEqual(pbr.get("roughnessFactor", 1.0), values["roughness"], delta=0.01, msg=material["name"])
+            emissive = material.get("emissiveFactor", [0, 0, 0])
+            if finish == "glow":
+                self.assertGreater(max(emissive), 0.0, material["name"])
+            else:
+                self.assertEqual(max(emissive), 0.0, material["name"])
+        self.assertIn("glow", {m["name"].split("_")[0] for m in gltf["materials"]})  # the eyes, the core and the lights glow
+
+    def test_cavity_colors_are_within_range_and_vary(self):
+        _, gltf, binary = self.built("biped-high-default.json")
+        values = []
+        for mesh in gltf["meshes"]:
+            for primitive in mesh["primitives"]:
+                self.assertIn("COLOR_0", primitive["attributes"])
+                self.assertNotIn("COLOR_1", primitive["attributes"])
+                values += accessor_normalized(gltf, binary, primitive["attributes"]["COLOR_0"])
+        for color in values:
+            for component in color[:3]:
+                self.assertGreaterEqual(component, 0.55 - 0.01)
+                self.assertLessEqual(component, 1.0 + 0.01)
+        self.assertGreater(max(c[0] for c in values) - min(c[0] for c in values), 0.2, "the cavity shading is flat")
+
+    def test_no_vertex_is_duplicated_needlessly(self):
+        _, gltf, _ = self.built("biped-high-default.json")
+        triangles, vertices, _ = self.glb_counts(gltf)
+        self.assertLess(vertices / triangles, 0.85)
+
+    def test_static_joints_are_merged(self):
+        _, gltf, _ = self.built("biped-high-default.json")
+        _, _, meshes = self.glb_counts(gltf)
+        self.assertLessEqual(meshes, 9)  # Run and Jump move only hips, thighs, shins and upper arms
+        names = node_names(gltf)
+        for joint, _parent in json.load(open(os.path.join(SCRIPTS, "kit.json")))["kinds"]["biped"]["joints"]:
+            self.assertIn(joint, names)  # a merged joint stays a node, so its children keep their transforms
+        moved = {gltf["nodes"][c["target"]["node"]]["name"] for a in gltf["animations"] for c in a["channels"]}
+        parents = parent_of(gltf)
+        for index, node in enumerate(gltf["nodes"]):
+            if "mesh" in node:
+                holder = gltf["nodes"][parents[index]]["name"]
+                self.assertTrue(holder in moved or holder == "hips", f"{node['name']} hangs from {holder}, which no clip moves")
+
+    def test_the_animations_are_unchanged_by_the_tier(self):
+        _, high, _ = self.built("biped-high-default.json")
+        standard_body = recipe_fixture("biped-default.json")
+        high_body = high_fixture("biped-high-default.json")
+        standard_body["motions"] = high_body["motions"]
+        self.assertEqual(self.build(standard_body).returncode, 0)
+        standard = read_glb(self.out)
+        self.assertEqual(sorted(a["name"] for a in high["animations"]), sorted(a["name"] for a in standard["animations"]))
+        for name in ("Run", "Jump"):
+            targets = lambda g: sorted(g["nodes"][c["target"]["node"]]["name"] + ":" + c["target"]["path"] for c in animation_named(g, name)["channels"])
+            self.assertEqual(targets(high), targets(standard), name)
+
+    def test_the_same_recipe_gives_the_same_counts_twice(self):
+        _, first, _ = self.built("biped-high-default.json")
+        first_stats = dict(self.stats)
+        _, second, _ = self.built("biped-high-default.json")
+        self.assertEqual(first_stats, self.stats)
+        self.assertEqual(self.glb_counts(first), self.glb_counts(second))
+
+    def test_a_recipe_over_budget_is_fitted_by_dropping_details_in_order(self):
+        body = high_fixture("biped-high-default.json")
+        body["recipe"]["extras"] = ["backpack", "ears"]
+        body["recipe"]["details"] = ["seams", "bolts", "cables", "lights"]  # 52 + 6 + 28 parts: over the 80 the biped may have
+        self.assertEqual(self.build(body).returncode, 0)
+        with open(self.stats_path, encoding="utf-8") as handle:
+            stats = json.load(handle)
+        self.assertLessEqual(stats["parts"], HIGH_CAPS["biped"]["parts"])
+        self.assertEqual(stats["parts"], 52 + 6 + 4 + 6)  # the cables and the bolts were dropped (14 + 4 parts), the seams and lights stayed
+
+    def test_a_body_the_worker_would_refuse_exits_5(self):
+        def mutated(change):
+            body = high_fixture("biped-high-default.json")
+            change(body)
+            return body
+
+        cases = {
+            "an unknown quality": mutated(lambda b: b["recipe"].update(quality="ultra")),
+            "no finishes": mutated(lambda b: b["recipe"].pop("finishes")),
+            "an unknown finish": mutated(lambda b: b["recipe"]["finishes"].update(head="chrome")),
+            "an unknown detail": mutated(lambda b: b["recipe"].update(details=["sparkles"])),
+            "five details": mutated(lambda b: b["recipe"].update(details=["seams", "bolts", "cables", "lights", "seams"])),
+            "a detail the kind lacks": mutated(lambda b: b["recipe"].update(kind="blob")),
+            "a Standard recipe with finishes": mutated(lambda b: b["recipe"].update(quality="standard")),
+        }
+        for name, body in cases.items():
+            self.assertEqual(self.build(body).returncode, EXIT_BAD_RECIPE, name)
+
+    def test_high_glb_size(self):
+        self.built("biped-high-default.json")
+        self.assertLessEqual(os.path.getsize(self.out), 450 * 1024)
+
+    def test_the_glb_reimports_with_its_animations(self):
+        self.built("biped-high-default.json")
+        fresh()
+        self.assertIn("FINISHED", bpy.ops.import_scene.gltf(filepath=self.out))
+        self.assertGreater(len(bpy.data.actions), 0)
+
+
 if __name__ == "__main__":
     # Test names can follow a "--" (blender ... -P test_blender.py -- BlenderScripts.test_one_palette_color_paints_the_whole_model).
     names = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []

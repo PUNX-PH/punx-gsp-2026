@@ -295,6 +295,50 @@ describe("POST /build", () => {
     }
   });
 
+  const HIGH = new URL("./fixtures/recipes/high/", import.meta.url);
+  const highFixture = (name) => JSON.parse(readFileSync(new URL(name, HIGH), "utf8"));
+  const highValid = readdirSync(HIGH).filter((f) => f.endsWith(".json") && !f.startsWith("invalid-") && !f.startsWith("expected"));
+  const highInvalid = readdirSync(HIGH).filter((f) => f.startsWith("invalid-"));
+
+  it("builds each High fixture and also returns the shared vertex count in X-Vertices", async () => {
+    const t = await start();
+    assert.ok(highValid.length >= 8);
+    for (const name of highValid) {
+      const response = await build(t, highFixture(name));
+      assert.equal(response.status, 200, name);
+      assert.equal(response.headers.get("x-vertices"), "144", name);
+      assert.equal(response.headers.get("x-triangles"), "180", name);
+      assert.equal(Buffer.from(await response.arrayBuffer()).subarray(0, 4).toString("latin1"), "glTF");
+    }
+  });
+
+  it("sends no X-Vertices for a Standard build", async () => {
+    const t = await start();
+    const response = await build(t, fixture("biped-default.json"));
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("x-vertices"), null);
+  });
+
+  it("says failed, 500, when Blender builds a High model and leaves out its vertex count", async () => {
+    const t = await start();
+    const body = highFixture("biped-high-default.json");
+    body.recipe.summary = "NOVERTICES";
+    const response = await build(t, body);
+    assert.equal(response.status, 500);
+    assert.deepEqual(await errorBody(response), { error: "failed" });
+  });
+
+  it("refuses every invalid High fixture, 422 bad-recipe, and never starts Blender", async () => {
+    const t = await start();
+    assert.ok(highInvalid.length >= 8);
+    for (const name of highInvalid) {
+      const response = await build(t, highFixture(name));
+      assert.equal(response.status, 422, name);
+      assert.deepEqual(await errorBody(response), { error: "bad-recipe" }, name);
+    }
+    assert.equal(t.started(), false);
+  });
+
   it("refuses a body that is not JSON, 400 bad-request, and never starts Blender", async () => {
     const t = await start();
     for (const body of ["not json", "", "{", "\u0000"]) {

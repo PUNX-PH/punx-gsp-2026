@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bmesh  # noqa: E402
 import bpy  # noqa: E402
 import common  # noqa: E402
+import high  # noqa: E402
 from mathutils import Matrix, Vector  # noqa: E402
 
 EXIT_BAD_RECIPE = 5
@@ -613,12 +614,132 @@ def bake_clip(clip_name, motion, objects, rest):
         obj.scale = (1.0, 1.0, 1.0)
 
 
+# ---- the High tier ----
+
+
+def check_high(recipe, spec):
+    """The High rules this script can see (the worker has already checked them): returns True for a High recipe, False for Standard; raises
+    BadRecipe for a quality that is neither, a Standard recipe with finishes or details, a High recipe whose finishes or details are not the
+    kit's, and a kind with no High builder yet."""
+    quality = recipe.get("quality", "standard")
+    need(quality in ("standard", "high"))
+    if quality == "standard":
+        need("finishes" not in recipe and "details" not in recipe)
+        return False
+    tier = KIT["tiers"]["high"]
+    need(recipe["kind"] in high.HIGH_LAYOUTS)
+    finishes = recipe.get("finishes")
+    need(isinstance(finishes, dict) and set(finishes) == set(spec["slots"]) and all(v in tier["finishes"] for v in finishes.values()))
+    details = recipe.get("details")
+    need(isinstance(details, list) and len(details) <= tier["caps"]["details"] and len(set(map(str, details))) == len(details))
+    need(all(isinstance(d, str) and d in tier["details"] and recipe["kind"] in tier["details"][d] for d in details))
+    return True
+
+
+def estimate_high(recipe):
+    """What the kit's tier says a High recipe uses: the same arithmetic as the web app's estimate (recipes.ts) and the worker's (recipe.mjs)."""
+    tier = KIT["tiers"]["high"]
+    kind, build = recipe["kind"], recipe["build"]
+    if kind == "vehicle":
+        base = dict(tier["base"]["vehicle"])
+        cab, wheel = base.pop("cab"), base.pop("wheel")
+        total = dict(base)
+        parts = [(cab, 1)] if build["cabSize"] > 0 else []
+        parts.append((wheel, int(build["wheelCount"])))
+    elif kind == "prop":
+        total, parts = dict(tier["base"]["prop"]["shapes"][build["shape"]]), []
+    else:
+        total, parts = dict(tier["base"][kind]), []
+    for cost, count in parts:
+        for key in total:
+            total[key] += cost[key] * count
+    for extra in recipe["extras"]:
+        for key in total:
+            total[key] += tier["extras"][extra][key]
+    for detail in recipe["details"]:
+        cost = tier["details"][detail][kind]
+        for key in total:
+            total[key] += cost[key]
+    return total
+
+
+def merge_map(joints, moved):
+    """{joint: the joint whose mesh holds its parts}: a joint no clip moves shares the mesh of its nearest ancestor that one does (the first
+    joint, the root, always has a mesh). The joint stays a node, so its children keep their transforms."""
+    parent = dict(joints)
+    root = joints[0][0]
+    group = {}
+    for name, _ in joints:
+        group[name] = name if name in moved or name == root else group[parent[name]]
+    return group
+
+
+def build_high(out, recipe, motions, palette, spec, joints, extras, details, bevel):
+    """Builds one High configuration of a recipe (the extras, details and bevel it is given), exports it to `out` and returns what the
+    exported GLB really holds ({ triangles, vertices, parts, meshes }) and its clips."""
+    tier = KIT["tiers"]["high"]
+    kind = recipe["kind"]
+    moved = {track["joint"] for motion in motions["motions"].values() if motion["tracks"] for track in motion["tracks"]}
+    group_of = merge_map(joints, moved)
+
+    common.reset_scene()
+    pivots, _ = LAYOUTS[kind](recipe["build"], extras)  # the pivots are Standard's, so the same clips move the same joints
+    objects, rest = build_joints(joint_list(kind, spec, recipe["build"], extras), pivots)
+    builder = high.HighBuilder(palette, recipe["colors"], recipe["finishes"], tier["finishes"], group_of, bevel)
+    high.HIGH_LAYOUTS[kind](builder, recipe["build"], extras, details)
+    zs = [v.co.z for group in builder.groups.values() for v in group.bm.verts]
+    high.finish(builder, objects, (min(zs), max(zs)))
+    need(len(builder.library) <= tier["caps"]["materials"])
+
+    clips = []
+    for key, clip_name in CLIPS:
+        motion = motions["motions"].get(key)
+        if motion and motion["tracks"]:
+            bake_clip(clip_name, motion, objects, rest)
+            clips.append(clip_name)
+    bpy.context.scene.frame_set(0)
+    common.export_glb(out, animations=bool(clips), vertex_colors=True)
+    real = common.glb_counts(out)
+    real["parts"] = builder.parts
+    return real, clips
+
+
+def run_high(args, recipe, motions, palette, spec, joints):
+    """Builds a High model and fits it to its caps by the real counts of the exported GLB, dropping, in the tier's order, cables, bolts, seams,
+    lights, then extras from the end, then bevel segments. Exits 5 when it cannot fit, and when the real counts are not within 10 percent of
+    the kit's estimate (a mistake in the kit's tables, not in the recipe)."""
+    caps = KIT["tiers"]["high"]["caps"][recipe["kind"]]
+    details, extras, bevel = list(recipe["details"]), list(recipe["extras"]), 2
+    while True:
+        real, clips = build_high(args.out, recipe, motions, palette, spec, joints, extras, details, bevel)
+        if all(real[key] <= caps[key] for key in ("triangles", "vertices", "parts", "meshes")):
+            break
+        droppable = next((d for d in ("cables", "bolts", "seams", "lights") if d in details), None)
+        if droppable:
+            details.remove(droppable)
+        elif extras:
+            extras.pop()
+        elif bevel > 0:
+            bevel -= 1
+        else:
+            raise BadRecipe()
+
+    estimated = estimate_high({**recipe, "extras": extras, "details": details})
+    for key in ("triangles", "vertices"):
+        need(abs(real[key] - estimated[key]) <= 0.10 * estimated[key])
+    with open(args.stats, "w", encoding="utf-8") as handle:
+        json.dump({"triangles": real["triangles"], "vertices": real["vertices"], "parts": real["parts"], "meshes": real["meshes"], "clips": clips}, handle)
+
+
 def main():
     args = common.parse_args(configure)
     try:
         with open(args.recipe, encoding="utf-8") as handle:
             body = json.load(handle)
         recipe, motions, palette, spec, joints = check_body(body)
+        if check_high(recipe, spec):
+            run_high(args, recipe, motions, palette, spec, joints)
+            return
 
         common.reset_scene()
         pivots, parts = LAYOUTS[recipe["kind"]](recipe["build"], recipe["extras"])
@@ -645,4 +766,5 @@ def main():
         json.dump({"triangles": triangles, "parts": meshes.parts, "clips": clips}, handle)
 
 
-main()
+if __name__ == "__main__":
+    main()

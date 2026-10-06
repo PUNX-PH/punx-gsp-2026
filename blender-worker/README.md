@@ -26,7 +26,7 @@ Dockerfile            Node 24 + Blender 5.2 LTS (pinned, checksum-verified)
 | `GET /health` | none | 200, `ok` (no Blender run; not `/healthz`, which Cloud Run reserves and answers itself) |
 | `POST /prepare?format=glb\|fbx\|obj&triangles=100..5000&color=original\|#rrggbb` | the model file, up to 32 MiB | 200 and the GLB, with `X-Triangles-Before` and `X-Triangles-After` |
 | `POST /shape` | `{"shape": "cube\|sphere\|cone\|cylinder\|pyramid\|coin\|ring", "color": "#rrggbb"}` | 200 and the GLB, with `X-Triangles-After` |
-| `POST /build` | `{"recipe": {...}, "motions": {...}, "palette": ["#rrggbb" x 5]}`, JSON up to 64 KiB, checked again here | 200 and the GLB (a model with a skeleton and named clips), with `X-Triangles`, `X-Parts` and `X-Clips` (comma-separated, may be empty) |
+| `POST /build` | `{"recipe": {...}, "motions": {...}, "palette": ["#rrggbb" x 5]}`, JSON up to 64 KiB, checked again here | 200 and the GLB (a model with a skeleton and named clips), with `X-Triangles`, `X-Parts` and `X-Clips` (comma-separated, may be empty), and for a High recipe `X-Vertices` (the shared vertices the GLB holds) |
 
 Every failure is a status and `{"error": "<code>"}` and nothing else: `bad-request` 400 (also 404 and 405), `too-big` 413, `bad-format` 415,
 `empty` 422, `bad-recipe` 422 (a /build body that fails the check, or that `build.py` refuses), `failed` 500, `timeout` 504 (Blender ran and said no to the file), and `unavailable` 503 (the service itself is broken: Blender
@@ -130,4 +130,6 @@ blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/buil
   --out web/src/lib/blender/fixtures/built-prop.glb --stats stats.json
 blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/build.py -- --recipe blender-worker/fixtures/recipes/scenery-tree.json \
   --out web/src/lib/blender/fixtures/built-tree.glb --stats stats.json
+blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/build.py -- --recipe blender-worker/fixtures/recipes/high/biped-high-default.json \
+  --out web/src/lib/blender/fixtures/high/built-biped-high.glb --stats web/src/lib/blender/fixtures/high/built-biped-high.stats.json
 ```

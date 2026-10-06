@@ -37,7 +37,13 @@ if (text.includes("SLEEP")) {
   if (!text.includes("NOOUT")) {
     fs.writeFileSync(option(after, "--out"), Buffer.concat([Buffer.from("glTF"), Buffer.alloc(8)]));
     const stats = recipe
-      ? { triangles: 180, parts: 15, clips: text.includes("BADSTATS") ? ["Dance"] : ["Run", "Jump"] }
+      ? {
+          triangles: 180,
+          parts: 15,
+          clips: text.includes("BADSTATS") ? ["Dance"] : ["Run", "Jump"],
+          // a High recipe also gets the shared vertex count (the marker NOVERTICES leaves it out)
+          ...(text.includes('"quality":"high"') && !text.includes("NOVERTICES") ? { vertices: 144, meshes: 9 } : {}),
+        }
       : input
         ? { before: 9400, after: 2000 }
         : { after: 80 };

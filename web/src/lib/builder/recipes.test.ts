@@ -214,7 +214,7 @@ const EXPECTED_HIGH_PROBLEM: Record<string, string> = {
   "invalid-high-unknown-finish.json": "recipe.finishes",
   "invalid-high-unknown-detail.json": "recipe.details",
   "invalid-high-five-details.json": "recipe.details",
-  "invalid-high-over-triangles.json": "triangles",
+  "invalid-high-over-budget.json": "is over the biped limit",
   "invalid-standard-with-finishes.json": "recipe.finishes",
   "invalid-quality-word.json": "recipe.quality",
   "invalid-world-standard.json": "recipe.kind",
@@ -345,9 +345,9 @@ describe("a High recipe", () => {
   });
 
   it("refuses a recipe over the kind's caps, naming what is over", () => {
-    const body = highBody({ ...defaultHighRecipe("biped"), extras: ["backpack", "ears"], details: ["seams", "bolts", "cables", "lights"] }, "hero");
-    expect(estimate(body.recipe).triangles).toBeGreaterThan(KIT.tiers.high.caps.biped.triangles);
-    expect(checkBuildBody(body)).toMatch(/triangles/);
+    const body = highBody({ ...defaultHighRecipe("biped"), extras: ["backpack", "antenna"], details: ["seams", "bolts", "cables", "lights"] }, "hero");
+    expect(estimate(body.recipe).parts).toBeGreaterThan(KIT.tiers.high.caps.biped.parts);
+    expect(checkBuildBody(body)).toMatch(/parts is over the biped limit of 80/);
   });
 
   it("keeps the existing refusals working in High: an out-of-range number, an extra the kind lacks, a joint it lacks", () => {
@@ -436,7 +436,10 @@ describe("fitToBudget", () => {
   };
   // Only the limit given binds: the others are infinite, so a test can say which one is over.
   const only = (limit: Partial<{ triangles: number; vertices: number; parts: number; meshes: number }>) => ({ triangles: Infinity, vertices: Infinity, parts: Infinity, meshes: Infinity, ...limit });
+  // Two big extras and every detail: over the parts cap, and the case for the order of the drops (with a limit only that test sets).
   const heavy = (): ModelRecipe => ({ ...defaultHighRecipe("biped"), extras: ["backpack", "ears"], details: ["seams", "bolts", "cables", "lights"] });
+  // Just over the real parts cap: one extra and every detail.
+  const justOver = (): ModelRecipe => ({ ...defaultHighRecipe("biped"), extras: ["hat"], details: ["seams", "bolts", "cables", "lights"] });
 
   it("never touches a recipe that is already within its budget (and gives back a new object)", () => {
     for (const kind of MODEL_KINDS) {
@@ -449,10 +452,18 @@ describe("fitToBudget", () => {
     expect(fitToBudget(stress)).toEqual(stress);
   });
 
-  it("drops cables first on a biped with two big extras and every detail", () => {
+  it("drops cables first, and only as much as it must, on a biped that is just over", () => {
+    expect(within(justOver())).toBe(false);
+    const fitted = fitToBudget(justOver())!;
+    expect(fitted.details).toEqual(["seams", "bolts", "lights"]);
+    expect(fitted.extras).toEqual(["hat"]);
+    expect(within(fitted)).toBe(true);
+  });
+
+  it("drops bolts next when cables are not enough", () => {
     expect(within(heavy())).toBe(false);
     const fitted = fitToBudget(heavy())!;
-    expect(fitted.details).toEqual(["seams", "bolts", "lights"]);
+    expect(fitted.details).toEqual(["seams", "lights"]);
     expect(fitted.extras).toEqual(["backpack", "ears"]);
     expect(within(fitted)).toBe(true);
   });
@@ -484,8 +495,11 @@ describe("fitToBudget", () => {
   it("keeps whichever of the four limits is the one that is over (vertices, parts and meshes count too)", () => {
     const byVertices = fitToBudget(heavy(), only({ vertices: estimate({ ...heavy(), details: ["seams", "bolts", "lights"] }).vertices }))!;
     expect(byVertices.details).toEqual(["seams", "bolts", "lights"]);
-    const byMeshes = fitToBudget({ ...defaultHighRecipe("biped"), extras: ["tail", "ears"], details: [] }, only({ meshes: estimate(defaultHighRecipe("biped")).meshes + 2 }))!;
-    expect(byMeshes.extras).toEqual(["tail"]);
+    const byParts = fitToBudget(heavy(), only({ parts: estimate({ ...heavy(), details: ["seams", "lights"] }).parts }))!;
+    expect(byParts.details).toEqual(["seams", "lights"]);
+    // extras and details join existing meshes, so only the base can be over the mesh cap, and nothing can be dropped to fix it
+    expect(fitToBudget(heavy(), only({ meshes: estimate(defaultHighRecipe("biped")).meshes - 1 }))).toBeNull();
+    expect(fitToBudget(heavy(), only({ meshes: estimate(defaultHighRecipe("biped")).meshes }))).toEqual(heavy());
   });
 
   it("property: the result is within the caps, and its extras and details are a subset of the input's, in the input's order", () => {

@@ -111,7 +111,7 @@ const EXPECTED_HIGH_PROBLEM = {
   "invalid-high-unknown-finish.json": "recipe.finishes",
   "invalid-high-unknown-detail.json": "recipe.details",
   "invalid-high-five-details.json": "recipe.details",
-  "invalid-high-over-triangles.json": "triangles",
+  "invalid-high-over-budget.json": "is over the biped limit",
   "invalid-standard-with-finishes.json": "recipe.finishes",
   "invalid-quality-word.json": "recipe.quality",
   "invalid-world-standard.json": "recipe.kind",
