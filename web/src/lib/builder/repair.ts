@@ -5,6 +5,8 @@ import {
   AXES,
   CHANNELS,
   CLIP_NAMES,
+  DETAILS,
+  FINISHES,
   KIT,
   MAX_SCENERY,
   MODEL_KINDS,
@@ -14,14 +16,17 @@ import {
   type BuildField,
   type Channel,
   type ClipKey,
+  type Detail,
   type Extra,
   type ModelKind,
+  type Quality,
   type SceneryKind,
   type Wave,
 } from "@/lib/builder/kinds";
 import {
   DEFAULT_ENVIRONMENT,
   defaultMotions,
+  fitToBudget,
   jointsOf,
   partCount,
   triangleEstimate,
@@ -62,8 +67,13 @@ function repairField(field: BuildField, v: unknown): number | string {
   return clamp(field.whole ? Math.round(v) : v, field.min, field.max);
 }
 
-/** A model answer made into a valid recipe, or `{ ok: false }`. `wanted.kind` is the person's choice; null means Claude picks (Auto). */
-export function repairModelRecipe(raw: unknown, wanted: { kind: ModelKind | null }): { ok: true; recipe: ModelRecipe } | { ok: false } {
+/**
+ * A model answer made into a valid recipe, or `{ ok: false }`. `wanted.kind` is the person's choice; null means Claude picks (Auto).
+ * `wanted.quality` is Standard unless it says high: then the recipe also gets a finish for each slot (an unknown one takes the default of
+ * the kit for that slot) and details (unknown and unavailable ones dropped, duplicates removed, the first four kept; the defaults of the kit
+ * when Claude gave none), and is brought within the High budget by `fitToBudget` instead of the Standard caps.
+ */
+export function repairModelRecipe(raw: unknown, wanted: { kind: ModelKind | null; quality?: Quality }): { ok: true; recipe: ModelRecipe } | { ok: false } {
   if (!isObject(raw)) return { ok: false };
   const kind = wanted.kind ?? (oneOf(MODEL_KINDS, raw.kind) ? raw.kind : null);
   if (kind === null || !oneOf(MODEL_KINDS, kind)) return { ok: false };
@@ -86,6 +96,24 @@ export function repairModelRecipe(raw: unknown, wanted: { kind: ModelKind | null
   const summary = typeof raw.summary === "string" ? Array.from(raw.summary.replace(CONTROL, " ").trim()).slice(0, KIT.caps.summary).join("") : "";
 
   const recipe: ModelRecipe = { version: 1, kind, summary, build, colors, extras };
+  if (wanted.quality === "high") {
+    const defaults = KIT.tiers.high.defaults[kind];
+    const rawFinishes = isObject(raw.finishes) ? raw.finishes : {};
+    const finishes = Object.fromEntries(
+      Object.keys(spec.slots).map((slot) => {
+        const v = Object.hasOwn(rawFinishes, slot) ? rawFinishes[slot] : undefined;
+        return [slot, oneOf(FINISHES, v) ? v : defaults.finishes[slot]];
+      }),
+    );
+    const details = Array.isArray(raw.details)
+      ? raw.details
+          .filter((d): d is Detail => oneOf(DETAILS, d) && KIT.tiers.high.details[d][kind] !== undefined)
+          .filter((d, i, all) => all.indexOf(d) === i)
+          .slice(0, KIT.tiers.high.caps.details)
+      : [...defaults.details];
+    const fitted = fitToBudget({ ...recipe, quality: "high", finishes, details });
+    return fitted ? { ok: true, recipe: fitted } : { ok: false };
+  }
   const capped = enforceCaps(recipe);
   return capped ? { ok: true, recipe: capped } : { ok: false };
 }

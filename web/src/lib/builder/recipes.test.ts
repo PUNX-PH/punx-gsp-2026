@@ -1,17 +1,21 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { CLIPS_FOR_ROLE, KIT, MODEL_KINDS, SCENERY_KINDS, type ModelKind } from "@/lib/builder/kinds";
+import { CLIPS_FOR_ROLE, KIT, MODEL_KINDS, SCENERY_KINDS, type ModelKind, WORLD_PIECES, WORLD_STYLES } from "@/lib/builder/kinds";
 import {
   checkBuildBody,
   clipsOf,
+  defaultHighRecipe,
   defaultMotions,
   defaultRecipe,
+  estimate,
+  fitToBudget,
   jointsOf,
   partCount,
   sceneryMotions,
   sceneryRecipe,
   triangleEstimate,
+  worldRecipe,
   type BuildBody,
   type ModelRecipe,
 } from "@/lib/builder/recipes";
@@ -191,6 +195,330 @@ describe("scenery recipes", () => {
     expect(checkBuildBody(body((b) => (b.motions.motions.loop!.tracks[0].joint = "blades")))).toContain("joint");
     expect(checkBuildBody(body((b) => ((b.recipe as unknown as Record<string, unknown>).kind = "Scenery")))).toContain("recipe.kind");
     expect(checkBuildBody(body((b) => (b.recipe.colors.main = 5)))).toContain("recipe.colors.main");
+  });
+});
+
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// The High tier: the same check on both sides, the estimate, the budget fit and the shared fixtures.
+
+const HIGH_DIR = FIXTURES + "high/";
+const readHigh = (name: string): BuildBody => JSON.parse(readFileSync(HIGH_DIR + name, "utf8")) as BuildBody;
+const highFiles = readdirSync(HIGH_DIR);
+const validHigh = highFiles.filter((f) => f.endsWith(".json") && !f.startsWith("invalid-") && !f.startsWith("expected"));
+const invalidHigh = highFiles.filter((f) => f.startsWith("invalid-"));
+
+// What each invalid High fixture's problem must contain: the same table as the worker's recipe.test.mjs.
+const EXPECTED_HIGH_PROBLEM: Record<string, string> = {
+  "invalid-high-no-finishes.json": "recipe.finishes",
+  "invalid-high-unknown-finish.json": "recipe.finishes",
+  "invalid-high-unknown-detail.json": "recipe.details",
+  "invalid-high-five-details.json": "recipe.details",
+  "invalid-high-over-triangles.json": "triangles",
+  "invalid-standard-with-finishes.json": "recipe.finishes",
+  "invalid-quality-word.json": "recipe.quality",
+  "invalid-world-standard.json": "recipe.kind",
+};
+
+const highBody = (recipe: ModelRecipe, role: Role): BuildBody => ({ recipe, motions: defaultMotions(recipe, CLIPS_FOR_ROLE[role]), palette: [...SAMPLE_PALETTE] });
+const everyExtra = (kind: ModelKind) => KIT.kinds[kind].extras;
+const cloneRecipe = (recipe: ModelRecipe): ModelRecipe => JSON.parse(JSON.stringify(recipe)) as ModelRecipe;
+
+describe("the shared High recipe fixtures", () => {
+  it("every valid High fixture passes the check", () => {
+    expect(validHigh.length).toBeGreaterThanOrEqual(8);
+    for (const f of validHigh) expect(checkBuildBody(readHigh(f)), f).toBeNull();
+  });
+
+  it("every invalid High fixture fails with the expected problem, and the table has no stragglers", () => {
+    expect([...invalidHigh].sort()).toEqual(Object.keys(EXPECTED_HIGH_PROBLEM).sort());
+    for (const f of invalidHigh) {
+      const problem = checkBuildBody(readHigh(f));
+      expect(problem, f).not.toBeNull();
+      expect(problem, f).toContain(EXPECTED_HIGH_PROBLEM[f]);
+    }
+  });
+
+  it("each <kind>-high-default.json is the default High body", () => {
+    for (const kind of MODEL_KINDS) {
+      expect(readHigh(`${kind}-high-default.json`), kind).toEqual(highBody(defaultHighRecipe(kind), ROLE_OF[kind]));
+    }
+  });
+
+  it("estimate of each valid fixture equals expected-high.json, with its clips", () => {
+    const expected = JSON.parse(readFileSync(HIGH_DIR + "expected-high.json", "utf8")) as Record<string, { parts: number; triangles: number; vertices: number; meshes: number; clips: string[] }>;
+    expect(Object.keys(expected).sort()).toEqual([...validHigh].sort());
+    for (const f of validHigh) {
+      const b = readHigh(f);
+      expect({ ...estimate(b.recipe), clips: clipsOf(b.motions) }, f).toEqual(expected[f]);
+    }
+  });
+
+  it("each stress fixture is within its caps (parts, triangles, vertices, meshes) and has 12 tracks per motion", () => {
+    for (const kind of MODEL_KINDS) {
+      const b = readHigh(`${kind}-high-stress.json`);
+      const caps = KIT.tiers.high.caps[kind];
+      const e = estimate(b.recipe);
+      expect(e.parts, kind).toBeLessThanOrEqual(caps.parts);
+      expect(e.triangles, kind).toBeLessThanOrEqual(caps.triangles);
+      expect(e.vertices, kind).toBeLessThanOrEqual(caps.vertices);
+      expect(e.meshes, kind).toBeLessThanOrEqual(caps.meshes);
+      expect(b.recipe.extras, kind).toHaveLength(Math.min(2, KIT.kinds[kind].extras.length));
+      expect(Object.keys(b.motions.motions).sort(), kind).toEqual(["jump", "loop", "run"]);
+      for (const m of Object.values(b.motions.motions)) expect(m?.tracks.length, kind).toBe(12);
+    }
+    expect(readHigh("prop-high-stress.json").recipe.build.shape).toBe("ring");
+  });
+});
+
+describe("a High recipe", () => {
+  it("is the kind's default with the quality, the default finishes and the default details", () => {
+    for (const kind of MODEL_KINDS) {
+      const recipe = defaultHighRecipe(kind);
+      expect(recipe, kind).toEqual({
+        ...defaultRecipe(kind),
+        quality: "high",
+        finishes: KIT.tiers.high.defaults[kind].finishes,
+        details: KIT.tiers.high.defaults[kind].details,
+      });
+      expect(checkBuildBody(highBody(recipe, "hero")), kind).toBeNull();
+    }
+  });
+
+  it("makes a new recipe every time", () => {
+    const a = defaultHighRecipe("biped");
+    a.finishes!.head = "glow";
+    a.details!.push("cables");
+    expect(defaultHighRecipe("biped").finishes!.head).toBe("painted");
+    expect(defaultHighRecipe("biped").details).toEqual(["seams", "bolts", "lights"]);
+  });
+
+  it("keeps a Standard recipe exactly as it was: no quality, finishes or details keys", () => {
+    for (const kind of MODEL_KINDS) {
+      const recipe = defaultRecipe(kind);
+      expect("quality" in recipe).toBe(false);
+      expect("finishes" in recipe).toBe(false);
+      expect("details" in recipe).toBe(false);
+    }
+  });
+
+  it("accepts quality standard written out, and refuses a Standard recipe with finishes or details", () => {
+    const standard = highBody(defaultRecipe("biped"), "hero");
+    expect(checkBuildBody({ ...standard, recipe: { ...standard.recipe, quality: "standard" } })).toBeNull();
+    expect(checkBuildBody({ ...standard, recipe: { ...standard.recipe, details: ["seams"] } })).toContain("recipe.details");
+    expect(checkBuildBody({ ...standard, recipe: { ...standard.recipe, finishes: {} } })).toContain("recipe.finishes");
+    expect(checkBuildBody({ ...standard, recipe: { ...standard.recipe, quality: "standard", details: [] } })).toContain("recipe.details");
+  });
+
+  it("refuses a quality that is not standard or high", () => {
+    const body = highBody(defaultHighRecipe("biped"), "hero");
+    for (const quality of ["ultra", "High", "", null, 1, true]) {
+      expect(checkBuildBody({ ...body, recipe: { ...body.recipe, quality } }), String(quality)).toContain("recipe.quality");
+    }
+  });
+
+  it("needs finishes for exactly the kind's slots, each a known finish", () => {
+    const body = highBody(defaultHighRecipe("biped"), "hero");
+    const withFinishes = (finishes: unknown) => checkBuildBody({ ...body, recipe: { ...body.recipe, finishes } });
+    expect(withFinishes({ ...body.recipe.finishes })).toBeNull();
+    expect(withFinishes(undefined)).toContain("recipe.finishes");
+    expect(withFinishes(null)).toContain("recipe.finishes");
+    expect(withFinishes({ head: "painted" })).toContain("recipe.finishes");
+    expect(withFinishes({ ...body.recipe.finishes, wings: "matte" })).toContain("recipe.finishes");
+    expect(withFinishes({ ...body.recipe.finishes, head: "chrome" })).toContain("recipe.finishes.head");
+    expect(withFinishes({ ...body.recipe.finishes, head: 3 })).toContain("recipe.finishes.head");
+    expect(withFinishes(JSON.parse('{"__proto__": "matte", "head": "matte"}'))).toContain("recipe.finishes");
+  });
+
+  it("needs details that are distinct names the kind can have, at most four", () => {
+    const body = highBody(defaultHighRecipe("biped"), "hero");
+    const withDetails = (details: unknown) => checkBuildBody({ ...body, recipe: { ...body.recipe, details } });
+    expect(withDetails([])).toBeNull();
+    expect(withDetails(undefined)).toContain("recipe.details");
+    expect(withDetails("seams")).toContain("recipe.details");
+    expect(withDetails(["seams", "sparkles"])).toContain("recipe.details");
+    expect(withDetails(["seams", "seams"])).toContain("recipe.details");
+    expect(withDetails(["seams", "bolts", "cables", "lights", "seams"])).toContain("recipe.details");
+    expect(withDetails([7])).toContain("recipe.details");
+    const blob = highBody(defaultHighRecipe("blob"), "collectible");
+    expect(checkBuildBody({ ...blob, recipe: { ...blob.recipe, details: ["bolts"] } })).toContain("recipe.details"); // a blob has no bolts
+  });
+
+  it("refuses a recipe over the kind's caps, naming what is over", () => {
+    const body = highBody({ ...defaultHighRecipe("biped"), extras: ["backpack", "ears"], details: ["seams", "bolts", "cables", "lights"] }, "hero");
+    expect(estimate(body.recipe).triangles).toBeGreaterThan(KIT.tiers.high.caps.biped.triangles);
+    expect(checkBuildBody(body)).toMatch(/triangles/);
+  });
+
+  it("keeps the existing refusals working in High: an out-of-range number, an extra the kind lacks, a joint it lacks", () => {
+    const body = highBody(defaultHighRecipe("biped"), "hero");
+    const bad = cloneRecipe(body.recipe);
+    (bad.build as Record<string, unknown>).headSize = 2;
+    expect(checkBuildBody({ ...body, recipe: bad })).toContain("recipe.build.headSize");
+    expect(checkBuildBody({ ...body, recipe: { ...body.recipe, extras: ["wings"] } })).toContain("recipe.extras");
+    const vehicle = highBody(defaultHighRecipe("vehicle"), "obstacle");
+    expect(checkBuildBody({ ...vehicle, recipe: { ...vehicle.recipe, extras: ["tail"] } })).toContain("recipe.extras");
+  });
+
+  it("allows a High scenery piece, and a world piece only in High", () => {
+    for (const kind of SCENERY_KINDS) {
+      const recipe = sceneryRecipe(kind, "high");
+      expect(recipe.quality, kind).toBe("high");
+      expect(checkBuildBody({ recipe, motions: sceneryMotions(kind), palette: [...SAMPLE_PALETTE] }), kind).toBeNull();
+      expect(checkBuildBody({ recipe: { ...recipe, details: ["seams"] }, motions: sceneryMotions(kind), palette: [...SAMPLE_PALETTE] }), kind).toContain("recipe.details");
+    }
+    for (const piece of WORLD_PIECES) {
+      for (const style of WORLD_STYLES) {
+        const recipe = worldRecipe(piece, style);
+        const body = { recipe, motions: { version: 1 as const, motions: {} }, palette: [...SAMPLE_PALETTE] };
+        expect(checkBuildBody(body), `${piece} ${style}`).toBeNull();
+        expect(checkBuildBody({ ...body, recipe: { ...recipe, quality: "standard", finishes: undefined, details: undefined } }), `${piece} ${style} standard`).toContain("recipe.kind");
+        expect(checkBuildBody({ ...body, recipe: { ...recipe, build: { piece, style: "tundra" } } }), `${piece} tundra`).toContain("recipe.build.style");
+        expect(checkBuildBody({ ...body, recipe: { ...recipe, extras: ["hat"] } }), `${piece} extras`).toContain("recipe.extras");
+        expect(checkBuildBody({ ...body, motions: sceneryMotions("tree") }), `${piece} motions`).toContain("motions.motions");
+      }
+    }
+  });
+});
+
+describe("estimate", () => {
+  it("is the Standard counts with no vertices or meshes for a Standard recipe", () => {
+    expect(estimate(defaultRecipe("biped"))).toEqual({ parts: 15, triangles: 180, vertices: 0, meshes: 0 });
+    expect(estimate(sceneryRecipe("tree"))).toEqual({ parts: 3, triangles: 188, vertices: 0, meshes: 0 });
+  });
+
+  it("is the High base for a High recipe with no extras and no details", () => {
+    const high = KIT.tiers.high;
+    expect(estimate({ ...defaultHighRecipe("biped"), details: [] })).toEqual(high.base.biped);
+    expect(estimate({ ...defaultHighRecipe("blob"), details: [] })).toEqual(high.base.blob);
+  });
+
+  it("adds each extra and each detail", () => {
+    const high = KIT.tiers.high;
+    const plain = estimate({ ...defaultHighRecipe("biped"), details: [] });
+    const withTail = estimate({ ...defaultHighRecipe("biped"), details: [], extras: ["tail"] });
+    expect(withTail.triangles - plain.triangles).toBe(high.extras.tail.triangles);
+    expect(withTail.meshes - plain.meshes).toBe(high.extras.tail.meshes);
+    const withBolts = estimate({ ...defaultHighRecipe("biped"), details: ["bolts"] });
+    expect(withBolts.vertices - plain.vertices).toBe(high.details.bolts.biped!.vertices);
+    expect(withBolts.parts - plain.parts).toBe(high.details.bolts.biped!.parts);
+  });
+
+  it("prices a vehicle by its cab and its wheels", () => {
+    const high = KIT.tiers.high.base.vehicle;
+    const base = (build: Record<string, number | string>) => estimate({ ...defaultHighRecipe("vehicle"), details: [], build: { ...defaultHighRecipe("vehicle").build, ...build } });
+    expect(base({ cabSize: 0, wheelCount: 2 }).triangles).toBe(high.triangles + 2 * high.wheel.triangles);
+    expect(base({ cabSize: 0.4, wheelCount: 2 }).triangles).toBe(high.triangles + high.cab.triangles + 2 * high.wheel.triangles);
+    expect(base({ cabSize: 0.4, wheelCount: 6 }).meshes).toBe(high.meshes + high.cab.meshes + 6 * high.wheel.meshes);
+  });
+
+  it("prices a prop by its shape", () => {
+    for (const shape of Object.keys(KIT.tiers.high.base.prop.shapes)) {
+      const recipe = { ...defaultHighRecipe("prop"), details: [], build: { shape, size: 1 } };
+      expect(estimate(recipe), shape).toEqual(KIT.tiers.high.base.prop.shapes[shape as keyof typeof KIT.tiers.high.base.prop.shapes]);
+    }
+  });
+
+  it("prices a scenery piece and a world piece", () => {
+    expect(estimate(sceneryRecipe("windmill", "high"))).toEqual(KIT.tiers.high.base.scenery.windmill);
+    const terrain = estimate(worldRecipe("terrain", "desert"));
+    expect(terrain.triangles).toBe(KIT.tiers.high.base.world.terrain.triangles);
+    expect(terrain.vertices).toBe(KIT.tiers.high.base.world.terrain.vertices);
+  });
+});
+
+describe("fitToBudget", () => {
+  const caps = KIT.tiers.high.caps;
+  const within = (recipe: ModelRecipe) => {
+    const e = estimate(recipe);
+    const c = caps[recipe.kind as ModelKind];
+    return e.triangles <= c.triangles && e.vertices <= c.vertices && e.parts <= c.parts && e.meshes <= c.meshes;
+  };
+  // Only the limit given binds: the others are infinite, so a test can say which one is over.
+  const only = (limit: Partial<{ triangles: number; vertices: number; parts: number; meshes: number }>) => ({ triangles: Infinity, vertices: Infinity, parts: Infinity, meshes: Infinity, ...limit });
+  const heavy = (): ModelRecipe => ({ ...defaultHighRecipe("biped"), extras: ["backpack", "ears"], details: ["seams", "bolts", "cables", "lights"] });
+
+  it("never touches a recipe that is already within its budget (and gives back a new object)", () => {
+    for (const kind of MODEL_KINDS) {
+      const recipe = defaultHighRecipe(kind);
+      const fitted = fitToBudget(recipe);
+      expect(fitted, kind).toEqual(recipe);
+      expect(fitted, kind).not.toBe(recipe);
+    }
+    const stress = readHigh("biped-high-stress.json").recipe;
+    expect(fitToBudget(stress)).toEqual(stress);
+  });
+
+  it("drops cables first on a biped with two big extras and every detail", () => {
+    expect(within(heavy())).toBe(false);
+    const fitted = fitToBudget(heavy())!;
+    expect(fitted.details).toEqual(["seams", "bolts", "lights"]);
+    expect(fitted.extras).toEqual(["backpack", "ears"]);
+    expect(within(fitted)).toBe(true);
+  });
+
+  it("drops in the order cables, bolts, seams, lights, then extras from the end, when the caps are tighter", () => {
+    const base = estimate({ ...heavy(), extras: [], details: [] });
+    const cost = (extras: ModelRecipe["extras"], details: NonNullable<ModelRecipe["details"]>) => estimate({ ...heavy(), extras, details }).triangles;
+    const order: [number, ModelRecipe["extras"], NonNullable<ModelRecipe["details"]>][] = [
+      [cost(["backpack", "ears"], ["seams", "bolts", "cables", "lights"]), ["backpack", "ears"], ["seams", "bolts", "cables", "lights"]],
+      [cost(["backpack", "ears"], ["seams", "bolts", "lights"]), ["backpack", "ears"], ["seams", "bolts", "lights"]],
+      [cost(["backpack", "ears"], ["seams", "lights"]), ["backpack", "ears"], ["seams", "lights"]],
+      [cost(["backpack", "ears"], ["lights"]), ["backpack", "ears"], ["lights"]],
+      [cost(["backpack", "ears"], []), ["backpack", "ears"], []],
+      [cost(["backpack"], []), ["backpack"], []],
+      [base.triangles, [], []],
+    ];
+    for (const [triangles, extras, details] of order) {
+      const fitted = fitToBudget(heavy(), only({ triangles }))!;
+      expect(fitted.extras).toEqual(extras);
+      expect(fitted.details).toEqual(details);
+    }
+  });
+
+  it("gives null when the recipe is still over with nothing left to drop", () => {
+    expect(fitToBudget(heavy(), only({ triangles: 100 }))).toBeNull();
+    expect(fitToBudget(defaultHighRecipe("biped"), only({ parts: 3 }))).toBeNull();
+  });
+
+  it("keeps whichever of the four limits is the one that is over (vertices, parts and meshes count too)", () => {
+    const byVertices = fitToBudget(heavy(), only({ vertices: estimate({ ...heavy(), details: ["seams", "bolts", "lights"] }).vertices }))!;
+    expect(byVertices.details).toEqual(["seams", "bolts", "lights"]);
+    const byMeshes = fitToBudget({ ...defaultHighRecipe("biped"), extras: ["tail", "ears"], details: [] }, only({ meshes: estimate(defaultHighRecipe("biped")).meshes + 2 }))!;
+    expect(byMeshes.extras).toEqual(["tail"]);
+  });
+
+  it("property: the result is within the caps, and its extras and details are a subset of the input's, in the input's order", () => {
+    const kinds: ModelKind[] = ["biped", "vehicle", "blob", "prop"];
+    for (const kind of kinds) {
+      const allExtras = everyExtra(kind);
+      for (const count of [0, 1, 2]) {
+        const extras = allExtras.slice(0, count);
+        for (const details of [[], ["lights"], ["seams", "bolts"], ["seams", "bolts", "cables", "lights"]] as ModelRecipe["details"][]) {
+          const allowed = details!.filter((d) => KIT.tiers.high.details[d][kind] !== undefined);
+          const input: ModelRecipe = { ...defaultHighRecipe(kind), extras, details: allowed };
+          const fitted = fitToBudget(input);
+          if (within(input)) {
+            expect(fitted, `${kind} ${count} ${allowed}`).toEqual(input);
+            continue;
+          }
+          expect(fitted, `${kind} ${count} ${allowed}`).not.toBeNull();
+          expect(within(fitted!), `${kind} ${count} ${allowed}`).toBe(true);
+          expect(allowed.filter((d) => fitted!.details!.includes(d)), `${kind}`).toEqual(fitted!.details);
+          expect(extras.slice(0, fitted!.extras.length), `${kind}`).toEqual(fitted!.extras);
+        }
+      }
+    }
+  });
+
+  it("does not change the recipe it was given", () => {
+    const recipe = Object.freeze({ ...heavy(), extras: Object.freeze([...heavy().extras]) as ModelRecipe["extras"], details: Object.freeze([...heavy().details!]) as ModelRecipe["details"] });
+    expect(() => fitToBudget(recipe as ModelRecipe)).not.toThrow();
+  });
+
+  it("passes a Standard recipe through as a copy", () => {
+    const recipe = defaultRecipe("biped");
+    expect(fitToBudget(recipe)).toEqual(recipe);
   });
 });
 

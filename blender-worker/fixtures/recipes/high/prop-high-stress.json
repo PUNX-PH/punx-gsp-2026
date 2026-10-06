@@ -1,0 +1,376 @@
+{
+  "recipe": {
+    "version": 1,
+    "kind": "prop",
+    "summary": "A simple spinning prop.",
+    "build": {
+      "shape": "ring",
+      "size": 1.5
+    },
+    "colors": {
+      "body": 4,
+      "extra": 4
+    },
+    "extras": [],
+    "quality": "high",
+    "finishes": {
+      "body": "painted",
+      "extra": "metal"
+    },
+    "details": [
+      "seams",
+      "bolts"
+    ]
+  },
+  "motions": {
+    "version": 1,
+    "motions": {
+      "run": {
+        "seconds": 3,
+        "tracks": [
+          {
+            "joint": "root",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "spin",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "move",
+            "axis": "y",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "hold",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "move",
+            "axis": "y",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "pulse",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "move",
+            "axis": "y",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "bounce",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "move",
+            "axis": "y",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          }
+        ]
+      },
+      "jump": {
+        "seconds": 3,
+        "tracks": [
+          {
+            "joint": "root",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "spin",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "move",
+            "axis": "y",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "hold",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "move",
+            "axis": "y",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "pulse",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "move",
+            "axis": "y",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "bounce",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "move",
+            "axis": "y",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          }
+        ]
+      },
+      "loop": {
+        "seconds": 3,
+        "tracks": [
+          {
+            "joint": "root",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "spin",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "move",
+            "axis": "y",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "hold",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "move",
+            "axis": "y",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "pulse",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "move",
+            "axis": "y",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "bounce",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "move",
+            "axis": "y",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "root",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          }
+        ]
+      }
+    }
+  },
+  "palette": [
+    "#1b1f3b",
+    "#ff6f59",
+    "#ffd166",
+    "#06d6a0",
+    "#ffffff"
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "recipe": {
+    "version": 1,
+    "kind": "vehicle",
+    "summary": "A blocky little vehicle.",
+    "build": {
+      "bodyLength": 1.6,
+      "bodyWidth": 0.9,
+      "bodyHeight": 0.45,
+      "cabSize": 0.45,
+      "wheelCount": 4,
+      "wheelRadius": 0.25
+    },
+    "colors": {
+      "body": 3,
+      "cab": 4,
+      "wheels": 0,
+      "extra": 1
+    },
+    "extras": [],
+    "quality": "high",
+    "finishes": {
+      "body": "painted",
+      "cab": "metal",
+      "wheels": "rubber",
+      "extra": "glow"
+    },
+    "details": [
+      "seams",
+      "lights"
+    ]
+  },
+  "motions": {
+    "version": 1,
+    "motions": {
+      "loop": {
+        "seconds": 1,
+        "tracks": [
+          {
+            "joint": "wheel_1",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "spin",
+            "amplitude": 1,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "wheel_2",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "spin",
+            "amplitude": 1,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "wheel_3",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "spin",
+            "amplitude": 1,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "wheel_4",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "spin",
+            "amplitude": 1,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "body",
+            "channel": "move",
+            "axis": "y",
+            "wave": "bounce",
+            "amplitude": 0.03,
+            "cycles": 2,
+            "phase": 0
+          }
+        ]
+      }
+    }
+  },
+  "palette": [
+    "#1b1f3b",
+    "#ff6f59",
+    "#ffd166",
+    "#06d6a0",
+    "#ffffff"
+  ]
+}

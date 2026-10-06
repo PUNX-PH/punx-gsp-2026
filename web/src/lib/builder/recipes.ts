@@ -7,19 +7,32 @@ import {
   CHANNELS,
   CLIP_KEYS,
   CLIP_NAMES,
+  DETAILS,
+  DROP_ORDER,
+  FINISHES,
   KIT,
   MODEL_KINDS,
+  QUALITIES,
   SCENERY_KINDS,
+  tierCaps,
   WAVES,
+  WORLD_PIECES,
+  WORLD_STYLES,
   type Axis,
+  type Budget,
   type BuildField,
   type Channel,
   type ClipKey,
   type ClipName,
+  type Detail,
   type Extra,
+  type Finish,
   type ModelKind,
+  type Quality,
   type SceneryKind,
   type Wave,
+  type WorldPiece,
+  type WorldStyle,
 } from "@/lib/builder/kinds";
 
 export interface Track {
@@ -37,12 +50,19 @@ export interface Motion {
 }
 export interface ModelRecipe {
   version: 1;
-  // "scenery" is an environment piece: its build is exactly { scenery: <one of the kit's six> }.
-  kind: ModelKind | "scenery";
+  // "scenery" is an environment piece: its build is exactly { scenery: <one of the kit's six> }. "world" is a piece of the High world: its
+  // build is exactly { piece, style }, and it exists only in the High tier.
+  kind: ModelKind | "scenery" | "world";
   summary: string;
   build: Record<string, number | string>;
   colors: Record<string, number>;
   extras: Extra[];
+  /** Absent means Standard. */
+  quality?: Quality;
+  /** High only: one finish for each color slot. */
+  finishes?: Record<string, Finish>;
+  /** High only: extra detail, each priced in triangles. */
+  details?: Detail[];
 }
 export interface MotionRecipe {
   version: 1;
@@ -88,6 +108,7 @@ const shown = (v: unknown): string => {
 
 /** The joints a model of this kind starts with (a vehicle's wheels follow its wheel count). */
 function baseJoints(kind: ModelRecipe["kind"], build: ModelRecipe["build"]): string[] {
+  if (kind === "world") return ["root"];
   if (kind === "scenery") {
     const piece = build.scenery;
     return typeof piece === "string" && Object.hasOwn(KIT.scenery, piece) ? KIT.scenery[piece as SceneryKind].joints.map(([name]) => name) : ["root"];
@@ -115,17 +136,33 @@ function keysProblem(obj: Record<string, unknown>, expected: readonly string[], 
   return null;
 }
 
+const OPTIONAL_KEYS = ["quality", "finishes", "details"] as const;
+
+/** The recipe's own pieces for the kind it is: its build fields, and (once its build is known) its color slots and the extras it may have. */
+function buildFieldsOf(kind: string): Record<string, BuildField> {
+  if (kind === "scenery") return { scenery: { choices: SCENERY_KINDS, default: SCENERY_KINDS[0] } };
+  if (kind === "world") return { piece: { choices: WORLD_PIECES, default: WORLD_PIECES[0] }, style: { choices: WORLD_STYLES, default: WORLD_STYLES[0] } };
+  return KIT.kinds[kind as ModelKind].build;
+}
+
 function checkRecipe(recipe: unknown): string | null {
   if (!isObject(recipe)) return "recipe: must be an object";
-  const keys = keysProblem(recipe, ["version", "kind", "summary", "build", "colors", "extras"], "recipe");
+  const keys = keysProblem(recipe, ["version", "kind", "summary", "build", "colors", "extras", ...OPTIONAL_KEYS.filter((key) => Object.hasOwn(recipe, key))], "recipe");
   if (keys) return keys;
   if (recipe.version !== 1) return "recipe.version: must be 1";
   const kind = recipe.kind;
   const isScenery = kind === "scenery";
-  if (typeof kind !== "string" || !(isScenery || (MODEL_KINDS as readonly string[]).includes(kind))) return `recipe.kind: ${shown(kind)} is not one of ${[...MODEL_KINDS, "scenery"].join(", ")}`;
-  const spec = isScenery ? null : KIT.kinds[kind as ModelKind];
-  // A scenery piece has one build field, which piece it is, and the color slots and joints of that piece; it takes no extras.
-  const buildFields: Record<string, BuildField> = spec ? spec.build : { scenery: { choices: SCENERY_KINDS, default: SCENERY_KINDS[0] } };
+  const isWorld = kind === "world";
+  if (typeof kind !== "string" || !(isScenery || isWorld || (MODEL_KINDS as readonly string[]).includes(kind))) {
+    return `recipe.kind: ${shown(kind)} is not one of ${[...MODEL_KINDS, "scenery", "world"].join(", ")}`;
+  }
+  const quality = Object.hasOwn(recipe, "quality") ? recipe.quality : "standard";
+  if (typeof quality !== "string" || !(QUALITIES as readonly string[]).includes(quality)) return `recipe.quality: ${shown(quality)} is not standard or high`;
+  const high = quality === "high";
+  if (isWorld && !high) return 'recipe.kind: "world" is only for the High tier';
+  const spec = isScenery || isWorld ? null : KIT.kinds[kind as ModelKind];
+  // A scenery piece or a world piece has its own build fields, takes the color slots of the piece (or of the world), and takes no extras.
+  const buildFields = buildFieldsOf(kind);
 
   const summary = recipe.summary;
   if (typeof summary !== "string") return "recipe.summary: must be text";
@@ -149,7 +186,8 @@ function checkRecipe(recipe: unknown): string | null {
 
   const colors = recipe.colors;
   if (!isObject(colors)) return "recipe.colors: must be an object";
-  const slots = spec ? spec.slots : KIT.scenery[build.scenery as SceneryKind].slots; // build.scenery was checked to be one of the six above
+  // build.scenery was checked to be one of the six above
+  const slots = isWorld ? KIT.tiers.high.worlds.slots : spec ? spec.slots : KIT.scenery[build.scenery as SceneryKind].slots;
   const colorKeys = keysProblem(colors, Object.keys(slots), "recipe.colors");
   if (colorKeys) return colorKeys;
   for (const slot of Object.keys(slots)) {
@@ -164,6 +202,48 @@ function checkRecipe(recipe: unknown): string | null {
     if (typeof e !== "string" || !((spec?.extras ?? []) as readonly string[]).includes(e)) return `recipe.extras: ${shown(e)} is not allowed for this kind`;
     if (extras.indexOf(e) !== i) return `recipe.extras: ${e} twice`;
   }
+
+  if (!high) {
+    if (Object.hasOwn(recipe, "finishes")) return "recipe.finishes: a Standard recipe has no finishes";
+    if (Object.hasOwn(recipe, "details")) return "recipe.details: a Standard recipe has no details";
+    return null;
+  }
+  return checkHigh(recipe, kind, slots);
+}
+
+// What only a High recipe has: a finish for each color slot, details the kind can carry, and a size within the tier's budget.
+function checkHigh(recipe: Record<string, unknown>, kind: string, slots: Record<string, number>): string | null {
+  const finishes = recipe.finishes;
+  if (!isObject(finishes)) return "recipe.finishes: a High recipe needs a finish for each color";
+  const finishKeys = keysProblem(finishes, Object.keys(slots), "recipe.finishes");
+  if (finishKeys) return finishKeys;
+  for (const slot of Object.keys(slots)) {
+    const f = finishes[slot];
+    if (typeof f !== "string" || !(FINISHES as readonly string[]).includes(f)) return `recipe.finishes.${slot}: ${shown(f)} is not one of ${FINISHES.join(", ")}`;
+  }
+
+  const details = recipe.details;
+  if (!Array.isArray(details)) return "recipe.details: a High recipe needs a list of details (it may be empty)";
+  if (details.length > KIT.tiers.high.caps.details) return `recipe.details: at most ${KIT.tiers.high.caps.details}`;
+  const forModel = (MODEL_KINDS as readonly string[]).includes(kind);
+  for (const [i, d] of details.entries()) {
+    if (typeof d !== "string" || !(DETAILS as readonly string[]).includes(d)) return `recipe.details: ${shown(d)} is not one of ${DETAILS.join(", ")}`;
+    if (details.indexOf(d) !== i) return `recipe.details: ${d} twice`;
+    if (!forModel || KIT.tiers.high.details[d as Detail][kind as ModelKind] === undefined) return `recipe.details: ${d} is not for this kind`;
+  }
+
+  const e = estimate(recipe as unknown as ModelRecipe);
+  if (kind === "world") {
+    const caps = KIT.tiers.high.caps.world[(recipe.build as Record<string, string>).piece as WorldPiece];
+    if (e.triangles > caps.triangles) return `recipe: ${e.triangles} triangles is over the world piece's limit of ${caps.triangles}`;
+    if (e.vertices > caps.vertices) return `recipe: ${e.vertices} vertices is over the world piece's limit of ${caps.vertices}`;
+    return null;
+  }
+  const caps = tierCaps(kind as ModelKind | "scenery", "high");
+  if (e.triangles > caps.triangles) return `recipe: ${e.triangles} triangles is over the ${kind} limit of ${caps.triangles}`;
+  if (e.vertices > caps.vertices) return `recipe: ${e.vertices} vertices is over the ${kind} limit of ${caps.vertices}`;
+  if (e.parts > caps.parts) return `recipe: ${e.parts} parts is over the ${kind} limit of ${caps.parts}`;
+  if (e.meshes > caps.meshes) return `recipe: ${e.meshes} meshes is over the ${kind} limit of ${caps.meshes}`;
   return null;
 }
 
@@ -174,6 +254,7 @@ function checkMotions(motions: unknown, recipe: ModelRecipe): string | null {
   if (motions.version !== 1) return "motions.version: must be 1";
   const clips = motions.motions;
   if (!isObject(clips)) return "motions.motions: must be an object";
+  if (recipe.kind === "world" && Object.keys(clips).length > 0) return "motions.motions: a world piece has no motions";
   const joints = new Set(jointsOf(recipe));
   const { motion, caps } = KIT;
   for (const clip of Object.keys(clips)) {
@@ -232,9 +313,111 @@ export function defaultRecipe(kind: ModelKind): ModelRecipe {
   };
 }
 
-/** The kit's recipe for a scenery piece: no summary, the piece named in its build, its own color slots, no extras. */
-export function sceneryRecipe(kind: SceneryKind): ModelRecipe {
-  return { version: 1, kind: "scenery", summary: "", build: { scenery: kind }, colors: { ...KIT.scenery[kind].slots }, extras: [] };
+/** The kit's recipe for a scenery piece: no summary, the piece named in its build, its own color slots, no extras. In High it also has finishes. */
+export function sceneryRecipe(kind: SceneryKind, quality: Quality = "standard"): ModelRecipe {
+  const recipe: ModelRecipe = { version: 1, kind: "scenery", summary: "", build: { scenery: kind }, colors: { ...KIT.scenery[kind].slots }, extras: [] };
+  if (quality === "high") return { ...recipe, quality: "high", finishes: { ...KIT.tiers.high.defaults.scenery[kind].finishes }, details: [] };
+  return recipe;
+}
+
+/** One piece of the High world in a style: terrain, road or backdrop, colored by the palette slots ground, accent and far. */
+export function worldRecipe(piece: WorldPiece, style: WorldStyle): ModelRecipe {
+  const high = KIT.tiers.high;
+  return {
+    version: 1,
+    kind: "world",
+    summary: "",
+    build: { piece, style },
+    colors: { ...high.worlds.slots },
+    extras: [],
+    quality: "high",
+    finishes: { ...high.defaults.world.finishes },
+    details: [],
+  };
+}
+
+/** The kit's High recipe for a kind: its default build, the default finishes for each color slot and the default details. */
+export function defaultHighRecipe(kind: ModelKind): ModelRecipe {
+  const defaults = KIT.tiers.high.defaults[kind];
+  return { ...defaultRecipe(kind), quality: "high", finishes: { ...defaults.finishes }, details: [...defaults.details] };
+}
+
+export const isHigh = (recipe: ModelRecipe): boolean => recipe.quality === "high";
+
+/** What a recipe uses: parts, triangles, shared vertices and meshes. Standard counts only parts and triangles (vertices and meshes are 0). */
+export interface Estimate {
+  parts: number;
+  triangles: number;
+  vertices: number;
+  meshes: number;
+}
+
+const plus = (a: Estimate, b: Budget): Estimate => ({ parts: a.parts + b.parts, triangles: a.triangles + b.triangles, vertices: a.vertices + b.vertices, meshes: a.meshes + b.meshes });
+const times = (b: Budget, n: number): Budget => ({ parts: b.parts * n, triangles: b.triangles * n, vertices: b.vertices * n, meshes: b.meshes * n });
+const NONE: Estimate = { parts: 0, triangles: 0, vertices: 0, meshes: 0 };
+
+export function estimate(recipe: ModelRecipe): Estimate {
+  if (!isHigh(recipe)) {
+    const standard = counts(recipe);
+    return { parts: standard.parts, triangles: standard.triangles, vertices: 0, meshes: 0 };
+  }
+  const high = KIT.tiers.high;
+  const kind = recipe.kind;
+  const { build } = recipe;
+  if (kind === "world") {
+    const piece = typeof build.piece === "string" && Object.hasOwn(high.base.world, build.piece) ? high.base.world[build.piece as WorldPiece] : null;
+    return piece ? { parts: 1, triangles: piece.triangles, vertices: piece.vertices, meshes: 1 } : NONE;
+  }
+
+  let total: Estimate = NONE;
+  if (kind === "scenery") {
+    const piece = typeof build.scenery === "string" && Object.hasOwn(high.base.scenery, build.scenery) ? high.base.scenery[build.scenery as SceneryKind] : null;
+    return piece ? plus(NONE, piece) : NONE;
+  }
+  if (kind === "vehicle") {
+    const { cab, wheel, ...body } = high.base.vehicle;
+    total = plus(NONE, body);
+    if (typeof build.cabSize === "number" && build.cabSize > 0) total = plus(total, cab);
+    if (typeof build.wheelCount === "number") total = plus(total, times(wheel, Math.max(0, Math.floor(build.wheelCount))));
+  } else if (kind === "prop") {
+    const shape = typeof build.shape === "string" && Object.hasOwn(high.base.prop.shapes, build.shape) ? high.base.prop.shapes[build.shape as keyof typeof high.base.prop.shapes] : null;
+    total = shape ? plus(NONE, shape) : NONE;
+  } else {
+    total = plus(NONE, high.base[kind]);
+  }
+  for (const extra of recipe.extras) if (Object.hasOwn(high.extras, extra)) total = plus(total, high.extras[extra]);
+  for (const detail of recipe.details ?? []) {
+    const cost = Object.hasOwn(high.details, detail) ? high.details[detail][kind] : undefined;
+    if (cost) total = plus(total, cost);
+  }
+  return total;
+}
+
+/**
+ * Brings a High recipe within its caps by dropping, in this order, cables, bolts, seams, lights, then extras from the end. It adds nothing,
+ * never touches a recipe that is already within budget, and never changes the one it is given. Null when it is still over with nothing left
+ * to drop. A Standard recipe (or a world piece, which has nothing to drop) comes back as a copy. `caps` is for tests: the tier's own by default.
+ */
+export function fitToBudget(recipe: ModelRecipe, caps?: Budget): ModelRecipe | null {
+  const fitted = clone(recipe);
+  if (!isHigh(fitted) || fitted.kind === "world") return fitted;
+  const limits = caps ?? tierCaps(fitted.kind === "scenery" ? "scenery" : fitted.kind, "high");
+  const over = () => {
+    const e = estimate(fitted);
+    return e.triangles > limits.triangles || e.vertices > limits.vertices || e.parts > limits.parts || e.meshes > limits.meshes;
+  };
+  while (over()) {
+    const details = fitted.details ?? [];
+    const next = DROP_ORDER.find((detail) => details.includes(detail));
+    if (next) {
+      fitted.details = details.filter((detail) => detail !== next);
+    } else if (fitted.extras.length > 0) {
+      fitted.extras = fitted.extras.slice(0, -1);
+    } else {
+      return null;
+    }
+  }
+  return fitted;
 }
 
 /** A piece's motions: the Loop of an animated one (a tree, a pine, a windmill), nothing for one that stands still. */
@@ -246,7 +429,7 @@ export function sceneryMotions(kind: SceneryKind): MotionRecipe {
 /** The kit's motions for these clips; tracks on joints the recipe lacks are dropped silently (a three-wheeled vehicle has no wheel_4). */
 export function defaultMotions(recipe: ModelRecipe, clips: readonly ClipKey[]): MotionRecipe {
   const motions: MotionRecipe["motions"] = {};
-  if (recipe.kind === "scenery") return { version: 1, motions };
+  if (recipe.kind === "scenery" || recipe.kind === "world") return { version: 1, motions };
   const joints = new Set(jointsOf(recipe));
   for (const clip of clips) {
     const spec = KIT.kinds[recipe.kind].motions[clip];
@@ -256,6 +439,7 @@ export function defaultMotions(recipe: ModelRecipe, clips: readonly ClipKey[]): 
 }
 
 function counts(recipe: ModelRecipe): { parts: number; triangles: number } {
+  if (recipe.kind === "world") return { parts: 0, triangles: 0 };
   if (recipe.kind === "scenery") {
     const piece = recipe.build.scenery;
     const entry = typeof piece === "string" && Object.hasOwn(KIT.scenery, piece) ? KIT.scenery[piece as SceneryKind].count : null;

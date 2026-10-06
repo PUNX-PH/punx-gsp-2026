@@ -47,6 +47,24 @@ export type Axis = (typeof AXES)[number];
 export const WAVES = ["swing", "spin", "bounce", "pulse", "hold"] as const;
 export type Wave = (typeof WAVES)[number];
 
+/** Standard is the default and the phone-safe tier; High is lit and detailed, inside hard budgets (see the kit's tiers). */
+export const QUALITIES = ["standard", "high"] as const;
+export type Quality = (typeof QUALITIES)[number];
+
+/** What a color slot is made of: a finish is a metallic, roughness and emission setting, so metal and glow cost no triangles. */
+export const FINISHES = ["matte", "painted", "metal", "rubber", "glow"] as const;
+export type Finish = (typeof FINISHES)[number];
+
+/** Extra detail a High model can have, each priced in triangles. Dropped in this order when over budget: cables, bolts, seams, lights. */
+export const DETAILS = ["seams", "bolts", "cables", "lights"] as const;
+export type Detail = (typeof DETAILS)[number];
+export const DROP_ORDER: readonly Detail[] = ["cables", "bolts", "seams", "lights"];
+
+export const WORLD_PIECES = ["terrain", "road", "backdrop"] as const;
+export type WorldPiece = (typeof WORLD_PIECES)[number];
+export const WORLD_STYLES = ["desert", "meadow"] as const;
+export type WorldStyle = (typeof WORLD_STYLES)[number];
+
 export interface NumberField {
   min: number;
   max: number;
@@ -107,6 +125,54 @@ export interface SceneryKit {
   /** The Loop of an animated piece, or null for one that stands still. */
   loop: MotionSpec | null;
 }
+/** Triangles, shared vertices, parts and meshes: what a High model may use, or what a piece of it costs. */
+export interface Budget {
+  triangles: number;
+  vertices: number;
+  parts: number;
+  meshes: number;
+}
+export interface FinishValues {
+  metallic: number;
+  roughness: number;
+  emission: number;
+}
+export interface TierDefaults {
+  finishes: Record<string, Finish>;
+  details: Detail[];
+}
+export interface HighTier {
+  caps: Record<ModelKind | "scenery", Budget> & {
+    world: Record<WorldPiece, { triangles: number; vertices: number }>;
+    materials: number;
+    details: number;
+  };
+  finishes: Record<Finish, FinishValues>;
+  /** What each extra adds in High. */
+  extras: Record<Extra, Budget>;
+  /** What each detail adds, per kind that can have it; a kind with no entry cannot have that detail. */
+  details: Record<Detail, Partial<Record<ModelKind, Budget>>>;
+  defaults: {
+    biped: TierDefaults;
+    vehicle: TierDefaults;
+    blob: TierDefaults;
+    prop: TierDefaults;
+    scenery: Record<SceneryKind, { finishes: Record<string, Finish> }>;
+    world: { finishes: Record<string, Finish> };
+  };
+  /** The High model of each kind before extras and details (a vehicle adds its cab and wheels, a prop is its shape). */
+  base: {
+    biped: Budget;
+    vehicle: Budget & { cab: Budget; wheel: Budget };
+    blob: Budget;
+    prop: { shapes: Record<PropShape, Budget> };
+    scenery: Record<SceneryKind, Budget>;
+    world: Record<WorldPiece, { triangles: number; vertices: number }>;
+  };
+  /** The palette slots a world piece is colored with (ground, accent, far), and the styles. */
+  worlds: { pieces: WorldPiece[]; slots: Record<string, number>; styles: WorldStyle[] };
+}
+
 export interface Kit {
   version: 1;
   caps: { parts: number; triangles: number; sceneryTriangles: number; extras: number; tracks: number; summary: number };
@@ -120,6 +186,7 @@ export interface Kit {
   kinds: Record<ModelKind, KindSpec>;
   extras: Record<Extra, ExtraSpec>;
   scenery: Record<SceneryKind, SceneryKit>;
+  tiers: { high: HighTier };
 }
 
 export const KIT: Kit = {
@@ -725,5 +792,157 @@ export const KIT: Kit = {
       "count": { "parts": 3, "triangles": 68 },
       "loop": null
     }
+  },
+  "tiers": {
+    "high": {
+      "caps": {
+        "biped": { "triangles": 12000, "vertices": 9500, "parts": 80, "meshes": 14 },
+        "vehicle": { "triangles": 6000, "vertices": 4800, "parts": 50, "meshes": 10 },
+        "blob": { "triangles": 5000, "vertices": 4000, "parts": 30, "meshes": 6 },
+        "prop": { "triangles": 3500, "vertices": 2800, "parts": 24, "meshes": 5 },
+        "scenery": { "triangles": 1500, "vertices": 1200, "parts": 24, "meshes": 3 },
+        "world": {
+          "terrain": { "triangles": 8000, "vertices": 4200 },
+          "road": { "triangles": 1500, "vertices": 1200 },
+          "backdrop": { "triangles": 1200, "vertices": 700 }
+        },
+        "materials": 7,
+        "details": 4
+      },
+      "finishes": {
+        "matte": { "metallic": 0, "roughness": 0.85, "emission": 0 },
+        "painted": { "metallic": 0, "roughness": 0.35, "emission": 0 },
+        "metal": { "metallic": 0.9, "roughness": 0.3, "emission": 0 },
+        "rubber": { "metallic": 0, "roughness": 0.9, "emission": 0 },
+        "glow": { "metallic": 0, "roughness": 0.5, "emission": 1 }
+      },
+      "extras": {
+        "tail": { "triangles": 420, "vertices": 340, "parts": 2, "meshes": 2 },
+        "ears": { "triangles": 700, "vertices": 560, "parts": 2, "meshes": 2 },
+        "antenna": { "triangles": 520, "vertices": 420, "parts": 3, "meshes": 1 },
+        "hat": { "triangles": 600, "vertices": 480, "parts": 1, "meshes": 1 },
+        "backpack": { "triangles": 900, "vertices": 700, "parts": 4, "meshes": 1 }
+      },
+      "details": {
+        "seams": {
+          "biped": { "triangles": 800, "vertices": 640, "parts": 4, "meshes": 0 },
+          "vehicle": { "triangles": 250, "vertices": 200, "parts": 3, "meshes": 0 },
+          "blob": { "triangles": 200, "vertices": 160, "parts": 2, "meshes": 0 },
+          "prop": { "triangles": 300, "vertices": 240, "parts": 3, "meshes": 0 }
+        },
+        "bolts": {
+          "biped": { "triangles": 1700, "vertices": 1360, "parts": 14, "meshes": 0 },
+          "vehicle": { "triangles": 400, "vertices": 320, "parts": 8, "meshes": 0 },
+          "prop": { "triangles": 500, "vertices": 400, "parts": 8, "meshes": 0 }
+        },
+        "cables": {
+          "biped": { "triangles": 1300, "vertices": 1040, "parts": 4, "meshes": 0 },
+          "vehicle": { "triangles": 200, "vertices": 160, "parts": 2, "meshes": 0 }
+        },
+        "lights": {
+          "biped": { "triangles": 400, "vertices": 320, "parts": 6, "meshes": 0 },
+          "vehicle": { "triangles": 240, "vertices": 190, "parts": 4, "meshes": 0 },
+          "blob": { "triangles": 200, "vertices": 160, "parts": 2, "meshes": 0 }
+        }
+      },
+      "defaults": {
+        "biped": {
+          "finishes": { "head": "painted", "body": "painted", "arms": "painted", "legs": "metal", "feet": "rubber", "extra": "glow" },
+          "details": ["seams", "bolts", "lights"]
+        },
+        "vehicle": {
+          "finishes": { "body": "painted", "cab": "metal", "wheels": "rubber", "extra": "glow" },
+          "details": ["seams", "lights"]
+        },
+        "blob": {
+          "finishes": { "body": "painted", "eyes": "glow", "extra": "matte" },
+          "details": ["lights"]
+        },
+        "prop": {
+          "finishes": { "body": "painted", "extra": "metal" },
+          "details": ["seams", "bolts"]
+        },
+        "scenery": {
+          "tree": {
+            "finishes": { "main": "matte", "detail": "matte" }
+          },
+          "pine": {
+            "finishes": { "main": "matte", "detail": "matte" }
+          },
+          "rock": {
+            "finishes": { "main": "matte", "detail": "matte" }
+          },
+          "cactus": {
+            "finishes": { "main": "matte", "detail": "glow" }
+          },
+          "windmill": {
+            "finishes": { "main": "painted", "detail": "painted" }
+          },
+          "lamp": {
+            "finishes": { "main": "metal", "detail": "glow" }
+          }
+        },
+        "world": {
+          "finishes": { "ground": "matte", "accent": "matte", "far": "matte" }
+        }
+      },
+      "base": {
+        "biped": { "triangles": 6800, "vertices": 5400, "parts": 44, "meshes": 9 },
+        "vehicle": {
+          "triangles": 1500,
+          "vertices": 1200,
+          "parts": 4,
+          "meshes": 1,
+          "cab": { "triangles": 500, "vertices": 400, "parts": 2, "meshes": 0 },
+          "wheel": { "triangles": 400, "vertices": 320, "parts": 2, "meshes": 1 }
+        },
+        "blob": { "triangles": 2600, "vertices": 2000, "parts": 6, "meshes": 1 },
+        "prop": {
+          "shapes": {
+            "cube": { "triangles": 900, "vertices": 700, "parts": 1, "meshes": 1 },
+            "sphere": { "triangles": 700, "vertices": 560, "parts": 1, "meshes": 1 },
+            "cone": { "triangles": 600, "vertices": 480, "parts": 1, "meshes": 1 },
+            "cylinder": { "triangles": 700, "vertices": 560, "parts": 1, "meshes": 1 },
+            "pyramid": { "triangles": 500, "vertices": 400, "parts": 1, "meshes": 1 },
+            "coin": { "triangles": 800, "vertices": 640, "parts": 2, "meshes": 1 },
+            "ring": { "triangles": 1400, "vertices": 1100, "parts": 1, "meshes": 1 },
+            "gem": { "triangles": 900, "vertices": 700, "parts": 3, "meshes": 1 },
+            "crate": { "triangles": 1500, "vertices": 1150, "parts": 3, "meshes": 1 }
+          }
+        },
+        "scenery": {
+          "tree": { "triangles": 900, "vertices": 720, "parts": 4, "meshes": 2 },
+          "pine": { "triangles": 800, "vertices": 640, "parts": 5, "meshes": 2 },
+          "rock": { "triangles": 600, "vertices": 480, "parts": 2, "meshes": 1 },
+          "cactus": { "triangles": 1000, "vertices": 800, "parts": 8, "meshes": 1 },
+          "windmill": { "triangles": 1100, "vertices": 880, "parts": 9, "meshes": 2 },
+          "lamp": { "triangles": 700, "vertices": 560, "parts": 4, "meshes": 1 }
+        },
+        "world": {
+          "terrain": { "triangles": 7800, "vertices": 4100 },
+          "road": { "triangles": 1450, "vertices": 1150 },
+          "backdrop": { "triangles": 1100, "vertices": 650 }
+        }
+      },
+      "worlds": {
+        "pieces": ["terrain", "road", "backdrop"],
+        "slots": { "ground": 3, "accent": 2, "far": 1 },
+        "styles": ["desert", "meadow"]
+      }
+    }
   }
 };
+
+/** The metallic, roughness and emission of each finish. */
+export const FINISH_VALUES: Record<Finish, FinishValues> = KIT.tiers.high.finishes;
+
+/** What a model or scenery piece of this kind may use in this tier. Standard has no vertex or mesh limit: those are infinite here. */
+export function tierCaps(kind: ModelKind | "scenery", quality: Quality): Budget {
+  if (quality === "high") return KIT.tiers.high.caps[kind];
+  return {
+    triangles: kind === "scenery" ? KIT.caps.sceneryTriangles : KIT.caps.triangles,
+    vertices: Number.POSITIVE_INFINITY,
+    parts: KIT.caps.parts,
+    meshes: Number.POSITIVE_INFINITY,
+  };
+}

@@ -1,0 +1,83 @@
+{
+  "biped-high-default.json": {
+    "parts": 68,
+    "triangles": 9700,
+    "vertices": 7720,
+    "meshes": 9,
+    "clips": [
+      "Run",
+      "Jump"
+    ]
+  },
+  "biped-high-stress.json": {
+    "parts": 73,
+    "triangles": 10920,
+    "vertices": 8700,
+    "meshes": 12,
+    "clips": [
+      "Run",
+      "Jump",
+      "Loop"
+    ]
+  },
+  "vehicle-high-default.json": {
+    "parts": 21,
+    "triangles": 4090,
+    "vertices": 3270,
+    "meshes": 5,
+    "clips": [
+      "Loop"
+    ]
+  },
+  "vehicle-high-stress.json": {
+    "parts": 36,
+    "triangles": 5810,
+    "vertices": 4650,
+    "meshes": 8,
+    "clips": [
+      "Run",
+      "Jump",
+      "Loop"
+    ]
+  },
+  "blob-high-default.json": {
+    "parts": 8,
+    "triangles": 2800,
+    "vertices": 2160,
+    "meshes": 1,
+    "clips": [
+      "Loop"
+    ]
+  },
+  "blob-high-stress.json": {
+    "parts": 15,
+    "triangles": 4220,
+    "vertices": 3300,
+    "meshes": 4,
+    "clips": [
+      "Run",
+      "Jump",
+      "Loop"
+    ]
+  },
+  "prop-high-default.json": {
+    "parts": 14,
+    "triangles": 1700,
+    "vertices": 1340,
+    "meshes": 1,
+    "clips": [
+      "Loop"
+    ]
+  },
+  "prop-high-stress.json": {
+    "parts": 12,
+    "triangles": 2200,
+    "vertices": 1740,
+    "meshes": 1,
+    "clips": [
+      "Run",
+      "Jump",
+      "Loop"
+    ]
+  }
+}

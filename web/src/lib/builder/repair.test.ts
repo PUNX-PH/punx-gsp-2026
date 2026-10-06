@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CLIPS_FOR_ROLE, type ClipKey, type ModelKind } from "@/lib/builder/kinds";
-import { checkBuildBody, DEFAULT_ENVIRONMENT, defaultMotions, defaultRecipe, type ModelRecipe } from "@/lib/builder/recipes";
+import { CLIPS_FOR_ROLE, type ClipKey, KIT, type ModelKind } from "@/lib/builder/kinds";
+import { checkBuildBody, DEFAULT_ENVIRONMENT, defaultMotions, defaultRecipe, estimate, type ModelRecipe } from "@/lib/builder/recipes";
 import { enforceCaps, repairEnvironment, repairModelRecipe, repairMotions } from "@/lib/builder/repair";
 import { SAMPLE_PALETTE } from "@/lib/graph/palette";
 
@@ -239,5 +239,87 @@ describe("repairEnvironment", () => {
   it("never changes what it was given", () => {
     const raw = Object.freeze({ sky: 9, field: 1, stripe: 1, scenery: Object.freeze(["tree", "x"]) });
     expect(() => repairEnvironment(raw)).not.toThrow();
+  });
+});
+
+describe("repairModelRecipe in the High tier", () => {
+  const high = (raw: unknown, kind: ModelKind | null = "biped") => {
+    const r = repairModelRecipe(raw, { kind, quality: "high" });
+    if (!r.ok) throw new Error("repair failed");
+    return r.recipe;
+  };
+  const defaults = KIT.tiers.high.defaults;
+  const answerWith = (kind: ModelKind, extra: Record<string, unknown>) => ({ ...answer(kind), ...extra });
+
+  it("makes a High recipe: the quality, a finish for each slot and the details", () => {
+    const recipe = high(answerWith("biped", { finishes: { ...defaults.biped.finishes, head: "glow" }, details: ["seams", "lights"] }));
+    expect(recipe.quality).toBe("high");
+    expect(recipe.finishes).toEqual({ ...defaults.biped.finishes, head: "glow" });
+    expect(recipe.details).toEqual(["seams", "lights"]);
+    expect(checkBuildBody({ recipe, motions: defaultMotions(recipe, ["run", "jump"]), palette: [...SAMPLE_PALETTE] })).toBeNull();
+  });
+
+  it("gives an unknown finish the default of the kit for that slot, and every slot a finish", () => {
+    const recipe = high(answerWith("biped", { finishes: { head: "chrome", body: "glow", arms: 7, legs: null, wings: "metal" } }));
+    expect(recipe.finishes).toEqual({ ...defaults.biped.finishes, body: "glow" });
+    expect(Object.keys(recipe.finishes!).sort()).toEqual(Object.keys(KIT.kinds.biped.slots).sort());
+  });
+
+  it.each([["nothing", undefined], ["a list", ["metal"]], ["text", "metal"], ["null", null]])("takes every default finish when finishes is %s", (_label, finishes) => {
+    expect(high(answerWith("vehicle", { finishes }), "vehicle").finishes).toEqual(defaults.vehicle.finishes);
+  });
+
+  it("drops unknown details and ones the kind cannot have, removes duplicates and keeps the first four", () => {
+    expect(high(answerWith("biped", { details: ["seams", "sparkles", "seams", "bolts", "cables", "lights", "lights"] })).details).toEqual(["seams", "bolts", "cables", "lights"]);
+    expect(high(answerWith("blob", { details: ["bolts", "lights", "cables", 3, "seams"] }), "blob").details).toEqual(["lights", "seams"]);
+    expect(high(answerWith("prop", { details: ["lights", "bolts"] }), "prop").details).toEqual(["bolts"]);
+  });
+
+  it("takes the default details when Claude gives none, and keeps an empty list as empty", () => {
+    expect(high(answerWith("biped", { details: undefined })).details).toEqual(defaults.biped.details);
+    expect(high(answerWith("biped", { details: "seams" })).details).toEqual(defaults.biped.details);
+    expect(high(answerWith("biped", { details: [] })).details).toEqual([]);
+  });
+
+  it("brings a recipe over budget within it, dropping cables first", () => {
+    const recipe = high(answerWith("biped", { extras: ["backpack", "ears"], details: ["seams", "bolts", "cables", "lights"] }));
+    expect(recipe.details).toEqual(["seams", "bolts", "lights"]);
+    expect(recipe.extras).toEqual(["backpack", "ears"]);
+  });
+
+  it("is not held to Standard caps: a default High biped has more than 24 parts and 2,000 triangles", () => {
+    expect(estimate(high(answer("biped"))).parts).toBeGreaterThan(KIT.caps.parts);
+    expect(estimate(high(answer("biped"))).triangles).toBeGreaterThan(KIT.caps.triangles);
+  });
+
+  it("with Auto takes the kind from the answer and still makes a High recipe; an unknown kind still fails", () => {
+    expect(high(answer("blob"), null).kind).toBe("blob");
+    expect(repairModelRecipe({ ...answer("blob"), kind: "dragon" }, { kind: null, quality: "high" })).toEqual({ ok: false });
+  });
+
+  it("repairs the build and the colors exactly as Standard does", () => {
+    const recipe = high(answer("biped", { build: { headSize: 9 }, colors: { head: 7.2 } }));
+    expect(recipe.build.headSize).toBe(0.8);
+    expect(recipe.colors.head).toBe(4);
+  });
+
+  it("is deterministic: the same raw answer twice gives deep-equal recipes", () => {
+    const raw = answerWith("biped", { extras: ["backpack", "ears", "hat"], details: ["cables", "seams", "bolts", "lights"], finishes: { head: "metal", legs: "x" } });
+    expect(high(raw)).toEqual(high(raw));
+    expect(high(JSON.parse(JSON.stringify(raw)))).toEqual(high(raw));
+  });
+
+  it("leaves Standard exactly as it was: no quality, finishes or details keys, and the Standard caps", () => {
+    const r = repairModelRecipe(answerWith("biped", { finishes: { head: "glow" }, details: ["seams"] }), { kind: "biped" });
+    expect(r.ok && "quality" in r.recipe).toBe(false);
+    expect(r.ok && "finishes" in r.recipe).toBe(false);
+    expect(r.ok && "details" in r.recipe).toBe(false);
+    const standard = repairModelRecipe(answerWith("biped", { extras: ["tail", "ears", "hat"] }), { kind: "biped", quality: "standard" });
+    expect(standard.ok && standard.recipe.extras).toEqual(["tail", "ears"]);
+  });
+
+  it("never changes what it was given", () => {
+    const raw = Object.freeze({ ...answer("biped"), details: Object.freeze(["seams", "bolts"]), finishes: Object.freeze({ head: "glow" }), extras: Object.freeze(["tail"]) });
+    expect(() => repairModelRecipe(raw, { kind: "biped", quality: "high" })).not.toThrow();
   });
 });

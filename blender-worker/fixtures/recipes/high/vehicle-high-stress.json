@@ -1,0 +1,387 @@
+{
+  "recipe": {
+    "version": 1,
+    "kind": "vehicle",
+    "summary": "A blocky little vehicle.",
+    "build": {
+      "bodyLength": 2.5,
+      "bodyWidth": 1.5,
+      "bodyHeight": 1,
+      "cabSize": 0.8,
+      "wheelCount": 6,
+      "wheelRadius": 0.5
+    },
+    "colors": {
+      "body": 4,
+      "cab": 4,
+      "wheels": 4,
+      "extra": 4
+    },
+    "extras": [
+      "antenna"
+    ],
+    "quality": "high",
+    "finishes": {
+      "body": "painted",
+      "cab": "metal",
+      "wheels": "rubber",
+      "extra": "glow"
+    },
+    "details": [
+      "seams",
+      "bolts",
+      "lights"
+    ]
+  },
+  "motions": {
+    "version": 1,
+    "motions": {
+      "run": {
+        "seconds": 3,
+        "tracks": [
+          {
+            "joint": "body",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "spin",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_1",
+            "channel": "move",
+            "axis": "y",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_2",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_3",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "hold",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_4",
+            "channel": "move",
+            "axis": "y",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_5",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_6",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "pulse",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "antenna",
+            "channel": "move",
+            "axis": "y",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "body",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_1",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "bounce",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_2",
+            "channel": "move",
+            "axis": "y",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_3",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          }
+        ]
+      },
+      "jump": {
+        "seconds": 3,
+        "tracks": [
+          {
+            "joint": "body",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "spin",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_1",
+            "channel": "move",
+            "axis": "y",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_2",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_3",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "hold",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_4",
+            "channel": "move",
+            "axis": "y",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_5",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_6",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "pulse",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "antenna",
+            "channel": "move",
+            "axis": "y",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "body",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_1",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "bounce",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_2",
+            "channel": "move",
+            "axis": "y",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_3",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          }
+        ]
+      },
+      "loop": {
+        "seconds": 3,
+        "tracks": [
+          {
+            "joint": "body",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "spin",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_1",
+            "channel": "move",
+            "axis": "y",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_2",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_3",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "hold",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_4",
+            "channel": "move",
+            "axis": "y",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_5",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "bounce",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_6",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "pulse",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "antenna",
+            "channel": "move",
+            "axis": "y",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "body",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "swing",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_1",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "bounce",
+            "amplitude": 90,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_2",
+            "channel": "move",
+            "axis": "y",
+            "wave": "pulse",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          },
+          {
+            "joint": "wheel_3",
+            "channel": "scale",
+            "axis": "z",
+            "wave": "hold",
+            "amplitude": 0.5,
+            "cycles": 4,
+            "phase": 1
+          }
+        ]
+      }
+    }
+  },
+  "palette": [
+    "#1b1f3b",
+    "#ff6f59",
+    "#ffd166",
+    "#06d6a0",
+    "#ffffff"
+  ]
+}

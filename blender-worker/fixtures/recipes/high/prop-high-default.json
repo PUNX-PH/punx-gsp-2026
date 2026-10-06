@@ -1,0 +1,60 @@
+{
+  "recipe": {
+    "version": 1,
+    "kind": "prop",
+    "summary": "A simple spinning prop.",
+    "build": {
+      "shape": "gem",
+      "size": 1
+    },
+    "colors": {
+      "body": 3,
+      "extra": 4
+    },
+    "extras": [],
+    "quality": "high",
+    "finishes": {
+      "body": "painted",
+      "extra": "metal"
+    },
+    "details": [
+      "seams",
+      "bolts"
+    ]
+  },
+  "motions": {
+    "version": 1,
+    "motions": {
+      "loop": {
+        "seconds": 1,
+        "tracks": [
+          {
+            "joint": "root",
+            "channel": "rotate",
+            "axis": "y",
+            "wave": "spin",
+            "amplitude": 1,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "root",
+            "channel": "move",
+            "axis": "y",
+            "wave": "swing",
+            "amplitude": 0.1,
+            "cycles": 1,
+            "phase": 0
+          }
+        ]
+      }
+    }
+  },
+  "palette": [
+    "#1b1f3b",
+    "#ff6f59",
+    "#ffd166",
+    "#06d6a0",
+    "#ffffff"
+  ]
+}
