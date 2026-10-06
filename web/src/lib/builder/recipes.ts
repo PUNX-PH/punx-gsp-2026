@@ -9,13 +9,16 @@ import {
   CLIP_NAMES,
   KIT,
   MODEL_KINDS,
+  SCENERY_KINDS,
   WAVES,
   type Axis,
+  type BuildField,
   type Channel,
   type ClipKey,
   type ClipName,
   type Extra,
   type ModelKind,
+  type SceneryKind,
   type Wave,
 } from "@/lib/builder/kinds";
 
@@ -34,7 +37,7 @@ export interface Motion {
 }
 export interface ModelRecipe {
   version: 1;
-  // "scenery" is declared for the environment's pieces; the check accepts only the four model kinds until the scenery kit exists.
+  // "scenery" is an environment piece: its build is exactly { scenery: <one of the kit's six> }.
   kind: ModelKind | "scenery";
   summary: string;
   build: Record<string, number | string>;
@@ -70,7 +73,10 @@ const shown = (v: unknown): string => {
 
 /** The joints a model of this kind starts with (a vehicle's wheels follow its wheel count). */
 function baseJoints(kind: ModelRecipe["kind"], build: ModelRecipe["build"]): string[] {
-  if (kind === "scenery") return ["root"];
+  if (kind === "scenery") {
+    const piece = build.scenery;
+    return typeof piece === "string" && Object.hasOwn(KIT.scenery, piece) ? KIT.scenery[piece as SceneryKind].joints.map(([name]) => name) : ["root"];
+  }
   if (kind === "vehicle") {
     const field = KIT.kinds.vehicle.build.wheelCount;
     const fallback = "min" in field ? field.default : 4;
@@ -100,8 +106,11 @@ function checkRecipe(recipe: unknown): string | null {
   if (keys) return keys;
   if (recipe.version !== 1) return "recipe.version: must be 1";
   const kind = recipe.kind;
-  if (typeof kind !== "string" || !(MODEL_KINDS as readonly string[]).includes(kind)) return `recipe.kind: ${shown(kind)} is not one of ${MODEL_KINDS.join(", ")}`;
-  const spec = KIT.kinds[kind as ModelKind];
+  const isScenery = kind === "scenery";
+  if (typeof kind !== "string" || !(isScenery || (MODEL_KINDS as readonly string[]).includes(kind))) return `recipe.kind: ${shown(kind)} is not one of ${[...MODEL_KINDS, "scenery"].join(", ")}`;
+  const spec = isScenery ? null : KIT.kinds[kind as ModelKind];
+  // A scenery piece has one build field, which piece it is, and the color slots and joints of that piece; it takes no extras.
+  const buildFields: Record<string, BuildField> = spec ? spec.build : { scenery: { choices: SCENERY_KINDS, default: SCENERY_KINDS[0] } };
 
   const summary = recipe.summary;
   if (typeof summary !== "string") return "recipe.summary: must be text";
@@ -110,9 +119,9 @@ function checkRecipe(recipe: unknown): string | null {
 
   const build = recipe.build;
   if (!isObject(build)) return "recipe.build: must be an object";
-  const buildKeys = keysProblem(build, Object.keys(spec.build), "recipe.build");
+  const buildKeys = keysProblem(build, Object.keys(buildFields), "recipe.build");
   if (buildKeys) return buildKeys;
-  for (const [name, field] of Object.entries(spec.build)) {
+  for (const [name, field] of Object.entries(buildFields)) {
     const v = build[name];
     if ("choices" in field) {
       if (typeof v !== "string" || !field.choices.includes(v)) return `recipe.build.${name}: ${shown(v)} is not one of ${field.choices.join(", ")}`;
@@ -125,9 +134,10 @@ function checkRecipe(recipe: unknown): string | null {
 
   const colors = recipe.colors;
   if (!isObject(colors)) return "recipe.colors: must be an object";
-  const colorKeys = keysProblem(colors, Object.keys(spec.slots), "recipe.colors");
+  const slots = spec ? spec.slots : KIT.scenery[build.scenery as SceneryKind].slots; // build.scenery was checked to be one of the six above
+  const colorKeys = keysProblem(colors, Object.keys(slots), "recipe.colors");
   if (colorKeys) return colorKeys;
-  for (const slot of Object.keys(spec.slots)) {
+  for (const slot of Object.keys(slots)) {
     const v = colors[slot];
     if (!isNumber(v) || !Number.isInteger(v) || v < 0 || v > 4) return `recipe.colors.${slot}: ${shown(v)} must be a whole number 0 to 4`;
   }
@@ -136,7 +146,7 @@ function checkRecipe(recipe: unknown): string | null {
   if (!Array.isArray(extras)) return "recipe.extras: must be a list";
   if (extras.length > KIT.caps.extras) return `recipe.extras: at most ${KIT.caps.extras}`;
   for (const [i, e] of extras.entries()) {
-    if (typeof e !== "string" || !(spec.extras as readonly string[]).includes(e)) return `recipe.extras: ${shown(e)} is not allowed for this kind`;
+    if (typeof e !== "string" || !((spec?.extras ?? []) as readonly string[]).includes(e)) return `recipe.extras: ${shown(e)} is not allowed for this kind`;
     if (extras.indexOf(e) !== i) return `recipe.extras: ${e} twice`;
   }
   return null;
@@ -207,6 +217,17 @@ export function defaultRecipe(kind: ModelKind): ModelRecipe {
   };
 }
 
+/** The kit's recipe for a scenery piece: no summary, the piece named in its build, its own color slots, no extras. */
+export function sceneryRecipe(kind: SceneryKind): ModelRecipe {
+  return { version: 1, kind: "scenery", summary: "", build: { scenery: kind }, colors: { ...KIT.scenery[kind].slots }, extras: [] };
+}
+
+/** A piece's motions: the Loop of an animated one (a tree, a pine, a windmill), nothing for one that stands still. */
+export function sceneryMotions(kind: SceneryKind): MotionRecipe {
+  const { loop } = KIT.scenery[kind];
+  return { version: 1, motions: loop ? { loop: clone(loop) } : {} };
+}
+
 /** The kit's motions for these clips; tracks on joints the recipe lacks are dropped silently (a three-wheeled vehicle has no wheel_4). */
 export function defaultMotions(recipe: ModelRecipe, clips: readonly ClipKey[]): MotionRecipe {
   const motions: MotionRecipe["motions"] = {};
@@ -220,7 +241,11 @@ export function defaultMotions(recipe: ModelRecipe, clips: readonly ClipKey[]): 
 }
 
 function counts(recipe: ModelRecipe): { parts: number; triangles: number } {
-  if (recipe.kind === "scenery") return { parts: 0, triangles: 0 };
+  if (recipe.kind === "scenery") {
+    const piece = recipe.build.scenery;
+    const entry = typeof piece === "string" && Object.hasOwn(KIT.scenery, piece) ? KIT.scenery[piece as SceneryKind].count : null;
+    return { parts: entry?.parts ?? 0, triangles: entry?.triangles ?? 0 };
+  }
   const count = KIT.kinds[recipe.kind].count;
   let parts = 0;
   let triangles = 0;

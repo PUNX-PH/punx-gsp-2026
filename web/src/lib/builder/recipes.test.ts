@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { CLIPS_FOR_ROLE, MODEL_KINDS, type ModelKind } from "@/lib/builder/kinds";
+import { CLIPS_FOR_ROLE, KIT, MODEL_KINDS, SCENERY_KINDS, type ModelKind } from "@/lib/builder/kinds";
 import {
   checkBuildBody,
   clipsOf,
@@ -9,6 +9,8 @@ import {
   defaultRecipe,
   jointsOf,
   partCount,
+  sceneryMotions,
+  sceneryRecipe,
   triangleEstimate,
   type BuildBody,
   type ModelRecipe,
@@ -41,6 +43,9 @@ const EXPECTED_PROBLEM: Record<string, string> = {
   "invalid-clip.json": "motions.motions",
   "invalid-palette.json": "palette",
   "invalid-extra-key.json": "body",
+  "invalid-scenery-kind.json": "recipe.build.scenery",
+  "invalid-scenery-extras.json": "recipe.extras",
+  "invalid-scenery-joint.json": "joint",
 };
 
 const ROLE_OF: Record<ModelKind, Role> = { biped: "hero", vehicle: "obstacle", blob: "collectible", prop: "collectible" };
@@ -123,6 +128,69 @@ describe("jointsOf, the defaults and the counts", () => {
     expect([partCount(defaultRecipe("prop")), triangleEstimate(defaultRecipe("prop"))]).toEqual([1, 12]);
     const noCab = { ...defaultRecipe("vehicle"), build: { ...defaultRecipe("vehicle").build, cabSize: 0 } };
     expect(partCount(noCab)).toBe(5);
+  });
+});
+
+describe("scenery recipes", () => {
+  it.each(SCENERY_KINDS)("scenery-%s.json is the kit's recipe and motions, and passes the check", (kind) => {
+    const body = read(`scenery-${kind}.json`);
+    expect(body).toEqual({ recipe: sceneryRecipe(kind), motions: sceneryMotions(kind), palette: [...SAMPLE_PALETTE] });
+    expect(checkBuildBody(body)).toBeNull();
+  });
+
+  it("a scenery recipe is exactly the kind, an empty summary, the piece's own slots and no extras", () => {
+    for (const kind of SCENERY_KINDS) {
+      expect(sceneryRecipe(kind)).toEqual({ version: 1, kind: "scenery", summary: "", build: { scenery: kind }, colors: KIT.scenery[kind].slots, extras: [] });
+    }
+  });
+
+  it("the motions are the Loop of the animated pieces and nothing for the rest", () => {
+    for (const kind of SCENERY_KINDS) {
+      const loop = KIT.scenery[kind].loop;
+      expect(sceneryMotions(kind), kind).toEqual({ version: 1, motions: loop ? { loop } : {} });
+    }
+    expect(clipsOf(sceneryMotions("windmill"))).toEqual(["Loop"]);
+    expect(clipsOf(sceneryMotions("rock"))).toEqual([]);
+  });
+
+  it("the motions are copies: changing one never changes the kit", () => {
+    const motions = sceneryMotions("tree");
+    motions.motions.loop!.tracks[0].amplitude = 90;
+    expect(KIT.scenery.tree.loop!.tracks[0].amplitude).toBe(4);
+  });
+
+  it("jointsOf gives each piece's own joints", () => {
+    expect(jointsOf(sceneryRecipe("tree"))).toEqual(["root", "canopy"]);
+    expect(jointsOf(sceneryRecipe("windmill"))).toEqual(["root", "blades"]);
+    expect(jointsOf(sceneryRecipe("lamp"))).toEqual(["root"]);
+  });
+
+  it("counts come from the kit, and no piece can go over the scenery's 600 triangles", () => {
+    for (const kind of SCENERY_KINDS) {
+      const recipe = sceneryRecipe(kind);
+      expect(partCount(recipe), kind).toBe(KIT.scenery[kind].count.parts);
+      expect(triangleEstimate(recipe), kind).toBe(KIT.scenery[kind].count.triangles);
+      expect(triangleEstimate(recipe), kind).toBeLessThanOrEqual(KIT.caps.sceneryTriangles);
+    }
+  });
+
+  it("defaultMotions of a scenery recipe is empty (a model's clips do not apply)", () => {
+    expect(defaultMotions(sceneryRecipe("tree"), ["loop"]).motions).toEqual({});
+  });
+
+  it("refuses a piece that is not in the kit, a scenery recipe with extras or a model's build fields, and a track on a joint the piece lacks", () => {
+    const body = (change: (b: BuildBody) => void) => {
+      const b = clone(read("scenery-tree.json"));
+      change(b);
+      return b;
+    };
+    expect(checkBuildBody(body((b) => ((b.recipe.build as Record<string, unknown>).scenery = "castle")))).toContain("recipe.build.scenery");
+    expect(checkBuildBody(body((b) => (b.recipe.extras = ["hat"])))).toContain("recipe.extras");
+    expect(checkBuildBody(body((b) => ((b.recipe.build as Record<string, unknown>).size = 1)))).toContain("recipe.build");
+    expect(checkBuildBody(body((b) => ((b.recipe.colors as Record<string, unknown>).head = 1)))).toContain("recipe.colors");
+    expect(checkBuildBody(body((b) => (b.motions.motions.loop!.tracks[0].joint = "blades")))).toContain("joint");
+    expect(checkBuildBody(body((b) => ((b.recipe as unknown as Record<string, unknown>).kind = "Scenery")))).toContain("recipe.kind");
+    expect(checkBuildBody(body((b) => (b.recipe.colors.main = 5)))).toContain("recipe.colors.main");
   });
 });
 

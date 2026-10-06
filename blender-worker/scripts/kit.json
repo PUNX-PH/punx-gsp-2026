@@ -542,5 +542,64 @@
     "hat": { "joints": [["hat", "@top"]], "parts": 1, "triangles": 28 },
     "backpack": { "joints": [["backpack", "@chest"]], "parts": 1, "triangles": 12 }
   },
-  "scenery": {}
+  "scenery": {
+    "tree": {
+      "joints": [["root", null], ["canopy", "root"]],
+      "slots": { "main": 3, "detail": 2 },
+      "height": 3.5,
+      "count": { "parts": 3, "triangles": 188 },
+      "loop": {
+        "seconds": 2.4,
+        "tracks": [
+          { "joint": "canopy", "channel": "rotate", "axis": "x", "wave": "swing", "amplitude": 4, "cycles": 1, "phase": 0 },
+          { "joint": "canopy", "channel": "rotate", "axis": "z", "wave": "swing", "amplitude": 3, "cycles": 1, "phase": 0.25 }
+        ]
+      }
+    },
+    "pine": {
+      "joints": [["root", null], ["canopy", "root"]],
+      "slots": { "main": 3, "detail": 2 },
+      "height": 4.5,
+      "count": { "parts": 4, "triangles": 70 },
+      "loop": {
+        "seconds": 2.8,
+        "tracks": [
+          { "joint": "canopy", "channel": "rotate", "axis": "x", "wave": "swing", "amplitude": 3, "cycles": 1, "phase": 0 }
+        ]
+      }
+    },
+    "rock": {
+      "joints": [["root", null]],
+      "slots": { "main": 2, "detail": 2 },
+      "height": 1.2,
+      "count": { "parts": 2, "triangles": 40 },
+      "loop": null
+    },
+    "cactus": {
+      "joints": [["root", null]],
+      "slots": { "main": 3, "detail": 2 },
+      "height": 2.2,
+      "count": { "parts": 6, "triangles": 88 },
+      "loop": null
+    },
+    "windmill": {
+      "joints": [["root", null], ["blades", "root"]],
+      "slots": { "main": 4, "detail": 1 },
+      "height": 6,
+      "count": { "parts": 7, "triangles": 102 },
+      "loop": {
+        "seconds": 2,
+        "tracks": [
+          { "joint": "blades", "channel": "rotate", "axis": "z", "wave": "spin", "amplitude": 1, "cycles": 1, "phase": 0 }
+        ]
+      }
+    },
+    "lamp": {
+      "joints": [["root", null]],
+      "slots": { "main": 2, "detail": 4 },
+      "height": 3.2,
+      "count": { "parts": 3, "triangles": 68 },
+      "loop": null
+    }
+  }
 }

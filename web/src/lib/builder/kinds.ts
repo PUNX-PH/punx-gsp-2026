@@ -94,6 +94,16 @@ export interface ExtraSpec extends Counts {
   /** [name, parent]; a parent starting with `@` is an anchor of the kind. */
   joints: [string, string][];
 }
+export interface SceneryKit {
+  /** [name, parent], parents first; the first is the root. */
+  joints: [string, string | null][];
+  slots: Record<string, number>;
+  /** How tall the piece is built, in meters. The game keeps this size. */
+  height: number;
+  count: Counts;
+  /** The Loop of an animated piece, or null for one that stands still. */
+  loop: MotionSpec | null;
+}
 export interface Kit {
   version: 1;
   caps: { parts: number; triangles: number; sceneryTriangles: number; extras: number; tracks: number; summary: number };
@@ -106,7 +116,7 @@ export interface Kit {
   };
   kinds: Record<ModelKind, KindSpec>;
   extras: Record<Extra, ExtraSpec>;
-  scenery: Record<string, unknown>;
+  scenery: Record<SceneryKind, SceneryKit>;
 }
 
 export const KIT: Kit = {
@@ -653,5 +663,64 @@ export const KIT: Kit = {
     "hat": { "joints": [["hat", "@top"]], "parts": 1, "triangles": 28 },
     "backpack": { "joints": [["backpack", "@chest"]], "parts": 1, "triangles": 12 }
   },
-  "scenery": {}
+  "scenery": {
+    "tree": {
+      "joints": [["root", null], ["canopy", "root"]],
+      "slots": { "main": 3, "detail": 2 },
+      "height": 3.5,
+      "count": { "parts": 3, "triangles": 188 },
+      "loop": {
+        "seconds": 2.4,
+        "tracks": [
+          { "joint": "canopy", "channel": "rotate", "axis": "x", "wave": "swing", "amplitude": 4, "cycles": 1, "phase": 0 },
+          { "joint": "canopy", "channel": "rotate", "axis": "z", "wave": "swing", "amplitude": 3, "cycles": 1, "phase": 0.25 }
+        ]
+      }
+    },
+    "pine": {
+      "joints": [["root", null], ["canopy", "root"]],
+      "slots": { "main": 3, "detail": 2 },
+      "height": 4.5,
+      "count": { "parts": 4, "triangles": 70 },
+      "loop": {
+        "seconds": 2.8,
+        "tracks": [
+          { "joint": "canopy", "channel": "rotate", "axis": "x", "wave": "swing", "amplitude": 3, "cycles": 1, "phase": 0 }
+        ]
+      }
+    },
+    "rock": {
+      "joints": [["root", null]],
+      "slots": { "main": 2, "detail": 2 },
+      "height": 1.2,
+      "count": { "parts": 2, "triangles": 40 },
+      "loop": null
+    },
+    "cactus": {
+      "joints": [["root", null]],
+      "slots": { "main": 3, "detail": 2 },
+      "height": 2.2,
+      "count": { "parts": 6, "triangles": 88 },
+      "loop": null
+    },
+    "windmill": {
+      "joints": [["root", null], ["blades", "root"]],
+      "slots": { "main": 4, "detail": 1 },
+      "height": 6,
+      "count": { "parts": 7, "triangles": 102 },
+      "loop": {
+        "seconds": 2,
+        "tracks": [
+          { "joint": "blades", "channel": "rotate", "axis": "z", "wave": "spin", "amplitude": 1, "cycles": 1, "phase": 0 }
+        ]
+      }
+    },
+    "lamp": {
+      "joints": [["root", null]],
+      "slots": { "main": 2, "detail": 4 },
+      "height": 3.2,
+      "count": { "parts": 3, "triangles": 68 },
+      "loop": null
+    }
+  }
 };

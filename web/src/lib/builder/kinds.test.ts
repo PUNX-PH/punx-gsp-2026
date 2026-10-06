@@ -18,6 +18,7 @@ import {
   type BuildField,
   type ClipKey,
   type ModelKind,
+  type SceneryKind,
 } from "@/lib/builder/kinds";
 
 // web/src/lib/builder -> the repository root is four levels up.
@@ -138,5 +139,81 @@ describe("the kit", () => {
     expect([...SCENERY_KINDS]).toEqual(["tree", "pine", "rock", "cactus", "windmill", "lamp"]);
     expect(CLIP_NAMES).toEqual({ run: "Run", jump: "Jump", loop: "Loop" });
     expect(CLIPS_FOR_ROLE).toEqual({ hero: ["run", "jump"], obstacle: ["loop"], collectible: ["loop"] });
+  });
+});
+
+describe("the scenery kit", () => {
+  const sceneryJoints = (kind: SceneryKind) => KIT.scenery[kind].joints.map(([name]) => name);
+
+  it("has an entry for each of the six pieces, and nothing else", () => {
+    expect(Object.keys(KIT.scenery)).toEqual([...SCENERY_KINDS]);
+  });
+
+  it("every piece starts at a root, lists parents before children, and has slots 0 to 4, a height and counts within the scenery cap", () => {
+    for (const kind of SCENERY_KINDS) {
+      const entry = KIT.scenery[kind];
+      expect(entry.joints[0], kind).toEqual(["root", null]);
+      const seen = new Set<string>();
+      for (const [name, parent] of entry.joints) {
+        if (parent !== null) expect(seen.has(parent), `${kind}: ${parent} before ${name}`).toBe(true);
+        seen.add(name);
+      }
+      for (const [slot, index] of Object.entries(entry.slots)) {
+        expect(Number.isInteger(index) && index >= 0 && index <= 4, `${kind}.${slot}`).toBe(true);
+      }
+      expect(entry.height, kind).toBeGreaterThan(0);
+      expect(entry.count.parts, kind).toBeGreaterThanOrEqual(1);
+      expect(entry.count.parts, kind).toBeLessThanOrEqual(KIT.caps.parts);
+      expect(entry.count.triangles, kind).toBeGreaterThanOrEqual(1);
+      expect(entry.count.triangles, kind).toBeLessThanOrEqual(KIT.caps.sceneryTriangles);
+    }
+  });
+
+  it("the heights, slots and joints are the ones in the plan", () => {
+    expect(Object.fromEntries(SCENERY_KINDS.map((kind) => [kind, KIT.scenery[kind].height]))).toEqual({ tree: 3.5, pine: 4.5, rock: 1.2, cactus: 2.2, windmill: 6, lamp: 3.2 });
+    expect(Object.fromEntries(SCENERY_KINDS.map((kind) => [kind, KIT.scenery[kind].slots]))).toEqual({
+      tree: { main: 3, detail: 2 },
+      pine: { main: 3, detail: 2 },
+      rock: { main: 2, detail: 2 },
+      cactus: { main: 3, detail: 2 },
+      windmill: { main: 4, detail: 1 },
+      lamp: { main: 2, detail: 4 },
+    });
+    expect(sceneryJoints("tree")).toEqual(["root", "canopy"]);
+    expect(sceneryJoints("pine")).toEqual(["root", "canopy"]);
+    expect(sceneryJoints("windmill")).toEqual(["root", "blades"]);
+    for (const kind of ["rock", "cactus", "lamp"] as const) expect(sceneryJoints(kind), kind).toEqual(["root"]);
+  });
+
+  it("only the tree, the pine and the windmill move: a Loop of whole cycles on their own joints, within the kit's ranges", () => {
+    for (const kind of SCENERY_KINDS) {
+      const loop = KIT.scenery[kind].loop;
+      if (!["tree", "pine", "windmill"].includes(kind)) {
+        expect(loop, kind).toBeNull();
+        continue;
+      }
+      expect(loop, kind).not.toBeNull();
+      expect(loop!.seconds).toBeGreaterThanOrEqual(KIT.motion.seconds[0]);
+      expect(loop!.seconds).toBeLessThanOrEqual(KIT.motion.seconds[1]);
+      expect(loop!.tracks.length).toBeGreaterThan(0);
+      expect(loop!.tracks.length).toBeLessThanOrEqual(KIT.caps.tracks);
+      for (const track of loop!.tracks) {
+        expect(sceneryJoints(kind), `${kind}: ${track.joint}`).toContain(track.joint);
+        expect(Number.isInteger(track.cycles), `${kind} cycles`).toBe(true);
+        const [low, high] = KIT.motion.amplitude[track.channel];
+        expect(track.amplitude).toBeGreaterThanOrEqual(low);
+        expect(track.amplitude).toBeLessThanOrEqual(high);
+        if (track.wave === "spin") expect(track.channel).toBe("rotate");
+      }
+    }
+    expect(KIT.scenery.tree.loop).toEqual({
+      seconds: 2.4,
+      tracks: [
+        { joint: "canopy", channel: "rotate", axis: "x", wave: "swing", amplitude: 4, cycles: 1, phase: 0 },
+        { joint: "canopy", channel: "rotate", axis: "z", wave: "swing", amplitude: 3, cycles: 1, phase: 0.25 },
+      ],
+    });
+    expect(KIT.scenery.pine.loop).toEqual({ seconds: 2.8, tracks: [{ joint: "canopy", channel: "rotate", axis: "x", wave: "swing", amplitude: 3, cycles: 1, phase: 0 }] });
+    expect(KIT.scenery.windmill.loop).toEqual({ seconds: 2, tracks: [{ joint: "blades", channel: "rotate", axis: "z", wave: "spin", amplitude: 1, cycles: 1, phase: 0 }] });
   });
 });

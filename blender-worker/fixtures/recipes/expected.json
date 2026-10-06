@@ -63,5 +63,41 @@
       "Jump",
       "Loop"
     ]
+  },
+  "scenery-tree.json": {
+    "parts": 3,
+    "triangles": 188,
+    "clips": [
+      "Loop"
+    ]
+  },
+  "scenery-pine.json": {
+    "parts": 4,
+    "triangles": 70,
+    "clips": [
+      "Loop"
+    ]
+  },
+  "scenery-rock.json": {
+    "parts": 2,
+    "triangles": 40,
+    "clips": []
+  },
+  "scenery-cactus.json": {
+    "parts": 6,
+    "triangles": 88,
+    "clips": []
+  },
+  "scenery-windmill.json": {
+    "parts": 7,
+    "triangles": 102,
+    "clips": [
+      "Loop"
+    ]
+  },
+  "scenery-lamp.json": {
+    "parts": 3,
+    "triangles": 68,
+    "clips": []
   }
 }

@@ -33,7 +33,7 @@ describe("what Blender really writes", () => {
   });
 });
 
-// What build.py really writes: a character with a skeleton and clips, and a prop, with the counts and clip names the worker sends for them
+// What build.py really writes: a character with a skeleton and clips, a prop and a tree, with the counts and clip names the worker sends for them
 // (the worker's fixtures/recipes/expected.json, which Blender's own tests check against build.py's output).
 describe("what build.py really writes", () => {
   const recipes = new URL("../../../../blender-worker/fixtures/recipes/", import.meta.url);
@@ -41,6 +41,7 @@ describe("what build.py really writes", () => {
   const BUILT = [
     ["built-biped.glb", "biped-default.json"],
     ["built-prop.glb", "prop-default.json"],
+    ["built-tree.glb", "scenery-tree.json"],
   ] as const;
 
   it.each(BUILT)("%s passes the app's own GLB check", (name) => {

@@ -11,7 +11,7 @@ recipe.mjs            the check of a /build body (the same rules as web/src/lib/
 scripts/kit.json      the kit: kinds, joints, slots, extras, counts, default motions (shared with the web app)
 scripts/prepare.py    Blender: import a GLB, FBX or OBJ, join, triangulate, decimate, flatten colors, export a GLB
 scripts/shape.py      Blender: build one of seven low-poly shapes, export a GLB
-scripts/build.py      Blender: build a model with a skeleton and named clips from a checked recipe, export a GLB
+scripts/build.py      Blender: build a model (or a scenery piece: tree, pine, rock, cactus, windmill, lamp) with a skeleton and named clips from a checked recipe, export a GLB
 tests/test_blender.py the Blender scripts' tests (run inside Blender)
 server.test.mjs       the wrapper's tests (run with a fake Blender)
 fixtures/             the fake Blender, a cube and an empty OBJ, and serve-fake.mjs
@@ -116,7 +116,7 @@ Edit the three `ARG`s in the Dockerfile (the checksum is on `download.blender.or
 
 ## The web app's fixtures
 
-`web/src/lib/blender/fixtures/*.glb` are real output of these scripts (a prepared cube and a ring, and a built character and prop);
+`web/src/lib/blender/fixtures/*.glb` are real output of these scripts (a prepared cube and a ring, and a built character, prop and tree);
 `blenderOutput.test.ts` checks that the app accepts them. After changing a script, regenerate them (Blender 5.2, from the repository root):
 
 ```bash
@@ -128,4 +128,6 @@ blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/buil
   --out web/src/lib/blender/fixtures/built-biped.glb --stats stats.json
 blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/build.py -- --recipe blender-worker/fixtures/recipes/prop-default.json \
   --out web/src/lib/blender/fixtures/built-prop.glb --stats stats.json
+blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/build.py -- --recipe blender-worker/fixtures/recipes/scenery-tree.json \
+  --out web/src/lib/blender/fixtures/built-tree.glb --stats stats.json
 ```

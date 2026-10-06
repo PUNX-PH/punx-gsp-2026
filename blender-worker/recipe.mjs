@@ -21,6 +21,10 @@ const isNumber = (v) => typeof v === "number" && Number.isFinite(v);
 const shown = (v) => (typeof v === "string" ? JSON.stringify(v.replace(new RegExp(CONTROL, "g"), " ").slice(0, 40)) : isNumber(v) ? String(v) : typeof v);
 
 function baseJoints(kind, build) {
+  if (kind === "scenery") {
+    const piece = build?.scenery;
+    return typeof piece === "string" && Object.hasOwn(KIT.scenery, piece) ? KIT.scenery[piece].joints.map(([name]) => name) : ["root"];
+  }
   if (kind === "vehicle") {
     const field = KIT.kinds.vehicle.build.wheelCount;
     const wheels = typeof build?.wheelCount === "number" ? build.wheelCount : field.default;
@@ -31,7 +35,7 @@ function baseJoints(kind, build) {
 
 /** Base joints, then each extra's joints in recipe order. */
 export function jointsOf(recipe) {
-  if (!MODEL_KINDS.includes(recipe?.kind)) return [];
+  if (!MODEL_KINDS.includes(recipe?.kind) && recipe?.kind !== "scenery") return [];
   const extras = (Array.isArray(recipe.extras) ? recipe.extras : []).flatMap((e) => (Object.hasOwn(KIT.extras, e) ? KIT.extras[e].joints.map(([name]) => name) : []));
   return [...baseJoints(recipe.kind, recipe.build), ...extras];
 }
@@ -49,8 +53,11 @@ function checkRecipe(recipe) {
   if (keys) return keys;
   if (recipe.version !== 1) return "recipe.version: must be 1";
   const kind = recipe.kind;
-  if (typeof kind !== "string" || !MODEL_KINDS.includes(kind)) return `recipe.kind: ${shown(kind)} is not one of ${MODEL_KINDS.join(", ")}`;
-  const spec = KIT.kinds[kind];
+  const isScenery = kind === "scenery";
+  if (typeof kind !== "string" || !(isScenery || MODEL_KINDS.includes(kind))) return `recipe.kind: ${shown(kind)} is not one of ${[...MODEL_KINDS, "scenery"].join(", ")}`;
+  const spec = isScenery ? null : KIT.kinds[kind];
+  // A scenery piece has one build field, which piece it is, and the color slots and joints of that piece; it takes no extras.
+  const buildFields = spec ? spec.build : { scenery: { choices: Object.keys(KIT.scenery), default: "tree" } };
 
   const summary = recipe.summary;
   if (typeof summary !== "string") return "recipe.summary: must be text";
@@ -59,9 +66,9 @@ function checkRecipe(recipe) {
 
   const build = recipe.build;
   if (!isObject(build)) return "recipe.build: must be an object";
-  const buildKeys = keysProblem(build, Object.keys(spec.build), "recipe.build");
+  const buildKeys = keysProblem(build, Object.keys(buildFields), "recipe.build");
   if (buildKeys) return buildKeys;
-  for (const [name, field] of Object.entries(spec.build)) {
+  for (const [name, field] of Object.entries(buildFields)) {
     const v = build[name];
     if (Object.hasOwn(field, "choices")) {
       if (typeof v !== "string" || !field.choices.includes(v)) return `recipe.build.${name}: ${shown(v)} is not one of ${field.choices.join(", ")}`;
@@ -74,9 +81,10 @@ function checkRecipe(recipe) {
 
   const colors = recipe.colors;
   if (!isObject(colors)) return "recipe.colors: must be an object";
-  const colorKeys = keysProblem(colors, Object.keys(spec.slots), "recipe.colors");
+  const slots = spec ? spec.slots : KIT.scenery[build.scenery].slots; // build.scenery was checked to be one of the six above
+  const colorKeys = keysProblem(colors, Object.keys(slots), "recipe.colors");
   if (colorKeys) return colorKeys;
-  for (const slot of Object.keys(spec.slots)) {
+  for (const slot of Object.keys(slots)) {
     const v = colors[slot];
     if (!isNumber(v) || !Number.isInteger(v) || v < 0 || v > 4) return `recipe.colors.${slot}: ${shown(v)} must be a whole number 0 to 4`;
   }
@@ -85,7 +93,7 @@ function checkRecipe(recipe) {
   if (!Array.isArray(extras)) return "recipe.extras: must be a list";
   if (extras.length > KIT.caps.extras) return `recipe.extras: at most ${KIT.caps.extras}`;
   for (const [i, e] of extras.entries()) {
-    if (typeof e !== "string" || !spec.extras.includes(e)) return `recipe.extras: ${shown(e)} is not allowed for this kind`;
+    if (typeof e !== "string" || !(spec?.extras ?? []).includes(e)) return `recipe.extras: ${shown(e)} is not allowed for this kind`;
     if (extras.indexOf(e) !== i) return `recipe.extras: ${e} twice`;
   }
   return null;

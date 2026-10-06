@@ -1,0 +1,41 @@
+{
+  "recipe": {
+    "version": 1,
+    "kind": "scenery",
+    "summary": "",
+    "build": {
+      "scenery": "pine"
+    },
+    "colors": {
+      "main": 3,
+      "detail": 2
+    },
+    "extras": []
+  },
+  "motions": {
+    "version": 1,
+    "motions": {
+      "loop": {
+        "seconds": 2.8,
+        "tracks": [
+          {
+            "joint": "canopy",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 3,
+            "cycles": 1,
+            "phase": 0
+          }
+        ]
+      }
+    }
+  },
+  "palette": [
+    "#1b1f3b",
+    "#ff6f59",
+    "#ffd166",
+    "#06d6a0",
+    "#ffffff"
+  ]
+}

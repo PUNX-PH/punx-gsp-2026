@@ -566,6 +566,50 @@ class BuildScript(unittest.TestCase):
                 self.assertEqual(triangles(gltf), wanted["triangles"])
                 self.assertAlmostEqual(extents(gltf)[1], body["recipe"]["build"]["size"], delta=0.02)  # `size` tall
 
+    def test_each_scenery_kind_builds_at_its_height(self):
+        kit = json.load(open(os.path.join(SCRIPTS, "kit.json")))["scenery"]
+        expected = recipe_fixture("expected.json")
+        self.assertEqual(sorted(kit), ["cactus", "lamp", "pine", "rock", "tree", "windmill"])
+        for kind, entry in kit.items():
+            with self.subTest(kind=kind):
+                _, gltf, _ = self.built(f"scenery-{kind}.json")
+                self.assertAlmostEqual(extents(gltf)[1], entry["height"], delta=0.05)
+                self.assertAlmostEqual(lowest_y(gltf), 0.0, delta=0.01)  # it stands on the ground
+                self.assertLessEqual(self.stats["triangles"], 600)
+                self.assertEqual(self.stats, expected[f"scenery-{kind}.json"])
+                self.assertEqual((self.stats["parts"], self.stats["triangles"]), (entry["count"]["parts"], entry["count"]["triangles"]))
+                self.assertEqual(triangles(gltf), self.stats["triangles"])
+                self.assertEqual(sorted(a["name"] for a in gltf.get("animations", [])), ["Loop"] if kind in ("tree", "pine", "windmill") else [])
+
+    def test_the_windmill_blades_turn_about_the_forward_axis(self):
+        _, gltf, binary = self.built("scenery-windmill.json")
+        animation = animation_named(gltf, "Loop")
+        channel = channels_of(gltf, animation, "rotation")[self.node_index(gltf, "blades")]
+        rotations = accessor_values(gltf, binary, animation["samplers"][channel["sampler"]]["output"])
+        self.assertTrue(all(abs(q[0]) < 0.01 and abs(q[1]) < 0.01 for q in rotations), "the blades tumble instead of turning about the forward axis")
+        self.assertGreater(max(abs(q[2]) for q in rotations), 0.9)  # through a half turn and more
+
+    def test_the_tree_and_the_pine_sway_from_their_canopy(self):
+        for name in ("scenery-tree.json", "scenery-pine.json"):
+            with self.subTest(name=name):
+                _, gltf, _ = self.built(name)
+                animation = animation_named(gltf, "Loop")
+                targets = {gltf["nodes"][c["target"]["node"]]["name"] for c in animation["channels"]}
+                self.assertEqual(targets, {"canopy"})
+
+    def test_a_scenery_body_the_worker_would_refuse_exits_5(self):
+        def mutated(change):
+            body = recipe_fixture("scenery-tree.json")
+            change(body)
+            return body
+
+        unknown = mutated(lambda b: b["recipe"]["build"].update(scenery="castle"))
+        extras = mutated(lambda b: b["recipe"].update(extras=["hat"]))
+        no_blades = mutated(lambda b: b["motions"]["motions"]["loop"]["tracks"][0].update(joint="blades"))
+        slot = mutated(lambda b: b["recipe"]["colors"].update(main=7))
+        for name, body in (("a piece that is not in the kit", unknown), ("extras on scenery", extras), ("a joint the piece lacks", no_blades), ("a color slot out of range", slot)):
+            self.assertEqual(self.build(body).returncode, EXIT_BAD_RECIPE, name)
+
     def test_a_body_the_worker_would_refuse_exits_5(self):
         def mutated(change):
             body = recipe_fixture("biped-default.json")

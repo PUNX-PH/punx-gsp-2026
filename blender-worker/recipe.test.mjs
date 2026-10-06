@@ -29,6 +29,9 @@ const EXPECTED_PROBLEM = {
   "invalid-clip.json": "motions.motions",
   "invalid-palette.json": "palette",
   "invalid-extra-key.json": "body",
+  "invalid-scenery-kind.json": "recipe.build.scenery",
+  "invalid-scenery-extras.json": "recipe.extras",
+  "invalid-scenery-joint.json": "joint",
 };
 
 describe("checkBuildBody", () => {
@@ -62,6 +65,29 @@ describe("checkBuildBody", () => {
     const vehicle = read("vehicle-default.json").recipe;
     assert.deepEqual(jointsOf({ ...vehicle, build: { ...vehicle.build, wheelCount: 3 } }), ["body", "wheel_1", "wheel_2", "wheel_3"]);
     assert.deepEqual(jointsOf(read("prop-default.json").recipe), ["root"]);
+  });
+
+  it("accepts the six scenery pieces and lists each piece's own joints, like the web app", () => {
+    assert.deepEqual(Object.keys(KIT.scenery), ["tree", "pine", "rock", "cactus", "windmill", "lamp"]);
+    for (const kind of Object.keys(KIT.scenery)) assert.equal(checkBuildBody(read(`scenery-${kind}.json`)), null, kind);
+    assert.deepEqual(jointsOf(read("scenery-tree.json").recipe), ["root", "canopy"]);
+    assert.deepEqual(jointsOf(read("scenery-windmill.json").recipe), ["root", "blades"]);
+    assert.deepEqual(jointsOf(read("scenery-lamp.json").recipe), ["root"]);
+  });
+
+  it("refuses a scenery recipe that is not a piece of the kit, has extras or a model's fields, or moves a joint it lacks", () => {
+    const changed = (change) => {
+      const body = structuredClone(read("scenery-tree.json"));
+      change(body);
+      return checkBuildBody(body);
+    };
+    assert.match(changed((b) => (b.recipe.build.scenery = "castle")), /recipe\.build\.scenery/);
+    assert.match(changed((b) => (b.recipe.build.scenery = "__proto__")), /recipe\.build\.scenery/);
+    assert.match(changed((b) => (b.recipe.extras = ["hat"])), /recipe\.extras/);
+    assert.match(changed((b) => (b.recipe.build.size = 1)), /recipe\.build/);
+    assert.match(changed((b) => (b.recipe.colors.head = 1)), /recipe\.colors/);
+    assert.match(changed((b) => (b.motions.motions.loop.tracks[0].joint = "blades")), /joint/);
+    assert.match(changed((b) => (b.recipe.colors.main = 5)), /recipe\.colors\.main/);
   });
 
   it("never throws, whatever it is given", () => {

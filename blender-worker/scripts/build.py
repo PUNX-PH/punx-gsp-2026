@@ -9,8 +9,9 @@ The model is rigid parts, one mesh per joint, under a hierarchy of empties (no s
 every frame and pushed onto an NLA track named after the clip, so the glTF exporter writes one animation per clip.
 
 Exit 0: the GLB and the stats { triangles, parts, clips } (clips in the order Run, Jump, Loop, only those with a track). Exit 5: the recipe
-breaks a rule this script can see (the worker has already checked the body, so this is a second line of defence): a kind not built yet, more
-extras or tracks than the caps, a joint that was not built, a number out of range, parts or triangles over the caps once built. Anything else
+breaks a rule this script can see (the worker has already checked the body, so this is a second line of defence): an unknown kind or scenery
+piece, more extras or tracks than the caps, a joint that was not built, a number out of range, parts or triangles over the caps (scenery has
+its own triangle cap) once built. Anything else
 (including an uncaught exception, because the wrapper passes --python-exit-code 1) is a plain failure.
 
 Axes in a recipe are the model's own: x side to side, y up, z forward (the way it faces). Blender's are X, Z up and -Y forward, so a model
@@ -235,7 +236,89 @@ def prop_layout(build, extras):
     return pivots, parts
 
 
-LAYOUTS = {"biped": biped_layout, "vehicle": vehicle_layout, "blob": blob_layout, "prop": prop_layout}
+# ---- scenery: each piece is built at the height the kit gives, standing on y = 0, centered over the origin ----
+
+
+def tree_layout():
+    """A trunk and a round canopy of two overlapping spheres. The canopy sways from the top of the trunk."""
+    trunk, r = 1.5, 0.2
+    canopy = (3.5 - trunk) / 2
+    return (
+        {"root": (0, 0, 0), "canopy": (0, trunk, 0)},
+        [
+            ("root", "detail", "cylinder", (r, trunk), (0, trunk / 2, 0)),
+            ("canopy", "main", "sphere", (canopy, 1.0), (0, trunk + canopy, 0)),
+            ("canopy", "main", "sphere", (canopy * 0.7, 1.0), (canopy * 0.55, trunk + canopy * 0.8, canopy * 0.3)),
+        ],
+    )
+
+
+def pine_layout():
+    """A thin trunk and three stacked cones, each narrower than the one below. The canopy sways from the top of the trunk."""
+    trunk = 1.0
+    parts = [("root", "detail", "cylinder", (0.15, trunk), (0, trunk / 2, 0))]
+    for base, radius, depth in ((0.8, 1.3, 1.7), (1.9, 1.0, 1.6), (2.9, 0.7, 1.6)):
+        parts.append(("canopy", "main", "cone", (radius, depth, 8, "up"), (0, base + depth / 2, 0)))
+    return {"root": (0, 0, 0), "canopy": (0, 0.8, 0)}, parts
+
+
+def rock_layout():
+    """A flattened boulder and a smaller stone beside it."""
+    return (
+        {"root": (0, 0, 0)},
+        [
+            ("root", "main", "sphere", (0.8, 0.75, 1), (0, 0.6, 0)),
+            ("root", "detail", "sphere", (0.45, 0.7, 1), (0.85, 0.315, 0.3)),
+        ],
+    )
+
+
+def cactus_layout():
+    """A tall body, an arm each side (a bar out and a bar up) and a flower on top."""
+    parts = [
+        ("root", "main", "cylinder", (0.28, 2.0), (0, 1.0, 0)),
+        ("root", "main", "box", (0.6, 0.2, 0.2), (0.5, 1.0, 0)),
+        ("root", "main", "box", (0.2, 0.7, 0.2), (0.7, 1.35, 0)),
+        ("root", "main", "box", (0.6, 0.2, 0.2), (-0.5, 1.4, 0)),
+        ("root", "main", "box", (0.2, 0.7, 0.2), (-0.7, 1.75, 0)),
+        ("root", "detail", "box", (0.2, 0.2, 0.2), (0, 2.1, 0)),
+    ]
+    return {"root": (0, 0, 0)}, parts
+
+
+def windmill_layout():
+    """A tapering tower with a pointed cap, and four blades round a hub on the front. The blades turn about the model's z (forward)."""
+    hub = (0, 4.0, 0.75)
+    parts = [
+        ("root", "main", "frustum", (0.9, 0.55, 4.6, 8), (0, 2.3, 0)),
+        ("root", "detail", "cone", (0.75, 1.4, 8, "up"), (0, 5.3, 0)),
+        ("blades", "detail", "box", (0.3, 0.3, 0.12), hub),
+        ("blades", "detail", "box", (1.6, 0.3, 0.06), (1.0, hub[1], hub[2])),
+        ("blades", "detail", "box", (1.6, 0.3, 0.06), (-1.0, hub[1], hub[2])),
+        ("blades", "detail", "box", (0.3, 1.6, 0.06), (0, hub[1] + 1.0, hub[2])),
+        ("blades", "detail", "box", (0.3, 1.6, 0.06), (0, hub[1] - 1.0, hub[2])),
+    ]
+    return {"root": (0, 0, 0), "blades": hub}, parts
+
+
+def lamp_layout():
+    """A round base, a thin pole and a square lamp on top."""
+    parts = [
+        ("root", "main", "cylinder", (0.22, 0.2), (0, 0.1, 0)),
+        ("root", "main", "cylinder", (0.06, 2.6), (0, 1.5, 0)),
+        ("root", "detail", "box", (0.4, 0.4, 0.4), (0, 3.0, 0)),
+    ]
+    return {"root": (0, 0, 0)}, parts
+
+
+SCENERY_LAYOUTS = {"tree": tree_layout, "pine": pine_layout, "rock": rock_layout, "cactus": cactus_layout, "windmill": windmill_layout, "lamp": lamp_layout}
+
+
+def scenery_layout(build, extras):
+    return SCENERY_LAYOUTS[build["scenery"]]()
+
+
+LAYOUTS = {"biped": biped_layout, "vehicle": vehicle_layout, "blob": blob_layout, "prop": prop_layout, "scenery": scenery_layout}
 
 
 # ---- checking the body ----
@@ -253,30 +336,8 @@ def joint_list(kind, spec, build, extras):
     return joints
 
 
-def check_body(body):
-    """The rules this script can see; raises BadRecipe. Returns (recipe, motions, palette, spec, joints)."""
-    need(isinstance(body, dict) and set(body) == {"recipe", "motions", "palette"})
-    recipe, motions, palette = body["recipe"], body["motions"], body["palette"]
-    need(isinstance(palette, list) and len(palette) == 5 and all(isinstance(c, str) and HEX.match(c) for c in palette))
-    need(isinstance(recipe, dict) and recipe.get("kind") in LAYOUTS and recipe["kind"] in KIT["kinds"])
-    spec = KIT["kinds"][recipe["kind"]]
-    extras = recipe.get("extras")
-    need(isinstance(extras, list) and len(extras) <= KIT["caps"]["extras"] and len(set(extras)) == len(extras))
-    need(all(isinstance(e, str) and e in spec["extras"] for e in extras))
-    build = recipe.get("build")
-    need(isinstance(build, dict) and set(build) == set(spec["build"]))
-    for name, field in spec["build"].items():
-        if "choices" in field:
-            need(build[name] in field["choices"])
-        else:
-            need(is_number(build[name]) and field["min"] <= build[name] <= field["max"])
-            need(not field.get("whole") or float(build[name]).is_integer())
-    colors = recipe.get("colors")
-    need(isinstance(colors, dict) and set(colors) == set(spec["slots"]))
-    need(all(isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 4 for v in colors.values()))
-
-    joints = joint_list(recipe["kind"], spec, build, extras)
-    names = {name for name, _ in joints}
+def check_motions(motions, names):
+    """The motion rules, for a model or a scenery piece: `names` are the joints that were built."""
     need(isinstance(motions, dict) and set(motions) == {"version", "motions"} and isinstance(motions["motions"], dict))
     for key, motion in motions["motions"].items():
         need(key in dict(CLIPS) and isinstance(motion, dict) and isinstance(motion.get("tracks"), list))
@@ -291,6 +352,50 @@ def check_body(body):
             need(is_number(track["amplitude"]) and low <= track["amplitude"] <= high)
             need(is_number(track["cycles"]) and KIT["motion"]["cycles"][0] <= track["cycles"] <= KIT["motion"]["cycles"][1])
             need(is_number(track["phase"]) and KIT["motion"]["phase"][0] <= track["phase"] <= KIT["motion"]["phase"][1])
+
+
+def check_colors(colors, slots):
+    need(isinstance(colors, dict) and set(colors) == set(slots))
+    need(all(isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 4 for v in colors.values()))
+
+
+def check_scenery(recipe, motions, palette):
+    """A scenery piece: its build is exactly { scenery: <one of the kit's pieces> }, its colors are that piece's slots, it takes no extras."""
+    build = recipe.get("build")
+    need(isinstance(build, dict) and set(build) == {"scenery"} and isinstance(build["scenery"], str) and build["scenery"] in KIT["scenery"])
+    spec = KIT["scenery"][build["scenery"]]
+    need(recipe.get("extras") == [])
+    check_colors(recipe.get("colors"), spec["slots"])
+    joints = [(name, parent) for name, parent in spec["joints"]]
+    check_motions(motions, {name for name, _ in joints})
+    return recipe, motions, palette, spec, joints
+
+
+def check_body(body):
+    """The rules this script can see; raises BadRecipe. Returns (recipe, motions, palette, spec, joints)."""
+    need(isinstance(body, dict) and set(body) == {"recipe", "motions", "palette"})
+    recipe, motions, palette = body["recipe"], body["motions"], body["palette"]
+    need(isinstance(palette, list) and len(palette) == 5 and all(isinstance(c, str) and HEX.match(c) for c in palette))
+    need(isinstance(recipe, dict) and recipe.get("kind") in LAYOUTS)
+    if recipe["kind"] == "scenery":
+        return check_scenery(recipe, motions, palette)
+    need(recipe["kind"] in KIT["kinds"])
+    spec = KIT["kinds"][recipe["kind"]]
+    extras = recipe.get("extras")
+    need(isinstance(extras, list) and len(extras) <= KIT["caps"]["extras"] and len(set(extras)) == len(extras))
+    need(all(isinstance(e, str) and e in spec["extras"] for e in extras))
+    build = recipe.get("build")
+    need(isinstance(build, dict) and set(build) == set(spec["build"]))
+    for name, field in spec["build"].items():
+        if "choices" in field:
+            need(build[name] in field["choices"])
+        else:
+            need(is_number(build[name]) and field["min"] <= build[name] <= field["max"])
+            need(not field.get("whole") or float(build[name]).is_integer())
+    check_colors(recipe.get("colors"), spec["slots"])
+
+    joints = joint_list(recipe["kind"], spec, build, extras)
+    check_motions(motions, {name for name, _ in joints})
     return recipe, motions, palette, spec, joints
 
 
@@ -332,12 +437,18 @@ def make_cone(bm, size):
 
 
 def make_sphere(bm, size):
-    """(radius, squash): an 80-triangle icosphere, its height scaled by squash."""
-    radius, squash = size
-    verts = bmesh.ops.create_icosphere(bm, subdivisions=2, radius=radius)["verts"]
+    """(radius, squash) or (radius, squash, subdivisions): an icosphere (80 triangles at 2, 20 at 1), its height scaled by squash."""
+    radius, squash, *more = size
+    verts = bmesh.ops.create_icosphere(bm, subdivisions=more[0] if more else 2, radius=radius)["verts"]
     for v in verts:
         v.co.z *= squash
     return verts
+
+
+def make_frustum(bm, size):
+    """(bottom radius, top radius, depth, sides): a cone with its point cut off, standing up."""
+    bottom, top, depth, sides = size
+    return bmesh.ops.create_cone(bm, cap_ends=True, segments=sides, radius1=bottom, radius2=top, depth=depth)["verts"]
 
 
 def make_torus(bm, size):
@@ -373,7 +484,7 @@ def make_gem(bm, size):
     return verts
 
 
-SHAPES = {"box": make_box, "cylinder": make_cylinder, "cone": make_cone, "sphere": make_sphere, "torus": make_torus, "gem": make_gem}
+SHAPES = {"box": make_box, "cylinder": make_cylinder, "cone": make_cone, "sphere": make_sphere, "frustum": make_frustum, "torus": make_torus, "gem": make_gem}
 
 
 class Meshes:
@@ -515,7 +626,8 @@ def main():
         for joint, slot, shape, size, center in parts:
             meshes.add(joint, slot, shape, size, center)
         triangles = attach_meshes(meshes, objects)
-        need(meshes.parts <= KIT["caps"]["parts"] and triangles <= KIT["caps"]["triangles"])
+        cap = KIT["caps"]["sceneryTriangles"] if recipe["kind"] == "scenery" else KIT["caps"]["triangles"]
+        need(meshes.parts <= KIT["caps"]["parts"] and triangles <= cap)
 
         clips = []
         for key, clip_name in CLIPS:
