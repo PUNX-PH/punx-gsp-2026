@@ -22,17 +22,17 @@
   },
   "vehicle-high-default.json": {
     "parts": 21,
-    "triangles": 4090,
-    "vertices": 3270,
+    "triangles": 1540,
+    "vertices": 1196,
     "meshes": 5,
     "clips": [
       "Loop"
     ]
   },
   "vehicle-high-stress.json": {
-    "parts": 36,
-    "triangles": 5806,
-    "vertices": 4588,
+    "parts": 38,
+    "triangles": 2744,
+    "vertices": 2186,
     "meshes": 7,
     "clips": [
       "Run",
@@ -42,8 +42,8 @@
   },
   "blob-high-default.json": {
     "parts": 8,
-    "triangles": 2800,
-    "vertices": 2160,
+    "triangles": 1776,
+    "vertices": 1194,
     "meshes": 1,
     "clips": [
       "Loop"
@@ -51,8 +51,8 @@
   },
   "blob-high-stress.json": {
     "parts": 15,
-    "triangles": 3876,
-    "vertices": 2862,
+    "triangles": 3036,
+    "vertices": 2088,
     "meshes": 1,
     "clips": [
       "Run",
@@ -62,8 +62,8 @@
   },
   "prop-high-default.json": {
     "parts": 14,
-    "triangles": 1700,
-    "vertices": 1340,
+    "triangles": 726,
+    "vertices": 805,
     "meshes": 1,
     "clips": [
       "Loop"
@@ -71,13 +71,61 @@
   },
   "prop-high-stress.json": {
     "parts": 12,
-    "triangles": 2200,
-    "vertices": 1740,
+    "triangles": 1136,
+    "vertices": 964,
     "meshes": 1,
     "clips": [
       "Run",
       "Jump",
       "Loop"
     ]
+  },
+  "scenery-tree-high.json": {
+    "parts": 4,
+    "triangles": 804,
+    "vertices": 430,
+    "meshes": 2,
+    "clips": [
+      "Loop"
+    ]
+  },
+  "scenery-pine-high.json": {
+    "parts": 6,
+    "triangles": 174,
+    "vertices": 193,
+    "meshes": 2,
+    "clips": [
+      "Loop"
+    ]
+  },
+  "scenery-rock-high.json": {
+    "parts": 2,
+    "triangles": 336,
+    "vertices": 174,
+    "meshes": 1,
+    "clips": []
+  },
+  "scenery-cactus-high.json": {
+    "parts": 7,
+    "triangles": 1068,
+    "vertices": 596,
+    "meshes": 1,
+    "clips": []
+  },
+  "scenery-windmill-high.json": {
+    "parts": 8,
+    "triangles": 834,
+    "vertices": 723,
+    "meshes": 2,
+    "clips": [
+      "Loop"
+    ]
+  },
+  "scenery-lamp-high.json": {
+    "parts": 5,
+    "triangles": 532,
+    "vertices": 422,
+    "meshes": 1,
+    "clips": []
   }
 }

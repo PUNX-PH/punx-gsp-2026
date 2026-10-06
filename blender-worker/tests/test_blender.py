@@ -823,6 +823,161 @@ class BuildHigh(unittest.TestCase):
         self.assertIn("FINISHED", bpy.ops.import_scene.gltf(filepath=self.out))
         self.assertGreater(len(bpy.data.actions), 0)
 
+    # ---- every kind and every scenery piece (Task 38) ----
+
+    KINDS = ("biped", "vehicle", "blob", "prop")
+    PIECES = ("tree", "pine", "rock", "cactus", "windmill", "lamp")
+    ANIMATED = ("tree", "pine", "windmill")
+    SHAPES = ("cube", "sphere", "cone", "cylinder", "pyramid", "coin", "ring", "gem", "crate")
+
+    def every_fixture(self):
+        return [f"{kind}-high-{variant}.json" for kind in self.KINDS for variant in ("default", "stress")] + [f"scenery-{piece}-high.json" for piece in self.PIECES]
+
+    @staticmethod
+    def cavity_values(gltf, binary):
+        values = []
+        for mesh in gltf["meshes"]:
+            for primitive in mesh["primitives"]:
+                values += accessor_normalized(gltf, binary, primitive["attributes"]["COLOR_0"])
+        return values
+
+    def test_every_high_fixture_is_within_its_caps_and_its_stats_match_the_glb(self):
+        expected = high_fixture("expected-high.json")
+        for name in self.every_fixture():
+            with self.subTest(name):
+                body, gltf, _ = self.built(name)
+                caps = HIGH_CAPS[body["recipe"]["kind"]]
+                triangles, vertices, meshes = self.glb_counts(gltf)
+                self.assertLessEqual(triangles, caps["triangles"])
+                self.assertLessEqual(vertices, caps["vertices"])
+                self.assertLessEqual(self.stats["parts"], caps["parts"])
+                self.assertLessEqual(meshes, caps["meshes"])
+                self.assertLessEqual(len(gltf["materials"]), HIGH_CAPS["materials"])
+                self.assertEqual((self.stats["triangles"], self.stats["vertices"], self.stats["meshes"]), (triangles, vertices, meshes))
+                self.assertEqual(self.stats["clips"], expected[name]["clips"])
+                self.assertEqual(sorted(a["name"] for a in gltf.get("animations", [])), sorted(expected[name]["clips"]))
+
+    def test_the_estimate_matches_the_real_counts_for_every_fixture(self):
+        expected = high_fixture("expected-high.json")
+        for name in self.every_fixture():
+            with self.subTest(name):
+                self.built(name)
+                self.assertEqual(self.stats["parts"], expected[name]["parts"])
+                self.assertAlmostEqual(self.stats["triangles"] / expected[name]["triangles"], 1.0, delta=0.10)
+                self.assertAlmostEqual(self.stats["vertices"] / expected[name]["vertices"], 1.0, delta=0.10)
+
+    def test_every_fixture_has_its_finishes_cavity_colors_and_merged_static_joints(self):
+        for name in self.every_fixture():
+            with self.subTest(name):
+                body, gltf, binary = self.built(name)
+                for material in gltf["materials"]:
+                    finish = material["name"].split("_")[0]
+                    values = FINISH_VALUES[finish]
+                    pbr = material["pbrMetallicRoughness"]
+                    self.assertAlmostEqual(pbr.get("metallicFactor", 1.0), values["metallic"], delta=0.01, msg=material["name"])
+                    self.assertAlmostEqual(pbr.get("roughnessFactor", 1.0), values["roughness"], delta=0.01, msg=material["name"])
+                    self.assertEqual(max(material.get("emissiveFactor", [0, 0, 0])) > 0, finish == "glow", material["name"])
+                colors = self.cavity_values(gltf, binary)
+                for color in colors:
+                    for component in color[:3]:
+                        self.assertGreaterEqual(component, 0.55 - 0.01)
+                        self.assertLessEqual(component, 1.0 + 0.01)
+                self.assertGreater(max(c[0] for c in colors) - min(c[0] for c in colors), 0.15, "the cavity shading is flat")
+                # the joints a clip has a track for (the exporter drops a constant channel, so the GLB's channels are not the way to tell)
+                moved = {track["joint"] for motion in body["motions"]["motions"].values() for track in motion["tracks"]}
+                parents = parent_of(gltf)
+                first = gltf["nodes"][gltf["scenes"][0]["nodes"][0]]["name"]
+                for index, node in enumerate(gltf["nodes"]):
+                    if "mesh" in node:
+                        holder = gltf["nodes"][parents[index]]["name"]
+                        self.assertTrue(holder in moved or holder == first, f"{node['name']} hangs from {holder}, which no clip moves")
+
+    def test_the_same_fixture_gives_the_same_counts_twice_for_every_new_kind(self):
+        for name in ("vehicle-high-default.json", "blob-high-default.json", "prop-high-default.json", "scenery-windmill-high.json"):
+            with self.subTest(name):
+                self.built(name)
+                first = dict(self.stats)
+                self.built(name)
+                self.assertEqual(first, self.stats)
+
+    def test_the_high_vehicle_has_dark_glass_lamps_hubs_and_wheels_that_spin_about_the_axle(self):
+        body, gltf, binary = self.built("vehicle-high-default.json")
+        self.assertTrue(any(max(m["pbrMetallicRoughness"]["baseColorFactor"][:3]) < 0.06 for m in gltf["materials"]), "no dark glass")
+        self.assertIn("glow", {m["name"].split("_")[0] for m in gltf["materials"]}, "no lamps")
+        x, y, z = extents(gltf)
+        self.assertGreater(z, x)
+        self.assertGreater(z, y)
+        self.assertAlmostEqual(lowest_y(gltf), 0.0, delta=0.02)  # the wheels are on the ground
+        animation = animation_named(gltf, "Loop")
+        channel = channels_of(gltf, animation, "rotation")[node_names(gltf).index("wheel_1")]
+        rotations = accessor_values(gltf, binary, animation["samplers"][channel["sampler"]]["output"])
+        self.assertTrue(all(abs(q[1]) < 0.01 and abs(q[2]) < 0.01 for q in rotations), "a wheel wobbles instead of spinning about the axle")
+        mesh = gltf["meshes"][gltf["nodes"][node_names(gltf).index("wheel_1_mesh")]["mesh"]]
+        box = gltf["accessors"][mesh["primitives"][0]["attributes"]["POSITION"]]
+        width, height, depth = (box["max"][i] - box["min"][i] for i in range(3))
+        self.assertLess(width, height * 0.5, "the wheel is not a disc whose axle is the model's x")
+        self.assertAlmostEqual(height, depth, delta=0.02)
+        self.assertGreater(len(mesh["primitives"]), 1, "the tire and the hub are one color")  # two materials on a wheel: rubber and the hub's
+
+    def test_the_high_blob_has_glow_eyes_and_stands_on_the_ground(self):
+        _, gltf, _ = self.built("blob-high-default.json")
+        self.assertIn("glow", {m["name"].split("_")[0] for m in gltf["materials"]})
+        self.assertAlmostEqual(lowest_y(gltf), 0.0, delta=0.02)
+        for joint in ("body", "eye_l", "eye_r"):
+            self.assertIn(joint, node_names(gltf))
+
+    def test_every_high_prop_shape_stands_on_the_ground_at_its_size_with_its_details(self):
+        tier = json.load(open(os.path.join(SCRIPTS, "kit.json")))["tiers"]["high"]
+        for shape in self.SHAPES:
+            with self.subTest(shape=shape):
+                body = high_fixture("prop-high-default.json")
+                body["recipe"]["build"]["shape"] = shape
+                result = self.build(body)
+                self.assertEqual(result.returncode, 0, result.stderr[-1500:])
+                with open(self.stats_path, encoding="utf-8") as handle:
+                    stats = json.load(handle)
+                base = tier["base"]["prop"]["shapes"][shape]
+                wanted = sum(tier["details"][d]["prop"]["parts"] for d in body["recipe"]["details"])
+                self.assertEqual(stats["parts"], base["parts"] + wanted)
+                triangles, vertices = (base[k] + sum(tier["details"][d]["prop"][k] for d in body["recipe"]["details"]) for k in ("triangles", "vertices"))
+                self.assertAlmostEqual(stats["triangles"] / triangles, 1.0, delta=0.10)
+                self.assertAlmostEqual(stats["vertices"] / vertices, 1.0, delta=0.10)
+                gltf = read_glb(self.out)
+                self.assertAlmostEqual(extents(gltf)[1], body["recipe"]["build"]["size"], delta=0.03)  # `size` tall
+                self.assertAlmostEqual(lowest_y(gltf), 0.0, delta=0.02)
+                if shape == "gem":
+                    self.assertIn("glow", {m["name"].split("_")[0] for m in gltf["materials"]})
+
+    def test_each_high_scenery_piece_stands_at_its_height_and_is_small(self):
+        kit = json.load(open(os.path.join(SCRIPTS, "kit.json")))["scenery"]
+        for piece in self.PIECES:
+            with self.subTest(piece=piece):
+                _, gltf, _ = self.built(f"scenery-{piece}-high.json")
+                self.assertAlmostEqual(extents(gltf)[1], kit[piece]["height"], delta=0.1)
+                self.assertAlmostEqual(lowest_y(gltf), 0.0, delta=0.02)
+                self.assertEqual(sorted(a["name"] for a in gltf.get("animations", [])), ["Loop"] if piece in self.ANIMATED else [])
+                self.assertLessEqual(os.path.getsize(self.out), 90 * 1024)
+
+    def test_the_high_windmill_blades_turn_about_the_forward_axis_and_the_canopies_sway_from_their_tops(self):
+        _, gltf, binary = self.built("scenery-windmill-high.json")
+        animation = animation_named(gltf, "Loop")
+        channel = channels_of(gltf, animation, "rotation")[node_names(gltf).index("blades")]
+        rotations = accessor_values(gltf, binary, animation["samplers"][channel["sampler"]]["output"])
+        self.assertTrue(all(abs(q[0]) < 0.01 and abs(q[1]) < 0.01 for q in rotations), "the blades tumble instead of turning about the forward axis")
+        self.assertGreater(max(abs(q[2]) for q in rotations), 0.9)
+        for piece in ("tree", "pine"):
+            _, gltf, _ = self.built(f"scenery-{piece}-high.json")
+            targets = {gltf["nodes"][c["target"]["node"]]["name"] for c in animation_named(gltf, "Loop")["channels"]}
+            self.assertEqual(targets, {"canopy"}, piece)
+
+    def test_the_cactus_and_the_lamp_glow_and_the_rock_has_strata(self):
+        for piece in ("cactus", "lamp"):
+            _, gltf, _ = self.built(f"scenery-{piece}-high.json")
+            self.assertIn("glow", {m["name"].split("_")[0] for m in gltf["materials"]}, piece)
+        _, gltf, binary = self.built("scenery-rock-high.json")
+        levels = {round(c[0], 1) for c in self.cavity_values(gltf, binary)}
+        self.assertGreaterEqual(len(levels), 4, "the rock has no bands of color")
+
 
 if __name__ == "__main__":
     # Test names can follow a "--" (blender ... -P test_blender.py -- BlenderScripts.test_one_palette_color_paints_the_whole_model).

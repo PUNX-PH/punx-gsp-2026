@@ -1,0 +1,32 @@
+{
+  "recipe": {
+    "version": 1,
+    "kind": "scenery",
+    "summary": "",
+    "build": {
+      "scenery": "rock"
+    },
+    "colors": {
+      "main": 2,
+      "detail": 2
+    },
+    "extras": [],
+    "quality": "high",
+    "finishes": {
+      "main": "matte",
+      "detail": "matte"
+    },
+    "details": []
+  },
+  "motions": {
+    "version": 1,
+    "motions": {}
+  },
+  "palette": [
+    "#1b1f3b",
+    "#ff6f59",
+    "#ffd166",
+    "#06d6a0",
+    "#ffffff"
+  ]
+}

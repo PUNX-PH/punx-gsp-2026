@@ -21,8 +21,11 @@ CAVITY_LOW, CAVITY_HIGH = 0.55, 1.0
 
 # What the tier decides about detail: segment counts for round parts and the bevel of the big flat ones. `bevel` is what budget fitting
 # lowers last (2, then 1, then 0 segments).
-ROUND = {"sphere": (12, 7), "head": (20, 10), "capsule": (10, 5), "cylinder": 12, "torus": (16, 6), "tube": 6}
+ROUND = {"sphere": (12, 7), "head": (20, 10), "shell": (24, 14), "capsule": (10, 5), "cylinder": 12, "torus": (16, 6), "tube": 6}
 BEVEL_AREA = 0.045  # m2: a box with a bigger surface than this is bevelled, a smaller one stays hard
+
+# Colors that are not a slot of the recipe: dark glass is a fixed near-black metal, so a cab's windows read as windows whatever the palette is.
+GLASS = ("#0b0f14", "metal")
 
 
 def point(p):
@@ -80,19 +83,48 @@ def capsule(bm, radius, length, axis="y"):
     return turned(verts, axis)
 
 
-def cylinder(bm, radius, depth, axis="y", sides=None, bevel=0.0):
-    made = bmesh.ops.create_cone(bm, cap_ends=True, segments=sides or ROUND["cylinder"], radius1=radius, radius2=radius, depth=depth)
+def cylinder(bm, radius, depth, axis="y", sides=None, bevel=0.0, top=None, rim=False):
+    """A cylinder, or with `top` a cone (a radius of 0 is a point) whose wide end is `radius`, standing on its base. With `rim` only the
+    round edges of its ends are bevelled, not the lines down its side."""
+    made = bmesh.ops.create_cone(bm, cap_ends=True, segments=sides or ROUND["cylinder"], radius1=radius, radius2=radius if top is None else top, depth=depth)
     verts = made["verts"]
     if bevel > 0:
         edges = {e for v in verts for e in v.link_edges}
+        if rim:
+            edges = {e for e in edges if abs(e.verts[0].co.z - e.verts[1].co.z) < 1e-6 and e.calc_length() > 1e-6}  # not the ring that closes into a point
         result = bmesh.ops.bevel(bm, geom=list(verts) + list(edges), offset=bevel, segments=1, profile=0.6, affect="EDGES")
-        verts = list(result["verts"]) if result.get("verts") else verts
+        # every vertex of the part: the new ones and the ones the bevel left alone (a cone's tip), or the tip would not move with the rest
+        verts = list(dict.fromkeys([v for v in verts if v.is_valid] + list(result.get("verts", []))))
     return turned(verts, axis)
 
 
-def torus(bm, major, minor, axis="y", scale=(1.0, 1.0)):
+def fluted(bm, radius, depth, flutes, axis="y"):
+    """A column with `flutes` ribs: a prism with twice as many sides whose odd sides sit nearer the middle."""
+    sides = flutes * 2
+    verts = bmesh.ops.create_cone(bm, cap_ends=True, segments=sides, radius1=radius, radius2=radius, depth=depth)["verts"]
+    for v in verts:
+        if round(math.atan2(v.co.y, v.co.x) / (2 * math.pi / sides)) % 2:
+            v.co.x *= 0.78
+            v.co.y *= 0.78
+    return turned(verts, axis)
+
+
+def lump(bm, radii, seed, flat=0.8, segments=(12, 8)):
+    """A boulder: an ellipsoid whose surface is pushed in and out by a fixed pattern (the same for the same seed), cut flat at `flat` of
+    its height below the middle so it can sit on the ground (the caller puts its middle at radii[1] * flat). The top pole stays where it
+    is, so it is exactly as tall as its radius says."""
+    u, v = segments
+    verts = bmesh.ops.create_uvsphere(bm, u_segments=u, v_segments=v, radius=1.0)["verts"]
+    for p in verts:
+        ring = 1.0 - abs(p.co.z)  # 0 at the poles, 1 at the equator
+        wobble = 1.0 + 0.16 * ring * math.sin(seed + 3.1 * p.co.x + 5.3 * p.co.y) * math.cos(seed * 0.7 + 4.2 * p.co.z + 2.0 * p.co.x)
+        p.co = Vector((p.co.x * radii[0] * wobble, p.co.y * radii[2] * wobble, max(p.co.z * radii[1], -radii[1] * flat)))
+    return verts
+
+
+def torus(bm, major, minor, axis="y", scale=(1.0, 1.0), segments=None):
     """A ring. `axis` is the way its hole faces; `scale` stretches it to the model's (x, z) for a ring round an ellipse."""
-    major_sides, minor_sides = ROUND["torus"]
+    major_sides, minor_sides = segments or ROUND["torus"]
     rings = []
     for i in range(major_sides):
         a = 2 * math.pi * i / major_sides
@@ -170,9 +202,14 @@ class HighBuilder:
         self.parts = 0
 
     def material(self, slot):
-        """The material of a color slot, with the finish chosen for that slot. The slot "glow" is the `extra` color, always glowing."""
+        """The material of a color slot, with the finish chosen for that slot. Three more names are not slots of the recipe: "glow" is the
+        `extra` color, always glowing; "bodyglow" is the `body` color, always glowing (a crystal); "glass" is a fixed dark metal."""
         if slot == "glow":
             color, finish = self.palette[self.colors["extra"]].lower(), "glow"
+        elif slot == "bodyglow":
+            color, finish = self.palette[self.colors["body"]].lower(), "glow"
+        elif slot == "glass":
+            color, finish = GLASS
         else:
             color, finish = self.palette[self.colors[slot]].lower(), self.finishes[slot]
         key = (color, finish)
@@ -203,24 +240,35 @@ class HighBuilder:
     def box(self, joint, slot, size, center, bevel=None):
         self.add(joint, slot, lambda bm: rbox(bm, size, self.bevel, bevel), center)
 
-    def ball(self, joint, slot, radii, center, head=False):
-        self.add(joint, slot, lambda bm: ellipsoid(bm, radii if hasattr(radii, "__len__") else (radii, radii, radii), ROUND["head"] if head else None), center)
+    def ball(self, joint, slot, radii, center, head=False, segments=None):
+        self.add(joint, slot, lambda bm: ellipsoid(bm, radii if hasattr(radii, "__len__") else (radii, radii, radii), ROUND["head"] if head else segments), center)
 
     def bar(self, joint, slot, radius, length, center, axis="y"):
         self.add(joint, slot, lambda bm: capsule(bm, radius, length, axis), center)
 
-    def disc(self, joint, slot, radius, depth, center, axis="y", sides=None, bevel=0.0):
-        self.add(joint, slot, lambda bm: cylinder(bm, radius, depth, axis, sides, bevel), center)
+    def disc(self, joint, slot, radius, depth, center, axis="y", sides=None, bevel=0.0, top=None, rim=False):
+        self.add(joint, slot, lambda bm: cylinder(bm, radius, depth, axis, sides, bevel, top, rim), center)
 
-    def ring(self, joint, slot, major, minor, center, axis="y", scale=(1.0, 1.0)):
-        self.add(joint, slot, lambda bm: torus(bm, major, minor, axis, scale), center)
+    def ring(self, joint, slot, major, minor, center, axis="y", scale=(1.0, 1.0), segments=None):
+        self.add(joint, slot, lambda bm: torus(bm, major, minor, axis, scale, segments), center)
+
+    def column(self, joint, slot, radius, depth, flutes, center):
+        self.add(joint, slot, lambda bm: fluted(bm, radius, depth, flutes), center)
+
+    def boulder(self, joint, slot, radii, seed, center, flat=0.8):
+        self.add(joint, slot, lambda bm: lump(bm, radii, seed, flat), center)
+
+    def tilted(self, joint, slot, size, center, angle):
+        """A thin plate turned `angle` radians about the model's z (a blade, a spoke); `size` is its (x, y, z) before it is turned."""
+        self.add(joint, slot, lambda bm: rbox(bm, size, self.bevel, min(size) * 0.25), center, rotate=Matrix.Rotation(angle, 3, Vector((0, -1, 0))))
 
     def cable(self, joint, slot, points, radius):
         self.add(joint, slot, lambda bm: tube(bm, points, radius), (0, 0, 0))
 
 
-def finish(builder, objects, zrange):
-    """Every group becomes one mesh: welded, smoothed by angle, shaded for cavity, triangulated, and parented to its joint without moving."""
+def finish(builder, objects, zrange, strata=None):
+    """Every group becomes one mesh: welded, smoothed by angle, shaded for cavity, triangulated, and parented to its joint without moving.
+    `strata` is (band height, [multipliers]): bands of lighter and darker color up the model, for rock."""
     low, high = zrange
     meshes = 0
     for joint, group in builder.groups.items():
@@ -228,7 +276,7 @@ def finish(builder, objects, zrange):
         bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-5)
         bm.verts.ensure_lookup_table()
         bm.normal_update()
-        cavity_shading(bm, low, high)
+        cavity_shading(bm, low, high, strata)
         for edge in bm.edges:
             if len(edge.link_faces) == 2:
                 edge.smooth = edge.calc_face_angle(0.0) < math.radians(SMOOTH_ANGLE)
@@ -248,8 +296,9 @@ def finish(builder, objects, zrange):
     return meshes
 
 
-def cavity_shading(bm, low, high):
-    """The per-vertex multiplier `Col` (0.55 to 1.0): darker where the surface is concave and where it sits low. Deterministic, no ray casts."""
+def cavity_shading(bm, low, high, strata=None):
+    """The per-vertex multiplier `Col` (0.55 to 1.0): darker where the surface is concave and where it sits low. Deterministic, no ray casts.
+    With `strata` (band height, [multipliers]) the bands of the stone's layers are laid over it."""
     layer = bm.verts.layers.float_color.get("Col") or bm.verts.layers.float_color.new("Col")
     span = max(high - low, 1e-6)
     for v in bm.verts:
@@ -261,13 +310,18 @@ def cavity_shading(bm, low, high):
             if length > 1e-6:
                 concave = max(0.0, min(1.0, (centroid - v.co).dot(v.normal) / length * 3.0))
         lowness = 1.0 - max(0.0, min(1.0, (v.co.z - low) / span))
-        k = max(CAVITY_LOW, min(CAVITY_HIGH, 1.0 - 0.45 * concave - 0.25 * lowness))
+        k = 1.0 - 0.45 * concave - 0.25 * lowness
+        if strata is not None:
+            height, bands = strata
+            k *= bands[int(max(v.co.z, 0.0) / height) % len(bands)]
+        k = max(CAVITY_LOW, min(CAVITY_HIGH, k))
         v[layer] = (k, k, k, 1.0)
 
 
-def add_extra(b, extra, anchors, sizes):
+def add_extra(b, extra, anchors, sizes, trim="feet"):
     """One extra, with the same parts (and so the same cost) whatever kind it is on. `anchors` are model points ("back", "top" and "pack"),
-    `sizes` the units the parts are drawn from: "tail" a thickness, "head" a head's size, "body" a (width, height, depth) for a backpack."""
+    `sizes` the units the parts are drawn from: "tail" a thickness, "head" a head's size, "body" a (width, height, depth) for a backpack. `trim` is
+    the slot of the dark metal parts (a biped's "feet"; a kind without that slot names its own)."""
     t, h = sizes["tail"], sizes["head"]
     w, bh, d = sizes["body"]
     if extra == "tail":
@@ -280,7 +334,7 @@ def add_extra(b, extra, anchors, sizes):
             b.bar(f"ear_{name}", "extra", h * 0.09, h * 0.15, (x + side * h * 0.3, y + h * 0.15, z))
     elif extra == "antenna":
         x, y, z = anchors["top"]
-        b.bar("antenna", "feet", h * 0.025, h * 0.3, (x, y + h * 0.18, z))
+        b.bar("antenna", trim, h * 0.025, h * 0.3, (x, y + h * 0.18, z))
         b.ball("antenna", "glow", h * 0.06, (x, y + h * 0.4, z))
         b.ring("antenna", "extra", h * 0.05, h * 0.012, (x, y + h * 0.33, z))
     elif extra == "hat":
@@ -297,7 +351,7 @@ def add_extra(b, extra, anchors, sizes):
 # ---- the courier biped, driven by the build fields ----
 
 
-def biped_high(b, build, extras, details):
+def biped_high(b, build, extras, details, pivots=None):
     """The High biped: a rounded head with a dark lens, two glow eyes and a smile, ear cups, a chest panel with a glow core, a belt, shoulder
     balls and cuffs, thigh and shin guards, shoes with soles and joint balls. The pivots are the Standard biped's (build.py's own layout)."""
     head, width, height = build["headSize"], build["torsoWidth"], build["torsoHeight"]
@@ -406,4 +460,224 @@ def biped_high(b, build, extras, details):
             b.cable("hips", "feet", bezier((side * width * 0.14, leg + pelvis * 0.8, front), (side * width * 0.34, leg + pelvis * 0.9, front * 1.25), (side * width * 0.4, leg + pelvis * 0.5, front * 1.1), (side * width * 0.32, leg + pelvis * 0.05, front * 0.5)), leg_t * 0.05)
 
 
-HIGH_LAYOUTS = {"biped": biped_high}
+# ---- the vehicle: a bevelled body, a cab with a dark glass band, wheels with hubs, bumpers; lamps, seams, bolts and pipes as details ----
+
+
+def vehicle_high(b, build, extras, details, pivots):
+    length, width, height = build["bodyLength"], build["bodyWidth"], build["bodyHeight"]
+    cab, count, radius = build["cabSize"], int(build["wheelCount"]), build["wheelRadius"]
+    wheel_w = radius * 0.7
+    top = radius + height
+    mid = radius + height / 2
+    front, back = length / 2, -length / 2
+    bumper_y = radius + height * 0.22
+    bumper_z = (front + length * 0.01, back - length * 0.01)
+
+    b.box("body", "body", (width, height, length), (0, mid, 0))
+    for z in bumper_z:
+        b.box("body", "extra", (width * 1.02, height * 0.26, length * 0.07), (0, bumper_y, z))
+    b.box("body", "wheels", (width * 0.8, height * 0.18, length * 0.7), (0, radius + height * 0.05, 0))  # the dark underside between the wheels
+    if cab > 0:
+        b.box("body", "cab", (width * 0.8, cab, length * 0.45), (0, top + cab / 2, -length / 4))
+        b.box("body", "glass", (width * 0.8 * 1.02, cab * 0.42, length * 0.45 * 1.02), (0, top + cab * 0.58, -length / 4), bevel=0.0)
+    for k in range(1, count + 1):
+        joint = f"wheel_{k}"
+        x, _, z = pivots[joint]
+        b.disc(joint, "wheels", radius, wheel_w, (x, radius, z), axis="x", sides=16, bevel=radius * 0.1, rim=True)
+        b.disc(joint, "extra", radius * 0.55, wheel_w * 1.1, (x, radius, z), axis="x", sides=10)
+
+    anchors = {"back": (0, mid, back), "top": (width * 0.3, top + cab, -length * 0.4), "pack": (0, mid, back)}
+    for extra in extras:
+        add_extra(b, extra, anchors, {"tail": width * 0.1, "head": width * 0.8, "body": (width, height, length)}, trim="wheels")
+
+    if "lights" in details:
+        for sx in (-1, 1):
+            b.ball("body", "glow", (width * 0.11, height * 0.15, length * 0.02), (sx * width * 0.3, radius + height * 0.62, front + length * 0.005))
+            b.box("body", "glow", (width * 0.2, height * 0.22, length * 0.03), (sx * width * 0.3, radius + height * 0.62, back - length * 0.015), bevel=0.0)
+    if "seams" in details:
+        b.box("body", "wheels", (width * 1.006, height * 0.014, length * 0.7), (0, mid, 0), bevel=0.0)  # the belt line along each side, short of the rounded corners
+        b.box("body", "wheels", (width * 1.006, height * 0.42, length * 0.01), (0, mid, -length * 0.02), bevel=0.0)  # a door line on each side
+        b.box("body", "wheels", (width * 0.014, height * 0.206, length * 0.3), (0, top - height * 0.097, length * 0.28), bevel=0.0)  # the hood's middle line
+    if "bolts" in details:
+        for z, face in zip(bumper_z, (1, -1)):
+            for sx in (-1, 1):
+                for x in (0.15, 0.36):
+                    b.disc("body", "wheels", width * 0.022, width * 0.03, (sx * width * x, bumper_y, z + face * length * 0.035), axis="z", sides=8)
+    if "cables" in details:
+        for sx in (-1, 1):
+            x = sx * width * 0.27
+            b.cable("body", "wheels", bezier((x, radius + height * 0.3, back + length * 0.1), (x, radius + height * 0.1, back - length * 0.02), (x, radius + height * 0.03, back - length * 0.07), (x, radius + height * 0.03, back - length * 0.13)), width * 0.03)
+
+
+# ---- the blob: a glossy shell with a rim, glow eyes with rings round them ----
+
+
+def blob_high(b, build, extras, details, pivots):
+    r, squash, eye = build["radius"], build["squash"], build["eyeSize"]
+    half = r * squash
+    cy, top = half, 2 * half
+    ex, ey, ez = pivots["eye_l"]
+
+    b.ball("body", "body", (r, half, r), (0, cy, 0), segments=ROUND["shell"])
+    b.ring("body", "extra", r * 0.866, r * 0.045, (0, cy - half * 0.5, 0))  # a band round the shell, on its surface at that height
+    for side, name in ((1, "l"), (-1, "r")):
+        b.ball(f"eye_{name}", "eyes", (eye * 0.8, eye, eye * 0.5), (side * ex, ey, ez))
+        b.ring(f"eye_{name}", "extra", eye * 0.95, eye * 0.13, (side * ex, ey, ez), axis="z")
+
+    anchors = {"back": (0, cy, -r * 0.95), "top": (0, top - r * 0.03, 0), "pack": (0, cy, -r)}
+    for extra in extras:
+        add_extra(b, extra, anchors, {"tail": r * 0.25, "head": r, "body": (r, r, r)}, trim="body")
+
+    if "lights" in details:
+        for sx in (-1, 1):
+            b.ball("body", "glow", (r * 0.07, r * 0.05, r * 0.03), (sx * r * 0.62, cy - half * 0.15, r * 0.77))  # cheek lamps on the shell
+    if "seams" in details:
+        b.ring("body", "extra", r, r * 0.012, (0, cy, 0))  # the equator
+        b.ring("body", "extra", 1.0, 0.012, (0, cy, 0), axis="x", scale=(half, r))  # down the middle, over the top
+
+
+# ---- the prop: its shape, rounded; seams and bolts follow the shape's own front ----
+
+
+def prop_front(shape, s, x, y):
+    """The z of the front surface of a prop shape at (x, y) (y up from the ground), a little less than the real one where it is not flat."""
+    r = s / 2
+    dy = y - r
+    if shape == "cube":
+        return r
+    if shape == "crate":
+        return r + (0.03 * s if abs(y - 0.2 * s) < 0.07 * s or abs(y - 0.8 * s) < 0.07 * s else 0.0)
+    if shape == "sphere":
+        return math.sqrt(max(r * r - x * x - dy * dy, 0.0))
+    if shape == "cylinder":
+        return math.sqrt(max(r * r - x * x, 0.0))
+    if shape == "cone":
+        return math.sqrt(max((r * (1 - y / s)) ** 2 - x * x, 0.0))
+    if shape == "pyramid":
+        return max(r * (1 - y / s) - abs(x), 0.0)
+    if shape == "coin":
+        return 0.075 * s
+    if shape == "ring":
+        d = math.hypot(x, dy) - 0.35 * s
+        return math.sqrt(max((0.15 * s) ** 2 - d * d, 0.0))
+    gem_r = 0.35 * s * (y / (0.6 * s) if y < 0.6 * s else 1.0 if y < 0.65 * s else 1.0 - 0.45 * (y - 0.65 * s) / (0.35 * s))
+    return math.sqrt(max((0.96 * gem_r) ** 2 - x * x, 0.0))
+
+
+# shape: (height of the middle of the pattern, the circle of eight bolts, the three circles of seam), all as fractions of the size
+PROP_PATTERN = {
+    "cube": (0.5, 0.34, (0.12, 0.2, 0.27)),
+    "crate": (0.5, 0.34, (0.12, 0.2, 0.27)),
+    "sphere": (0.5, 0.30, (0.10, 0.18, 0.25)),
+    "cylinder": (0.5, 0.34, (0.12, 0.2, 0.28)),
+    "cone": (0.36, 0.13, (0.05, 0.08, 0.105)),
+    "pyramid": (0.36, 0.13, (0.05, 0.08, 0.105)),
+    "coin": (0.5, 0.30, (0.10, 0.18, 0.24)),
+    "ring": (0.5, 0.35, (0.25, 0.28, 0.42)),
+    "gem": (0.4, 0.13, (0.05, 0.08, 0.105)),
+}
+
+
+def prop_high(b, build, extras, details, pivots):
+    s, shape = build["size"], build["shape"]
+    mid = (0, s / 2, 0)
+    if shape == "cube":
+        b.box("root", "body", (s, s, s), mid, bevel=s * 0.1)
+    elif shape == "sphere":
+        b.ball("root", "body", (s / 2, s / 2, s / 2), mid, segments=(20, 12))
+    elif shape == "cone":
+        b.disc("root", "body", s / 2, s, mid, sides=24, top=0.0, bevel=s * 0.03, rim=True)
+    elif shape == "cylinder":
+        b.disc("root", "body", s / 2, s, mid, sides=20, bevel=s * 0.04, rim=True)
+    elif shape == "pyramid":
+        b.disc("root", "body", s / 2, s, mid, sides=4, top=0.0, bevel=s * 0.03, rim=True)
+    elif shape == "coin":
+        b.disc("root", "body", s / 2, s * 0.15, mid, axis="z", sides=24, bevel=s * 0.02, rim=True)
+        b.ring("root", "extra", s * 0.44, s * 0.035, (0, s / 2, s * 0.075), axis="z", segments=(24, 6))
+    elif shape == "ring":
+        b.ring("root", "body", s * 0.35, s * 0.15, mid, axis="z", segments=(24, 10))
+    elif shape == "gem":
+        reach = s * 0.35
+        b.disc("root", "bodyglow", 0.0, s * 0.6, (0, s * 0.3, 0), sides=8, top=reach)  # the point below
+        b.disc("root", "extra", reach * 1.04, s * 0.06, (0, s * 0.62, 0), sides=8)  # the setting round the widest part
+        b.disc("root", "bodyglow", reach, s * 0.35, (0, s * 0.825, 0), sides=8, top=reach * 0.55)  # the crown, cut flat on top
+    else:  # crate
+        b.box("root", "body", (s, s, s), mid, bevel=s * 0.06)
+        for y in (0.2, 0.8):
+            b.box("root", "extra", (s * 1.06, s * 0.14, s * 1.06), (0, s * y, 0), bevel=s * 0.03)
+
+    middle, bolt_circle, seam_circles = PROP_PATTERN[shape]
+    cy = s * middle
+
+    def on_front(circle, angle):
+        x, y = s * circle * math.cos(angle), cy + s * circle * math.sin(angle)
+        return (x, y, prop_front(shape, s, x, y))
+
+    if "seams" in details:
+        for circle in seam_circles:
+            b.cable("root", "extra", [on_front(circle, 2 * math.pi * i / 12) for i in range(13)], s * 0.012)
+    if "bolts" in details:
+        for i in range(8):
+            b.disc("root", "extra", s * 0.02, s * 0.03, on_front(bolt_circle, 2 * math.pi * i / 8 + math.pi / 8), axis="z", sides=8)
+
+
+# ---- scenery: each piece with the same joints and heights as the Standard one ----
+
+
+def tree_high(b):
+    b.disc("root", "detail", 0.22, 1.5, (0, 0.75, 0), sides=10, top=0.15)
+    for center, radii in (((0, 1.95, 0), (1.05, 0.65, 1.05)), ((0.05, 2.55, 0.02), (0.8, 0.55, 0.8)), ((0, 3.05, 0), (0.5, 0.45, 0.5))):
+        b.ball("canopy", "main", radii, center, segments=(16, 9))  # three layers of leaves, the widest at the bottom
+
+
+def pine_high(b):
+    b.disc("root", "detail", 0.17, 1.0, (0, 0.5, 0), sides=12, top=0.12)
+    for base, radius, depth in ((0.7, 1.3, 1.2), (1.4, 1.1, 1.1), (2.1, 0.9, 1.0), (2.8, 0.7, 0.95), (3.5, 0.5, 1.0)):
+        b.disc("canopy", "main", radius, depth, (0, base + depth / 2, 0), sides=14, top=0.0)
+
+
+def rock_high(b):
+    b.boulder("root", "main", (0.82, 0.66, 0.78), 1.3, (0, 0.66 * 0.8, 0))
+    b.boulder("root", "detail", (0.45, 0.37, 0.42), 4.1, (0.85, 0.37 * 0.8, 0.3))
+
+
+def cactus_high(b):
+    b.column("root", "main", 0.3, 2.0, 8, (0, 1.0, 0))
+    b.bar("root", "main", 0.11, 0.4, (0.45, 1.0, 0), axis="x")
+    b.bar("root", "main", 0.11, 0.5, (0.66, 1.35, 0))
+    b.bar("root", "main", 0.11, 0.4, (-0.45, 1.4, 0), axis="x")
+    b.bar("root", "main", 0.11, 0.5, (-0.66, 1.78, 0))
+    b.ball("root", "detail", (0.14, 0.13, 0.14), (0, 2.07, 0))  # blossoms
+    b.ball("root", "detail", (0.1, 0.09, 0.1), (-0.66, 2.12, 0))
+
+
+def windmill_high(b):
+    hub = (0, 4.0, -0.75)
+    b.disc("root", "main", 0.9, 4.6, (0, 2.3, 0), sides=12, top=0.55)
+    b.ring("root", "main", 0.66, 0.06, (0, 3.2, 0))
+    b.disc("root", "detail", 0.75, 1.4, (0, 5.3, 0), sides=12, top=0.0)
+    b.box("root", "detail", (0.4, 0.8, 0.12), (0, 0.4, -0.9))  # the door, on the side the player sees
+    b.ball("blades", "detail", (0.17, 0.17, 0.25), (hub[0], hub[1], hub[2] + 0.05))
+    for k in range(3):
+        angle = math.radians(120 * k)
+        b.tilted("blades", "detail", (0.3, 1.6, 0.06), (hub[0] - math.sin(angle), hub[1] + math.cos(angle), hub[2]), angle)  # the blades turn about z
+
+
+def lamp_high(b):
+    b.disc("root", "main", 0.28, 0.2, (0, 0.1, 0), sides=12, top=0.18)
+    b.disc("root", "main", 0.06, 2.6, (0, 1.5, 0), sides=8)
+    b.ring("root", "main", 0.1, 0.035, (0, 2.62, 0))
+    b.ball("root", "detail", (0.24, 0.27, 0.24), (0, 2.83, 0), segments=(14, 9))
+    b.disc("root", "main", 0.32, 0.15, (0, 3.125, 0), sides=12, top=0.06)
+
+
+SCENERY_HIGH = {"tree": tree_high, "pine": pine_high, "rock": rock_high, "cactus": cactus_high, "windmill": windmill_high, "lamp": lamp_high}
+# bands of stone: (band height in meters, color multipliers from the bottom up)
+STRATA = {"rock": (0.2, [1.0, 0.86, 0.95, 0.8, 0.92, 0.84])}
+
+
+def scenery_high(b, build, extras, details, pivots):
+    SCENERY_HIGH[build["scenery"]](b)
+
+
+HIGH_LAYOUTS = {"biped": biped_high, "vehicle": vehicle_high, "blob": blob_high, "prop": prop_high, "scenery": scenery_high}

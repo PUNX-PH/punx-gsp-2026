@@ -65,3 +65,47 @@ describe("what build.py really writes", () => {
     expect(made).toMatchObject({ triangles: want.triangles, parts: want.parts, clips: want.clips });
   });
 });
+
+// The High tier's real output (finishes, vertex colors, merged joints): the GLBs of three High models, and the stats build.py wrote beside each
+// (what the worker sends in its headers). The kit's estimate for the same recipe must be what the real build came to.
+describe("what build.py really writes in High", () => {
+  const recipes = new URL("../../../../blender-worker/fixtures/recipes/high/", import.meta.url);
+  const expected = JSON.parse(readFileSync(new URL("expected-high.json", recipes), "utf8")) as Record<string, { parts: number; triangles: number; vertices: number; clips: string[] }>;
+  type Stats = { triangles: number; vertices: number; parts: number; meshes: number; clips: string[] };
+  const stats = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/high/${name}.stats.json`, import.meta.url), "utf8")) as Stats;
+  const BUILT = [
+    ["built-biped-high", "biped-high-default.json"],
+    ["built-prop-high", "prop-high-default.json"],
+    ["built-lamp-high", "scenery-lamp-high.json"],
+  ] as const;
+
+  it.each(BUILT)("%s passes the app's own GLB check", (name) => {
+    expect(checkGlb(name, load(`high/${name}.glb`))).toEqual({ ok: true });
+  });
+
+  it.each(BUILT)("%s came to what the kit's estimate said, within 10 percent", (name, recipeFile) => {
+    const real = stats(name);
+    const want = expected[recipeFile];
+    expect(real.parts).toBe(want.parts);
+    expect(Math.abs(real.triangles - want.triangles)).toBeLessThanOrEqual(want.triangles * 0.1);
+    expect(Math.abs(real.vertices - want.vertices)).toBeLessThanOrEqual(want.vertices * 0.1);
+    expect(real.clips).toEqual(want.clips);
+  });
+
+  it.each(BUILT)("%s is accepted by the client's build, with the counts and clips the worker sends", async (name, recipeFile) => {
+    const bytes = load(`high/${name}.glb`);
+    const real = stats(name);
+    const headers = { "X-Triangles": String(real.triangles), "X-Parts": String(real.parts), "X-Clips": real.clips.join(","), "X-Vertices": String(real.vertices) };
+    const worker = makeBlenderWorker({
+      baseUrl: "https://worker.example",
+      getIdToken: async () => "tok",
+      fetch: (async () => new Response(bytes as BodyInit, { status: 200, headers })) as unknown as typeof fetch,
+    });
+    const body = JSON.parse(readFileSync(new URL(recipeFile, recipes), "utf8")) as BuildBody;
+
+    const made = await worker.build({ body, timeoutMs: 5000 });
+
+    expect(made.bytes).toEqual(bytes);
+    expect(made).toMatchObject({ triangles: real.triangles, parts: real.parts, clips: real.clips });
+  });
+});

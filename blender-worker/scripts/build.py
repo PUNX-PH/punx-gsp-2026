@@ -648,6 +648,8 @@ def estimate_high(recipe):
         parts.append((wheel, int(build["wheelCount"])))
     elif kind == "prop":
         total, parts = dict(tier["base"]["prop"]["shapes"][build["shape"]]), []
+    elif kind == "scenery":
+        total, parts = dict(tier["base"]["scenery"][build["scenery"]]), []
     else:
         total, parts = dict(tier["base"][kind]), []
     for cost, count in parts:
@@ -686,9 +688,9 @@ def build_high(out, recipe, motions, palette, spec, joints, extras, details, bev
     pivots, _ = LAYOUTS[kind](recipe["build"], extras)  # the pivots are Standard's, so the same clips move the same joints
     objects, rest = build_joints(joint_list(kind, spec, recipe["build"], extras), pivots)
     builder = high.HighBuilder(palette, recipe["colors"], recipe["finishes"], tier["finishes"], group_of, bevel)
-    high.HIGH_LAYOUTS[kind](builder, recipe["build"], extras, details)
+    high.HIGH_LAYOUTS[kind](builder, recipe["build"], extras, details, pivots)
     zs = [v.co.z for group in builder.groups.values() for v in group.bm.verts]
-    high.finish(builder, objects, (min(zs), max(zs)))
+    high.finish(builder, objects, (min(zs), max(zs)), high.STRATA.get(recipe["build"].get("scenery")))
     need(len(builder.library) <= tier["caps"]["materials"])
 
     clips = []

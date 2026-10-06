@@ -285,12 +285,13 @@ describe("the High tier", () => {
   });
 
   it("keeps every base model within its caps, and its vertices within what its triangles can share", () => {
-    const within = (what: string, b: { triangles: number; vertices: number; parts: number; meshes: number }, caps: { triangles: number; vertices: number; parts: number; meshes: number }) => {
+    const within = (what: string, b: { triangles: number; vertices: number; parts: number; meshes: number }, caps: { triangles: number; vertices: number; parts: number; meshes: number }, smooth = true) => {
       expect(b.triangles, `${what} triangles`).toBeLessThanOrEqual(caps.triangles);
       expect(b.vertices, `${what} vertices`).toBeLessThanOrEqual(caps.vertices);
       expect(b.parts, `${what} parts`).toBeLessThanOrEqual(caps.parts);
       expect(b.meshes, `${what} meshes`).toBeLessThanOrEqual(caps.meshes);
-      expect(b.vertices, `${what} vertices per triangle`).toBeLessThanOrEqual(b.triangles); // shared vertices: far fewer than 3 a triangle
+      // A smooth model shares its vertices (one or fewer a triangle); a faceted one (a cone, a gem, a pine) splits them at its hard edges, and can never need more than 3.
+      expect(b.vertices, `${what} vertices per triangle`).toBeLessThanOrEqual(smooth ? b.triangles : 3 * b.triangles);
     };
     within("biped", high.base.biped, high.caps.biped);
     const vehicle = high.base.vehicle;
@@ -302,8 +303,8 @@ describe("the High tier", () => {
     };
     within("vehicle with a cab and six wheels", sixWheeler, high.caps.vehicle);
     within("blob", high.base.blob, high.caps.blob);
-    for (const [shape, base] of Object.entries(high.base.prop.shapes)) within(`prop ${shape}`, base, high.caps.prop);
-    for (const [piece, base] of Object.entries(high.base.scenery)) within(`scenery ${piece}`, base, high.caps.scenery);
+    for (const [shape, base] of Object.entries(high.base.prop.shapes)) within(`prop ${shape}`, base, high.caps.prop, false);
+    for (const [piece, base] of Object.entries(high.base.scenery)) within(`scenery ${piece}`, base, high.caps.scenery, false);
     for (const piece of WORLD_PIECES) {
       expect(high.base.world[piece].triangles, piece).toBeLessThanOrEqual(high.caps.world[piece].triangles);
       expect(high.base.world[piece].vertices, piece).toBeLessThanOrEqual(high.caps.world[piece].vertices);

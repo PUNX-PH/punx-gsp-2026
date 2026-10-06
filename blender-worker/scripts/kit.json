@@ -635,23 +635,23 @@
       "details": {
         "seams": {
           "biped": { "triangles": 228, "vertices": 264, "parts": 4, "meshes": 0 },
-          "vehicle": { "triangles": 250, "vertices": 200, "parts": 3, "meshes": 0 },
-          "blob": { "triangles": 200, "vertices": 160, "parts": 2, "meshes": 0 },
-          "prop": { "triangles": 300, "vertices": 240, "parts": 3, "meshes": 0 }
+          "vehicle": { "triangles": 36, "vertices": 72, "parts": 3, "meshes": 0 },
+          "blob": { "triangles": 384, "vertices": 352, "parts": 2, "meshes": 0 },
+          "prop": { "triangles": 432, "vertices": 468, "parts": 3, "meshes": 0 }
         },
         "bolts": {
           "biped": { "triangles": 392, "vertices": 448, "parts": 14, "meshes": 0 },
-          "vehicle": { "triangles": 400, "vertices": 320, "parts": 8, "meshes": 0 },
-          "prop": { "triangles": 500, "vertices": 400, "parts": 8, "meshes": 0 }
+          "vehicle": { "triangles": 224, "vertices": 256, "parts": 8, "meshes": 0 },
+          "prop": { "triangles": 224, "vertices": 256, "parts": 8, "meshes": 0 }
         },
         "cables": {
           "biped": { "triangles": 288, "vertices": 336, "parts": 4, "meshes": 0 },
-          "vehicle": { "triangles": 200, "vertices": 160, "parts": 2, "meshes": 0 }
+          "vehicle": { "triangles": 144, "vertices": 168, "parts": 2, "meshes": 0 }
         },
         "lights": {
           "biped": { "triangles": 72, "vertices": 144, "parts": 6, "meshes": 0 },
-          "vehicle": { "triangles": 240, "vertices": 190, "parts": 4, "meshes": 0 },
-          "blob": { "triangles": 200, "vertices": 160, "parts": 2, "meshes": 0 }
+          "vehicle": { "triangles": 312, "vertices": 204, "parts": 4, "meshes": 0 },
+          "blob": { "triangles": 288, "vertices": 156, "parts": 2, "meshes": 0 }
         }
       },
       "defaults": {
@@ -698,34 +698,34 @@
       "base": {
         "biped": { "triangles": 7188, "vertices": 4788, "parts": 52, "meshes": 7 },
         "vehicle": {
-          "triangles": 1500,
-          "vertices": 1200,
+          "triangles": 432,
+          "vertices": 384,
           "parts": 4,
           "meshes": 1,
-          "cab": { "triangles": 500, "vertices": 400, "parts": 2, "meshes": 0 },
-          "wheel": { "triangles": 400, "vertices": 320, "parts": 2, "meshes": 1 }
+          "cab": { "triangles": 120, "vertices": 120, "parts": 2, "meshes": 0 },
+          "wheel": { "triangles": 160, "vertices": 104, "parts": 2, "meshes": 1 }
         },
-        "blob": { "triangles": 2600, "vertices": 2000, "parts": 6, "meshes": 1 },
+        "blob": { "triangles": 1488, "vertices": 1038, "parts": 6, "meshes": 1 },
         "prop": {
           "shapes": {
-            "cube": { "triangles": 900, "vertices": 700, "parts": 1, "meshes": 1 },
-            "sphere": { "triangles": 700, "vertices": 560, "parts": 1, "meshes": 1 },
-            "cone": { "triangles": 600, "vertices": 480, "parts": 1, "meshes": 1 },
-            "cylinder": { "triangles": 700, "vertices": 560, "parts": 1, "meshes": 1 },
-            "pyramid": { "triangles": 500, "vertices": 400, "parts": 1, "meshes": 1 },
-            "coin": { "triangles": 800, "vertices": 640, "parts": 2, "meshes": 1 },
-            "ring": { "triangles": 1400, "vertices": 1100, "parts": 1, "meshes": 1 },
-            "gem": { "triangles": 900, "vertices": 700, "parts": 3, "meshes": 1 },
-            "crate": { "triangles": 1500, "vertices": 1150, "parts": 3, "meshes": 1 }
+            "cube": { "triangles": 108, "vertices": 96, "parts": 1, "meshes": 1 },
+            "sphere": { "triangles": 440, "vertices": 222, "parts": 1, "meshes": 1 },
+            "cone": { "triangles": 94, "vertices": 97, "parts": 1, "meshes": 1 },
+            "cylinder": { "triangles": 156, "vertices": 80, "parts": 1, "meshes": 1 },
+            "pyramid": { "triangles": 14, "vertices": 32, "parts": 1, "meshes": 1 },
+            "coin": { "triangles": 476, "vertices": 384, "parts": 2, "meshes": 1 },
+            "ring": { "triangles": 480, "vertices": 240, "parts": 1, "meshes": 1 },
+            "gem": { "triangles": 70, "vertices": 81, "parts": 3, "meshes": 1 },
+            "crate": { "triangles": 324, "vertices": 288, "parts": 3, "meshes": 1 }
           }
         },
         "scenery": {
-          "tree": { "triangles": 900, "vertices": 720, "parts": 4, "meshes": 2 },
-          "pine": { "triangles": 800, "vertices": 640, "parts": 5, "meshes": 2 },
-          "rock": { "triangles": 600, "vertices": 480, "parts": 2, "meshes": 1 },
-          "cactus": { "triangles": 1000, "vertices": 800, "parts": 8, "meshes": 1 },
-          "windmill": { "triangles": 1100, "vertices": 880, "parts": 9, "meshes": 2 },
-          "lamp": { "triangles": 700, "vertices": 560, "parts": 4, "meshes": 1 }
+          "tree": { "triangles": 804, "vertices": 430, "parts": 4, "meshes": 2 },
+          "pine": { "triangles": 174, "vertices": 193, "parts": 6, "meshes": 2 },
+          "rock": { "triangles": 336, "vertices": 174, "parts": 2, "meshes": 1 },
+          "cactus": { "triangles": 1068, "vertices": 596, "parts": 7, "meshes": 1 },
+          "windmill": { "triangles": 834, "vertices": 723, "parts": 8, "meshes": 2 },
+          "lamp": { "triangles": 532, "vertices": 422, "parts": 5, "meshes": 1 }
         },
         "world": {
           "terrain": { "triangles": 7800, "vertices": 4100 },
