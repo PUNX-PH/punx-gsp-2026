@@ -21,9 +21,13 @@ node canvas). All of it is merged into `main` (a fast-forward on 2026-10-04; the
 (`docs/superpowers/specs/`). **Slice 4 (the Describe Game AI step: a prompt and a picture become a palette and the three tuning
 numbers, through Claude Sonnet 5.5 inside Play) is built, tested, merged into `main` and deployed (2026-10-04), but not yet run against the
 real API:** it needs the studio's Anthropic key first (`slice4-handoff.md`). **Slice 5 (Blender assets: Prepare Model turns an uploaded GLB, FBX
-or OBJ into a small flat-colored GLB, Make Shape builds low-poly shapes, both in a private Cloud Run container) is built, tested and reviewed on
-branch `slice-5-blender-assets`, not pushed or merged, and not yet run on the live site:** the studio has to deploy the worker first
-(`slice5-handoff.md`, `blender-worker/README.md`).
+or OBJ into a small flat-colored GLB, Make Shape builds low-poly shapes, both in a private Cloud Run container) is built, tested, reviewed and
+merged into `main`; the worker is deployed and passes its smoke test, but the live checks are not run (`slice5-handoff.md`,
+`slice5-setup-progress.md`, `blender-worker/README.md`). **Slice 6 (Build Model and Build Environment: Claude writes a recipe from words, the
+Blender worker builds it into a rigged low-poly model or a world with animated scenery, plus a High quality setting that gives Unity a lit look
+with a quality governor) is built and tested on branch `slice-6-built-models`:** `main` holds its first 34 tasks (the Standard steps) and the
+rest was pushed to the branch only (not merged), and its whole-branch review is not done. Unity could not run since Task 32 (no Hub sign-in), the published template is still the one from 2026-10-02, and
+nothing is run on the live site (`slice6-handoff.md`).
 
 ## Skills (in `.claude/skills/`; origins in `.claude/skills-sources/SOURCES.md`)
 
@@ -48,11 +52,13 @@ come from an uploaded file, and keep Blender and Unity workers sandboxed with no
 
 Slice 4's code is done and live but **parked until the studio has API funds** (2026-10-05); what is left is the studio's setup (a funded Claude Console workspace and key with a monthly spend limit, the data-terms
 decision, `ANTHROPIC_API_KEY` as a Sensitive Production variable in Vercel, then a redeploy), then the live checks and
-`slice4-results.md`. Slice 5's code is done on its branch; what is left is the studio's Google Cloud setup (deploy the worker as a no-roles
-service account, an invoker key in Vercel, a budget alert), then the live checks and `slice5-results.md`, then a merge to `main` when the user
-asks. Ask before any push: pushing `main` starts a production build. Also open (none of it blocks slice 6, if there is one): the password
+`slice4-results.md`. Slice 5's worker is deployed (its first revision predates `POST /build`, so it must be redeployed from the final slice 6
+code); what is left is the studio's invoker key and Vercel variables, a budget alert, then the live checks and `slice5-results.md`. Slice 6's
+code is done; what is left is the studio's Unity Hub sign-in (so I can run its Unity tests, rebuild and publish the template and measure), the
+worker redeploy, the funded key, a phone, then the live checks and `slice6-results.md`, and a push and merge when the user asks. Ask before any
+push: pushing `main` starts a production build. Also open (none of it blocks slice 7, if there is one): the password
 pre-registration decision (the Email/Password provider is still enabled next to Google), the checks listed as not run in the results notes,
-and slice 1's player-hardening gate before any use beyond punx.ai. Read `docs/superpowers/notes/slice5-handoff.md` and
-`slice4-handoff.md` first, then `slice2-results.md` (it also has what went wrong deploying to
+and slice 1's player-hardening gate before any use beyond punx.ai. Read `docs/superpowers/notes/slice6-handoff.md`, then
+`slice5-handoff.md` and `slice4-handoff.md` first, then `slice2-results.md` (it also has what went wrong deploying to
 Vercel and how it was fixed), `slice3a-results.md`, `slice3b-results.md` and the handoffs (`slice2-handoff.md`, `slice3a-handoff.md`,
 `slice3b-handoff.md`, `2026-10-02-slice1-handoff.md`) before doing anything else.
