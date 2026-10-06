@@ -36,6 +36,7 @@ namespace Runner.View
         Hud hud;
         RunnerView view;
         EnvironmentView environment; // null when the settings have no environment
+        WorldView worldView; // null unless the settings have a High world
         // The three files of a High world (terrain.glb, road.glb, backdrop.glb), loaded and kept hidden until the world view takes them; empty without a world.
         readonly Dictionary<string, GameObject> worldModels = new Dictionary<string, GameObject>();
 
@@ -60,6 +61,7 @@ namespace Runner.View
 
         async Task Boot()
         {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew(); // the time to ready is logged below: it is a budget (15 seconds)
             var pageUrl = Application.absoluteURL;
             var settingsUrl = ResolveSettingsUrl(pageUrl);
 
@@ -85,7 +87,15 @@ namespace Runner.View
                 var flatShader = Shader.Find("Runner/Flat");
                 if (flatShader == null) throw new LoadException("the Runner/Flat shader is missing from this build");
                 var flat = new Material(flatShader);
-                var generator = new FlatMaterialGenerator(flat);
+                IMaterialGenerator generator = new FlatMaterialGenerator(flat);
+                // A lit game (any High model or environment) makes its materials from the lit shader instead; the flat one still draws the plain ground.
+                var lit = SettingsParser.IsLit(settings);
+                if (lit)
+                {
+                    var litShader = Shader.Find("Runner/Lit");
+                    if (litShader == null) throw new LoadException("the Runner/Lit shader is missing from this build");
+                    generator = new LitMaterialGenerator(new Material(litShader));
+                }
                 var hero = await LoadRole(root, settingsUrl, "hero", settings.roles.hero, HeroHeight, generator);
                 var obstacle = await LoadRole(root, settingsUrl, "obstacle", settings.roles.obstacle, RunnerSim.ObstacleHeight, generator);
                 var collectible = await LoadRole(root, settingsUrl, "collectible", settings.roles.collectible, CollectibleHeight, generator);
@@ -110,12 +120,24 @@ namespace Runner.View
                 Sim = new RunnerSim(settings.tuning);
                 var poolSize = Mathf.CeilToInt(VisibleDistance / settings.tuning.obstacleSpacing) + 2;
                 var sky = PaletteColor(settings, hasEnvironment ? settings.environment.sky : 0);
+                var fieldColor = PaletteColor(settings, hasEnvironment ? settings.environment.field : 1);
+                var hasWorld = SettingsParser.HasWorld(settings);
                 view = new RunnerView(root, hero, obstacle, collectible, sky, PaletteColor(settings, 1), flat, poolSize);
                 if (hasEnvironment)
                 {
                     var world = settings.environment;
+                    // With a world the terrain and the road are the ground, so the plain field and stripes are not drawn; the scenery is as ever.
                     environment = new EnvironmentView(root, sceneryModels, PaletteColor(settings, world.field), PaletteColor(settings, world.stripe),
-                                                      flat, SceneryLayout.Spacing(world.density));
+                                                      flat, SceneryLayout.Spacing(world.density), !hasWorld);
+                }
+                if (hasWorld)
+                {
+                    worldView = new WorldView(root, worldModels, WorldLook.For(settings.environment.world.style, sky, fieldColor));
+                    view.HideGround();
+                }
+                else if (lit)
+                {
+                    WorldLook.For("meadow", sky, fieldColor).Apply(); // the lit shader reads its sun, sky and fog from globals, world or not
                 }
                 hud.PanelColor = PaletteColor(settings, 2);
                 hud.PanelTextColor = PaletteColor(settings, 0);
@@ -129,6 +151,7 @@ namespace Runner.View
 
             hud.Loading = false;
             State = BootState.Ready;
+            Debug.Log("RUNNER ready in " + stopwatch.ElapsedMilliseconds + " ms");
         }
 
         string ResolveSettingsUrl(string pageUrl)
@@ -248,6 +271,7 @@ namespace Runner.View
             }
             view.Sync(Sim);
             environment?.Sync(Sim.Z);
+            worldView?.Sync(Sim.Z, Sim.HeroY, view.CameraPosition);
             hud.Score = Sim.Score;
             hud.GameOver = Sim.GameOver;
         }

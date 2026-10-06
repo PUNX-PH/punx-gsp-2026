@@ -58,6 +58,12 @@ namespace Runner.View
         /// <summary>The hero's Run and Jump clips, or null when the model has no Run clip.</summary>
         public HeroClips HeroClips { get; }
 
+        /// <summary>Where the camera is, in world space (the world's sky and backdrop follow it).</summary>
+        public Vector3 CameraPosition => cameraTransform.position;
+
+        /// <summary>Hides the plain ground: a High world draws its own terrain and road.</summary>
+        public void HideGround() => ground.gameObject.SetActive(false);
+
         public void Sync(RunnerSim sim)
         {
             hero.localPosition = new Vector3(0f, sim.HeroY, sim.Z);

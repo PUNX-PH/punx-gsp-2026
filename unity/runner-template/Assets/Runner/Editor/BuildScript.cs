@@ -58,7 +58,7 @@ namespace Runner.EditorTools
         static void Configure()
         {
             EnsureScene();
-            EnsureFlatShaderIncluded();
+            EnsureShadersIncluded("Runner/Flat", "Runner/Lit", "Runner/Sky", "Runner/BlobShadow");
 
             PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Brotli;
             PlayerSettings.WebGL.decompressionFallback = true; // any static server can host the build
@@ -79,18 +79,24 @@ namespace Runner.EditorTools
             AssetDatabase.Refresh();
         }
 
-        static void EnsureFlatShaderIncluded()
+        // The shaders are found by name at runtime, so nothing in the scene references them: each is shipped through Always Included Shaders.
+        static void EnsureShadersIncluded(params string[] names)
         {
-            var shader = Shader.Find("Runner/Flat");
-            if (shader == null) throw new Exception("Shader Runner/Flat not found; is Assets/Runner/Shaders/RunnerFlat.shader imported?");
-
             var graphics = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/GraphicsSettings.asset")[0]);
             var included = graphics.FindProperty("m_AlwaysIncludedShaders");
-            for (var i = 0; i < included.arraySize; i++)
-                if (included.GetArrayElementAtIndex(i).objectReferenceValue == shader) return;
+            foreach (var name in names)
+            {
+                var shader = Shader.Find(name);
+                if (shader == null) throw new Exception("Shader " + name + " not found; is it in Assets/Runner/Shaders and imported?");
 
-            included.arraySize++;
-            included.GetArrayElementAtIndex(included.arraySize - 1).objectReferenceValue = shader;
+                var found = false;
+                for (var i = 0; i < included.arraySize && !found; i++)
+                    found = included.GetArrayElementAtIndex(i).objectReferenceValue == shader;
+                if (found) continue;
+
+                included.arraySize++;
+                included.GetArrayElementAtIndex(included.arraySize - 1).objectReferenceValue = shader;
+            }
             graphics.ApplyModifiedPropertiesWithoutUndo();
         }
 

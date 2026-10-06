@@ -26,12 +26,16 @@ namespace Runner.View
         readonly float spacing;
 
         /// <param name="sceneryModels">The fitted, hidden prototypes: one wrapper clones <c>sceneryModels[ModelForSlot(...)]</c> and never any other.</param>
-        public EnvironmentView(Transform root, IReadOnlyList<GameObject> sceneryModels, Color fieldColor, Color stripeColor, Material flat, float spacing)
+        /// <param name="drawGround">False in a High world, whose terrain and road are the ground: then only the scenery is made.</param>
+        public EnvironmentView(Transform root, IReadOnlyList<GameObject> sceneryModels, Color fieldColor, Color stripeColor, Material flat, float spacing, bool drawGround = true)
         {
             this.spacing = spacing;
 
-            field = TintedCube("Field", root, new Vector3(FieldWidth, 0.2f, FieldLength), flat, fieldColor);
-            stripes = Stripes(root, flat, stripeColor);
+            if (drawGround)
+            {
+                field = TintedCube("Field", root, new Vector3(FieldWidth, 0.2f, FieldLength), flat, fieldColor);
+                stripes = Stripes(root, flat, stripeColor);
+            }
 
             var models = sceneryModels.Count;
             poolSize = models == 0 ? 0 : SceneryLayout.PoolSize(spacing, models);
@@ -56,8 +60,8 @@ namespace Runner.View
         /// <summary>Moves the field and the stripes with the hero, and puts each wrapper in the slot it stands in for a hero at this z.</summary>
         public void Sync(float heroZ)
         {
-            field.localPosition = new Vector3(0f, FieldY, heroZ + AheadOfHero);
-            stripes.localPosition = new Vector3(0f, StripeY, heroZ + AheadOfHero);
+            if (field != null) field.localPosition = new Vector3(0f, FieldY, heroZ + AheadOfHero);
+            if (stripes != null) stripes.localPosition = new Vector3(0f, StripeY, heroZ + AheadOfHero);
 
             var first = SceneryLayout.FirstSlot(heroZ, spacing);
             for (var side = 0; side < 2; side++)
