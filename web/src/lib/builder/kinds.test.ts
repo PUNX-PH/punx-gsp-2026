@@ -169,13 +169,13 @@ describe("the scenery kit", () => {
     }
   });
 
-  it("the heights, slots and joints are the ones in the plan", () => {
+  it("the heights, slots and joints are the ones in the plan (canopies and the cactus take slot 1, not the default meadow field's slot 3)", () => {
     expect(Object.fromEntries(SCENERY_KINDS.map((kind) => [kind, KIT.scenery[kind].height]))).toEqual({ tree: 3.5, pine: 4.5, rock: 1.2, cactus: 2.2, windmill: 6, lamp: 3.2 });
     expect(Object.fromEntries(SCENERY_KINDS.map((kind) => [kind, KIT.scenery[kind].slots]))).toEqual({
-      tree: { main: 3, detail: 2 },
-      pine: { main: 3, detail: 2 },
+      tree: { main: 1, detail: 2 },
+      pine: { main: 1, detail: 2 },
       rock: { main: 2, detail: 2 },
-      cactus: { main: 3, detail: 2 },
+      cactus: { main: 1, detail: 2 },
       windmill: { main: 4, detail: 1 },
       lamp: { main: 2, detail: 4 },
     });

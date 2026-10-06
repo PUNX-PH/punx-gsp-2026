@@ -287,8 +287,9 @@ def cactus_layout():
 
 
 def windmill_layout():
-    """A tapering tower with a pointed cap, and four blades round a hub on the front. The blades turn about the model's z (forward)."""
-    hub = (0, 4.0, 0.75)
+    """A tapering tower with a pointed cap, and four blades round a hub on its -z side, the side the player approaches from (scenery is never
+    turned, and from behind the tower would hide the blades). The blades turn about the model's z axis."""
+    hub = (0, 4.0, -0.75)
     parts = [
         ("root", "main", "frustum", (0.9, 0.55, 4.6, 8), (0, 2.3, 0)),
         ("root", "detail", "cone", (0.75, 1.4, 8, "up"), (0, 5.3, 0)),

@@ -669,7 +669,7 @@ export const KIT: Kit = {
   "scenery": {
     "tree": {
       "joints": [["root", null], ["canopy", "root"]],
-      "slots": { "main": 3, "detail": 2 },
+      "slots": { "main": 1, "detail": 2 },
       "height": 3.5,
       "count": { "parts": 3, "triangles": 188 },
       "loop": {
@@ -682,7 +682,7 @@ export const KIT: Kit = {
     },
     "pine": {
       "joints": [["root", null], ["canopy", "root"]],
-      "slots": { "main": 3, "detail": 2 },
+      "slots": { "main": 1, "detail": 2 },
       "height": 4.5,
       "count": { "parts": 4, "triangles": 70 },
       "loop": {
@@ -701,7 +701,7 @@ export const KIT: Kit = {
     },
     "cactus": {
       "joints": [["root", null]],
-      "slots": { "main": 3, "detail": 2 },
+      "slots": { "main": 1, "detail": 2 },
       "height": 2.2,
       "count": { "parts": 6, "triangles": 88 },
       "loop": null
