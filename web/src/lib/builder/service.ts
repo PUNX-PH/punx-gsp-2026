@@ -8,11 +8,11 @@ import { dayOf } from "@/lib/ai/key";
 import type { UsageLimits } from "@/lib/ai/ports";
 import { AiRefusedError, AiUnavailableError, type DesignReply, type Designer } from "@/lib/ai/types";
 import type { BlenderService } from "@/lib/blender/types";
-import { CLIPS_FOR_ROLE, KIT, type ModelKind } from "@/lib/builder/kinds";
-import { designKey } from "@/lib/builder/keys";
+import { CLIPS_FOR_ROLE, KIT, type ClipKey, type ModelKind } from "@/lib/builder/kinds";
+import { designKey, motionKey } from "@/lib/builder/keys";
 import type { RecipeCache } from "@/lib/builder/ports";
-import { defaultMotions, defaultRecipe, type ModelRecipe, type MotionRecipe, type Skipped } from "@/lib/builder/recipes";
-import { repairModelRecipe } from "@/lib/builder/repair";
+import { defaultMotions, defaultRecipe, jointsOf, type ModelRecipe, type MotionRecipe, type Skipped } from "@/lib/builder/recipes";
+import { repairModelRecipe, repairMotions } from "@/lib/builder/repair";
 import type { BuildModelInput, BuilderService } from "@/lib/builder/types";
 import { pictureForModel } from "@/lib/graph/image";
 import { MIN_START_MS, RAN_OUT_OF_TIME, timeLeft } from "@/lib/graph/playTime";
@@ -149,6 +149,60 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
     return { recipe, asked: true };
   }
 
+  /**
+   * The motions of the model: Claude's for the clips whose boxes have words (cached by kind, joints and every clip's text), the kit's
+   * default for the rest. `skipped` is what Claude asked for on joints the model lacks. `asked` is true when Claude was asked.
+   */
+  async function motion(
+    ai: BuilderAi,
+    job: Parameters<BuilderService["buildModel"]>[0],
+    input: BuildModelInput,
+    recipe: ModelRecipe,
+    kind: ModelKind,
+  ): Promise<{ motions: MotionRecipe; skipped: Skipped[]; asked: boolean }> {
+    const clips = CLIPS_FOR_ROLE[input.role];
+    // Every clip the role has, "" for an empty box: the key says what each box said, so moving words between boxes is another key.
+    const texts = Object.fromEntries(clips.map((clip) => [clip, cleanPrompt(input.motions[clip])])) as Record<ClipKey, string>;
+    const wanted = clips.filter((clip) => texts[clip] !== "");
+    const joints = jointsOf(recipe);
+    const key = await motionKey({ model: ai.modelId, uid: job.user.uid, kind, joints, texts });
+
+    let answered: { motions: MotionRecipe; skipped: Skipped[] };
+    let asked = false;
+    const found = await ai.motions.get(key);
+    if (found) {
+      log({ step: STEP, call: "motion", outcome: "reused" });
+      answered = found.value;
+    } else {
+      const { value, usage } = await askClaude(
+        ai,
+        job,
+        "motion",
+        (timeoutMs) => ai.designer.designMotion({ kind, joints, texts: Object.fromEntries(wanted.map((clip) => [clip, texts[clip]])), timeoutMs }),
+        (raw) => {
+          const repaired = repairMotions(raw, { recipe, clips: wanted });
+          return repaired.ok ? { motions: repaired.motions, skipped: repaired.skipped } : null;
+        },
+      );
+      try {
+        await ai.motions.put(key, { value, model: ai.modelId, createdAt: deps.now(), inputTokens: usage.inputTokens, outputTokens: usage.outputTokens });
+      } catch {
+        log({ step: STEP, call: "motion", outcome: "cache-write-failed" });
+      }
+      log({ step: STEP, call: "motion", outcome: "answered", ...usage });
+      answered = value;
+      asked = true;
+    }
+
+    // The clips whose boxes are empty take the kit's default motion; the others take Claude's.
+    const merged = defaultMotions(recipe, clips);
+    for (const clip of wanted) {
+      const mine = answered.motions.motions[clip];
+      if (mine) merged.motions[clip] = mine;
+    }
+    return { motions: merged, skipped: answered.skipped, asked };
+  }
+
   return {
     async buildModel(job, input) {
       const description = cleanPrompt(input.description);
@@ -160,19 +214,27 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
 
       // Auto with an empty description was refused above, so a kind is chosen when there is no description to design from.
       let recipe: ModelRecipe;
-      let asked = false;
+      let askedLook = false;
       if (description !== "") {
         if (!deps.ai) throw say(NO_ANSWER);
-        ({ recipe, asked } = await design(deps.ai, job, input, description));
+        ({ recipe, asked: askedLook } = await design(deps.ai, job, input, description));
       } else {
         recipe = defaultRecipe(input.kind === "auto" ? "biped" : input.kind);
       }
-      if (motionWords) throw say(NO_ANSWER); // the AI half for motions is not here yet
-
-      const motions = defaultMotions(recipe, clips);
-      const built = await deps.blender.build(job, { label: "Build Model", body: { recipe, motions, palette: [...input.palette] } });
       // The repair and the check allow only the four model kinds until the scenery kit exists.
       const kind = recipe.kind as ModelKind;
+
+      let motions: MotionRecipe;
+      let skipped: Skipped[] = [];
+      let askedMotion = false;
+      if (motionWords) {
+        if (!deps.ai) throw say(NO_ANSWER);
+        ({ motions, skipped, asked: askedMotion } = await motion(deps.ai, job, input, recipe, kind));
+      } else {
+        motions = defaultMotions(recipe, clips);
+      }
+
+      const built = await deps.blender.build(job, { label: "Build Model", body: { recipe, motions, palette: [...input.palette] } });
       return {
         sha256: built.sha256,
         size: built.size,
@@ -181,8 +243,8 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
         triangles: built.triangles,
         clips: built.clips,
         summary: recipe.summary !== "" ? recipe.summary : KIT.kinds[kind].summary,
-        skipped: [],
-        reused: !asked && built.reused,
+        skipped,
+        reused: !askedLook && !askedMotion && built.reused,
       };
     },
   };

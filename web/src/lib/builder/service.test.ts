@@ -185,8 +185,15 @@ const rawModel = (kind: ModelKind = "biped", change: (raw: any) => void = () => 
   return raw;
 };
 const answer = (raw: unknown) => async () => ({ raw, usage: USAGE });
-const scriptedDesigner = (raw: () => unknown = () => rawModel()) => new ScriptedDesigner({ designModel: async () => ({ raw: raw(), usage: USAGE }) });
+/** One track of a motion, as Claude might write it. */
+const track = (joint: string, change: Record<string, unknown> = {}) => ({ joint, channel: "rotate", axis: "x", wave: "swing", amplitude: 30, cycles: 1, phase: 0, ...change });
+/** What Claude might say for motions: the clips it was asked for, each a length and tracks. */
+const rawMotions = (clips: Record<string, unknown[]>) => ({ motions: Object.fromEntries(Object.entries(clips).map(([clip, tracks]) => [clip, { seconds: 0.6, tracks }])) });
+const everyClip = () => rawMotions({ run: [track("thigh_l", { amplitude: 55 })], jump: [track("thigh_l", { amplitude: -55 })], loop: [track("body", { axis: "y" })] });
+const scriptedDesigner = (raw: () => unknown = () => rawModel(), motion: () => unknown = everyClip) =>
+  new ScriptedDesigner({ designModel: async () => ({ raw: raw(), usage: USAGE }), designMotion: async () => ({ raw: motion(), usage: USAGE }) });
 const designCalls = (designer: ScriptedDesigner) => designer.calls.filter((call) => call.method === "designModel");
+const motionCalls = (designer: ScriptedDesigner) => designer.calls.filter((call) => call.method === "designMotion");
 
 class FailingCache<T> extends MemoryRecipeCache<T> {
   override async put(): Promise<void> {
@@ -436,5 +443,211 @@ describe("the design call", () => {
     ]);
     const text = JSON.stringify(t.logs);
     for (const secret of ["private", "fox", "scarf", "headSize", "thigh", "colors", "extras"]) expect(text).not.toContain(secret);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// The motion call: Claude writes how the model moves.
+
+const motionRequest = (designer: ScriptedDesigner, index = 0) => motionCalls(designer)[index].request as { kind: string; joints: string[]; texts: Record<string, string>; timeoutMs: number };
+const gallop = (extra: Partial<BuildModelInput> = {}): BuildModelInput => input({ kind: "biped", motions: { run: "gallop like a horse", jump: "", loop: "" }, ...extra });
+
+describe("the motion call", () => {
+  it("asks only for the clips that have text, and the rest take the defaults", async () => {
+    const t = setupAi({ designer: scriptedDesigner(undefined, () => rawMotions({ run: [track("thigh_l", { amplitude: 55 }), track("thigh_r", { amplitude: 55, phase: 0.5 })] })) });
+    await t.service.buildModel(t.jobFor(), gallop());
+
+    expect(motionRequest(t.designer).texts).toEqual({ run: "gallop like a horse" });
+    const { motions } = t.builds[0].body.motions;
+    expect(motions.run!.tracks.map((tr) => tr.joint)).toEqual(["thigh_l", "thigh_r"]);
+    expect(motions.run!.tracks[0].amplitude).toBe(55);
+    expect(motions.jump).toEqual(fixture("biped-default.json").motions.motions.jump);
+  });
+
+  it("asks both clips of a hero when both boxes have words, and the Loop clip alone for an obstacle", async () => {
+    const hero = setupAi();
+    await hero.service.buildModel(hero.jobFor(), input({ kind: "biped", motions: { run: "gallop", jump: "leap", loop: "ignored for a hero" } }));
+    expect(motionRequest(hero.designer).texts).toEqual({ run: "gallop", jump: "leap" });
+
+    const obstacle = setupAi({ designer: scriptedDesigner(undefined, () => rawMotions({ loop: [track("body", { axis: "y" })] })) });
+    await obstacle.service.buildModel(obstacle.jobFor(), input({ role: "obstacle", kind: "vehicle", motions: { run: "ignored", jump: "ignored", loop: "wobble" } }));
+    expect(motionRequest(obstacle.designer).texts).toEqual({ loop: "wobble" });
+  });
+
+  it("with an empty description and a chosen kind asks for the motion only, with the default recipe's joints", async () => {
+    const t = setupAi();
+    await t.service.buildModel(t.jobFor(), gallop());
+
+    expect(designCalls(t.designer)).toHaveLength(0);
+    expect(motionRequest(t.designer).kind).toBe("biped");
+    expect(motionRequest(t.designer).joints).toHaveLength(17);
+    expect(motionRequest(t.designer).joints.slice(0, 3)).toEqual(["hips", "spine", "chest"]);
+    expect(t.builds[0].body.recipe).toEqual(defaultRecipe("biped"));
+  });
+
+  it("makes one motion call, no design call, and builds the same recipe when only a motion box changes", async () => {
+    const t = setupAi();
+    await t.service.buildModel(t.jobFor(), words("a fox in a scarf", { motions: { run: "gallop", jump: "", loop: "" } }));
+    await t.service.buildModel(t.jobFor(), words("a fox in a scarf", { motions: { run: "trot", jump: "", loop: "" } }));
+
+    expect(designCalls(t.designer)).toHaveLength(1);
+    expect(motionCalls(t.designer)).toHaveLength(2);
+    expect(t.builds[1].body.recipe).toEqual(t.builds[0].body.recipe);
+  });
+
+  it("answers a repeat from the cache: no call, no count, and the result says it was reused", async () => {
+    const t = setupAi();
+    await t.service.buildModel(t.jobFor(), words("a fox in a scarf", { motions: { run: "gallop", jump: "", loop: "" } }));
+    const again = await t.service.buildModel(t.jobFor(), words("a fox in a scarf", { motions: { run: "gallop", jump: "", loop: "" } }));
+
+    expect(t.designer.calls).toHaveLength(2);
+    expect(t.aiCount()).toBe(2);
+    expect(again.reused).toBe(true);
+    expect(t.logs.filter((log) => (log as { call?: string }).call === "motion")).toEqual([
+      { step: "build-model", call: "motion", outcome: "answered", ...USAGE },
+      { step: "build-model", call: "motion", outcome: "reused" },
+    ]);
+  });
+
+  it("gives a recipe with a tail another motion key, because the joints are part of it", async () => {
+    const designer = new ScriptedDesigner({
+      designModel: async (request) => ({ raw: rawModel("biped", (raw) => (raw.extras = request.description.includes("tail") ? ["tail"] : [])), usage: USAGE }),
+      designMotion: async () => ({ raw: everyClip(), usage: USAGE }),
+    });
+    const t = setupAi({ designer });
+    const run = { run: "gallop", jump: "", loop: "" };
+    await t.service.buildModel(t.jobFor(), words("a fox with a tail", { motions: run }));
+    await t.service.buildModel(t.jobFor(), words("a fox without one", { motions: run }));
+
+    expect(motionCalls(designer)).toHaveLength(2);
+    expect(motionRequest(designer, 0).joints).toContain("tail_1");
+    expect(motionRequest(designer, 1).joints).not.toContain("tail_1");
+  });
+
+  it("drops a track on a joint the model lacks, lists it in skipped, and brings skipped back from the cache", async () => {
+    const answerWithTail = () => rawMotions({ loop: [track("body", { axis: "y", wave: "bounce", amplitude: 0.1 }), track("tail_1", { axis: "z" })] });
+    const t = setupAi({ designer: scriptedDesigner(undefined, answerWithTail) });
+    const wag = input({ role: "collectible", kind: "blob", motions: { run: "", jump: "", loop: "wag the tail" } });
+
+    const first = await t.service.buildModel(t.jobFor(), wag);
+    expect(first.skipped).toEqual([{ clip: "Loop", joint: "tail_1" }]);
+    expect(t.builds[0].body.motions.motions.loop!.tracks.map((tr) => tr.joint)).toEqual(["body"]);
+
+    const again = await t.service.buildModel(t.jobFor(), wag);
+    expect(motionCalls(t.designer)).toHaveLength(1);
+    expect(again.skipped).toEqual([{ clip: "Loop", joint: "tail_1" }]);
+    expect(again.reused).toBe(true);
+  });
+
+  it("builds the default Run, and still lists the tracks, when every Run track names a joint the model lacks", async () => {
+    const t = setupAi({ designer: scriptedDesigner(undefined, () => rawMotions({ run: [track("wing_l"), track("wing_r")] })) });
+    const built = await t.service.buildModel(t.jobFor(), gallop());
+
+    expect(t.builds[0].body.motions.motions.run).toEqual(fixture("biped-default.json").motions.motions.run);
+    expect(built.skipped).toEqual([
+      { clip: "Run", joint: "wing_l" },
+      { clip: "Run", joint: "wing_r" },
+    ]);
+  });
+
+  it("takes one AI count for the design and one for the motion, and builds once", async () => {
+    const t = setupAi();
+    await t.service.buildModel(t.jobFor(), words("a fox in a scarf", { motions: { run: "gallop", jump: "", loop: "" } }));
+    expect(t.aiCount()).toBe(2);
+    expect(t.builds).toHaveLength(1);
+  });
+
+  it("counts a motion box of only spaces and control characters as empty: no motion call, no count (Review Focus 2)", async () => {
+    const t = setupAi();
+    await t.service.buildModel(t.jobFor(), input({ kind: "biped", motions: { run: "\u0007\u0000 \t\n", jump: "  ", loop: "" } }));
+    expect(t.designer.calls).toHaveLength(0);
+    expect(t.aiCount()).toBe(0);
+    expect(t.builds[0].body).toEqual(fixture("biped-default.json"));
+
+    await t.service.buildModel(t.jobFor(), words("a fox", { motions: { run: "\u0007\u0000", jump: "", loop: "" } }));
+    expect(motionCalls(t.designer)).toHaveLength(0);
+    expect(t.aiCount()).toBe(1); // only the design
+  });
+
+  it("refuses a motion with the person's sentence and calls no one, when the design already used the person's last count", async () => {
+    const t = setupAi({ perPerson: 1 });
+    const error = await failure(t.service.buildModel(t.jobFor(), words("a fox", { motions: { run: "gallop", jump: "", loop: "" } })));
+    expect((error as Error).message).toBe(PERSON);
+    expect(motionCalls(t.designer)).toHaveLength(0);
+    expect(t.logs.at(-1)).toEqual({ step: "build-model", call: "motion", outcome: "person-limit" });
+  });
+
+  it("refuses a motion with the site's sentence when the site's count is gone", async () => {
+    const t = setupAi({ total: 1 });
+    const error = await failure(t.service.buildModel(t.jobFor(), words("a fox", { motions: { run: "gallop", jump: "", loop: "" } })));
+    expect((error as Error).message).toBe(SITE);
+    expect(motionCalls(t.designer)).toHaveLength(0);
+  });
+
+  it("keeps the count for a refusal, and gives it back when the service did not answer or failed in some other way", async () => {
+    const make = (reject: () => Error) =>
+      setupAi({ designer: new ScriptedDesigner({ designMotion: async () => Promise.reject(reject()) }) });
+
+    const refused = make(() => new AiRefusedError());
+    expect(((await failure(refused.service.buildModel(refused.jobFor(), gallop()))) as Error).message).toBe(DECLINED);
+    expect(refused.aiCount()).toBe(1);
+    expect(refused.logs).toEqual([{ step: "build-model", call: "motion", outcome: "refused" }]);
+
+    const unavailable = make(() => new AiUnavailableError(503));
+    expect(((await failure(unavailable.service.buildModel(unavailable.jobFor(), gallop()))) as Error).message).toBe(NO_ANSWER);
+    expect(unavailable.aiCount()).toBe(0);
+    expect(unavailable.logs).toEqual([{ step: "build-model", call: "motion", outcome: "unavailable", status: 503 }]);
+
+    const unexpected = make(() => new RangeError("boom: secret"));
+    expect(((await failure(unexpected.service.buildModel(unexpected.jobFor(), gallop()))) as Error).message).toBe(NO_ANSWER);
+    expect(unexpected.aiCount()).toBe(0);
+    expect(unexpected.logs).toEqual([{ step: "build-model", call: "motion", outcome: "unexpected", kind: "RangeError" }]);
+  });
+
+  it("says could-not-build, keeping the count and caching nothing, when the answer cannot be repaired", async () => {
+    const t = setupAi({ designer: scriptedDesigner(undefined, () => "not motions") });
+    expect(((await failure(t.service.buildModel(t.jobFor(), gallop()))) as Error).message).toBe(COULD_NOT);
+    expect(t.aiCount()).toBe(1);
+    expect(t.builds).toHaveLength(0);
+    expect(t.logs).toEqual([{ step: "build-model", call: "motion", outcome: "bad-answer", ...USAGE }]);
+    await failure(t.service.buildModel(t.jobFor(), gallop()));
+    expect(motionCalls(t.designer)).toHaveLength(2);
+  });
+
+  it("says Play ran out of time and takes no count for a motion miss with less than 10 seconds left, but a hit still builds", async () => {
+    const t = setupAi();
+    await t.service.buildModel(t.jobFor(), words("a fox", { motions: { run: "gallop", jump: "", loop: "" } }));
+
+    const error = await failure(t.service.buildModel(t.jobFor(5_000), words("a fox", { motions: { run: "trot", jump: "", loop: "" } })));
+    expect((error as Error).message).toBe(OUT_OF_TIME);
+    expect(motionCalls(t.designer)).toHaveLength(1);
+    expect(t.aiCount()).toBe(2);
+    expect(t.logs.at(-1)).toEqual({ step: "build-model", call: "motion", outcome: "no-time" });
+
+    const hit = await t.service.buildModel(t.jobFor(5_000), words("a fox", { motions: { run: "gallop", jump: "", loop: "" } }));
+    expect(hit.reused).toBe(true);
+  });
+
+  it("gives Claude 60 seconds, or half the time left, for a motion", async () => {
+    const t = setupAi();
+    await t.service.buildModel(t.jobFor(200_000), gallop());
+    await t.service.buildModel(t.jobFor(20_000), gallop({ motions: { run: "trot", jump: "", loop: "" } }));
+    expect([0, 1].map((index) => motionRequest(t.designer, index).timeoutMs)).toEqual([60_000, 10_000]);
+  });
+
+  it("says the result was not reused whenever Claude was asked for a motion, even if the build was cached", async () => {
+    const t = setupAi();
+    await t.service.buildModel(t.jobFor(), gallop());
+    const other = await t.service.buildModel(t.jobFor(200_000, BOB), gallop());
+    expect(motionCalls(t.designer)).toHaveLength(2);
+    expect(t.builds[1].key).toBe(t.builds[0].key);
+    expect(other.reused).toBe(false);
+  });
+
+  it("logs the motion call without the words, the joints or a track", async () => {
+    const t = setupAi();
+    await t.service.buildModel(t.jobFor(), gallop({ motions: { run: "a very private gallop", jump: "", loop: "" } }));
+    const text = JSON.stringify(t.logs);
+    for (const secret of ["private", "gallop", "thigh", "amplitude", "tracks"]) expect(text).not.toContain(secret);
   });
 });
