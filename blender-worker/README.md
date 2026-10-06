@@ -13,6 +13,7 @@ scripts/prepare.py    Blender: import a GLB, FBX or OBJ, join, triangulate, deci
 scripts/shape.py      Blender: build one of seven low-poly shapes, export a GLB
 scripts/build.py      Blender: build a model (or a scenery piece: tree, pine, rock, cactus, windmill, lamp) with a skeleton and named clips from a checked recipe, export a GLB
 scripts/high.py       Blender: the High tier of build.py (rounded parts, finishes, details, cavity shading) for every kind and scenery piece
+scripts/world.py      Blender: the High world of build.py (terrain tile, road, backdrop; desert or meadow)
 tests/test_blender.py the Blender scripts' tests (run inside Blender)
 server.test.mjs       the wrapper's tests (run with a fake Blender)
 fixtures/             the fake Blender, a cube and an empty OBJ, and serve-fake.mjs
@@ -137,4 +138,10 @@ blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/buil
   --out web/src/lib/blender/fixtures/high/built-prop-high.glb --stats web/src/lib/blender/fixtures/high/built-prop-high.stats.json
 blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/build.py -- --recipe blender-worker/fixtures/recipes/high/scenery-lamp-high.json \
   --out web/src/lib/blender/fixtures/high/built-lamp-high.glb --stats web/src/lib/blender/fixtures/high/built-lamp-high.stats.json
+blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/build.py -- --recipe blender-worker/fixtures/recipes/high/world-terrain-desert.json \
+  --out web/src/lib/blender/fixtures/high/world-terrain-desert.glb --stats web/src/lib/blender/fixtures/high/world-terrain-desert.stats.json
+blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/build.py -- --recipe blender-worker/fixtures/recipes/high/world-road-desert.json \
+  --out web/src/lib/blender/fixtures/high/world-road-desert.glb --stats web/src/lib/blender/fixtures/high/world-road-desert.stats.json
+blender -b --factory-startup --python-exit-code 1 -P blender-worker/scripts/build.py -- --recipe blender-worker/fixtures/recipes/high/world-backdrop-desert.json \
+  --out web/src/lib/blender/fixtures/high/world-backdrop-desert.glb --stats web/src/lib/blender/fixtures/high/world-backdrop-desert.stats.json
 ```

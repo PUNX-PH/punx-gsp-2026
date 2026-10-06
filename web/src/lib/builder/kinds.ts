@@ -919,9 +919,9 @@ export const KIT: Kit = {
           "lamp": { "triangles": 532, "vertices": 422, "parts": 5, "meshes": 1 }
         },
         "world": {
-          "terrain": { "triangles": 7800, "vertices": 4100 },
-          "road": { "triangles": 1450, "vertices": 1150 },
-          "backdrop": { "triangles": 1100, "vertices": 650 }
+          "terrain": { "triangles": 8000, "vertices": 4131 },
+          "road": { "triangles": 868, "vertices": 595 },
+          "backdrop": { "triangles": 408, "vertices": 612 }
         }
       },
       "worlds": {

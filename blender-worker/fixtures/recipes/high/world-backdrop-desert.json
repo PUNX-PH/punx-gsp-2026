@@ -1,0 +1,35 @@
+{
+  "recipe": {
+    "version": 1,
+    "kind": "world",
+    "summary": "",
+    "build": {
+      "piece": "backdrop",
+      "style": "desert"
+    },
+    "colors": {
+      "ground": 3,
+      "accent": 2,
+      "far": 1
+    },
+    "extras": [],
+    "quality": "high",
+    "finishes": {
+      "ground": "matte",
+      "accent": "matte",
+      "far": "matte"
+    },
+    "details": []
+  },
+  "motions": {
+    "version": 1,
+    "motions": {}
+  },
+  "palette": [
+    "#1b1f3b",
+    "#ff6f59",
+    "#ffd166",
+    "#06d6a0",
+    "#ffffff"
+  ]
+}

@@ -29,6 +29,7 @@ import bmesh  # noqa: E402
 import bpy  # noqa: E402
 import common  # noqa: E402
 import high  # noqa: E402
+import world  # noqa: E402
 from mathutils import Matrix, Vector  # noqa: E402
 
 EXIT_BAD_RECIPE = 5
@@ -373,12 +374,33 @@ def check_scenery(recipe, motions, palette):
     return recipe, motions, palette, spec, joints
 
 
+def check_world(recipe, motions, palette):
+    """A piece of the High world: its build is exactly { piece, style } from the kit's lists, its colors and finishes are the world's three slots,
+    it is High, has no extras, no details and no motions."""
+    tier = KIT["tiers"]["high"]
+    build = recipe.get("build")
+    need(isinstance(build, dict) and set(build) == {"piece", "style"})
+    need(isinstance(build["piece"], str) and build["piece"] in tier["worlds"]["pieces"])
+    need(isinstance(build["style"], str) and build["style"] in tier["worlds"]["styles"])
+    need(recipe.get("quality") == "high" and recipe.get("extras") == [] and recipe.get("details") == [])
+    slots = tier["worlds"]["slots"]
+    check_colors(recipe.get("colors"), slots)
+    finishes = recipe.get("finishes")
+    need(isinstance(finishes, dict) and set(finishes) == set(slots) and all(isinstance(v, str) and v in tier["finishes"] for v in finishes.values()))
+    check_motions(motions, {"root"})
+    need(motions["motions"] == {})
+    return recipe, motions, palette, None, [("root", None)]
+
+
 def check_body(body):
     """The rules this script can see; raises BadRecipe. Returns (recipe, motions, palette, spec, joints)."""
     need(isinstance(body, dict) and set(body) == {"recipe", "motions", "palette"})
     recipe, motions, palette = body["recipe"], body["motions"], body["palette"]
     need(isinstance(palette, list) and len(palette) == 5 and all(isinstance(c, str) and HEX.match(c) for c in palette))
-    need(isinstance(recipe, dict) and recipe.get("kind") in LAYOUTS)
+    need(isinstance(recipe, dict))
+    if recipe.get("kind") == "world":
+        return check_world(recipe, motions, palette)
+    need(recipe.get("kind") in LAYOUTS)
     if recipe["kind"] == "scenery":
         return check_scenery(recipe, motions, palette)
     need(recipe["kind"] in KIT["kinds"])
@@ -733,12 +755,28 @@ def run_high(args, recipe, motions, palette, spec, joints):
         json.dump({"triangles": real["triangles"], "vertices": real["vertices"], "parts": real["parts"], "meshes": real["meshes"], "clips": clips}, handle)
 
 
+def run_world(args, recipe, palette):
+    """Builds a piece of the world. The kit's number for a piece is the larger of its two styles' (they build different shapes), so the real
+    count must be at most that and not less than half of it; and within the piece's caps."""
+    tier = KIT["tiers"]["high"]
+    piece = recipe["build"]["piece"]
+    real = world.build_world(args.out, recipe, palette, tier)
+    caps, base = tier["caps"]["world"][piece], tier["base"]["world"][piece]
+    for key in ("triangles", "vertices"):
+        need(real[key] <= caps[key] and 0.5 * base[key] <= real[key] <= base[key])
+    with open(args.stats, "w", encoding="utf-8") as handle:
+        json.dump({"triangles": real["triangles"], "vertices": real["vertices"], "parts": 1, "meshes": real["meshes"], "clips": []}, handle)
+
+
 def main():
     args = common.parse_args(configure)
     try:
         with open(args.recipe, encoding="utf-8") as handle:
             body = json.load(handle)
         recipe, motions, palette, spec, joints = check_body(body)
+        if recipe["kind"] == "world":
+            run_world(args, recipe, palette)
+            return
         if check_high(recipe, spec):
             run_high(args, recipe, motions, palette, spec, joints)
             return

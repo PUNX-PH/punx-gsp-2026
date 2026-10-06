@@ -127,5 +127,47 @@
     "vertices": 422,
     "meshes": 1,
     "clips": []
+  },
+  "world-terrain-desert.json": {
+    "parts": 1,
+    "triangles": 8000,
+    "vertices": 4131,
+    "meshes": 1,
+    "clips": []
+  },
+  "world-terrain-meadow.json": {
+    "parts": 1,
+    "triangles": 8000,
+    "vertices": 4131,
+    "meshes": 1,
+    "clips": []
+  },
+  "world-road-desert.json": {
+    "parts": 1,
+    "triangles": 868,
+    "vertices": 595,
+    "meshes": 1,
+    "clips": []
+  },
+  "world-road-meadow.json": {
+    "parts": 1,
+    "triangles": 868,
+    "vertices": 595,
+    "meshes": 1,
+    "clips": []
+  },
+  "world-backdrop-desert.json": {
+    "parts": 1,
+    "triangles": 408,
+    "vertices": 612,
+    "meshes": 1,
+    "clips": []
+  },
+  "world-backdrop-meadow.json": {
+    "parts": 1,
+    "triangles": 408,
+    "vertices": 612,
+    "meshes": 1,
+    "clips": []
   }
 }

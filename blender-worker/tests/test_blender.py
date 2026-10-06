@@ -979,6 +979,206 @@ class BuildHigh(unittest.TestCase):
         self.assertGreaterEqual(len(levels), 4, "the rock has no bands of color")
 
 
+def indices_of(gltf, binary, index):
+    """An index accessor (unsigned byte, short or int, one component) as a list of ints."""
+    accessor = gltf["accessors"][index]
+    code, size = {5121: ("B", 1), 5123: ("H", 2), 5125: ("I", 4)}[accessor["componentType"]]
+    view = gltf["bufferViews"][accessor["bufferView"]]
+    start = view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
+    return [struct.unpack_from("<" + code, binary, start + i * size)[0] for i in range(accessor["count"])]
+
+
+class BuildWorld(unittest.TestCase):
+    """The High world: a terrain tile, a road and a backdrop, in a desert or a meadow style (Task 39)."""
+
+    PIECES = ("terrain", "road", "backdrop")
+    STYLES = ("desert", "meadow")
+    KILOBYTES = {"terrain": 260, "road": 80, "backdrop": 60}
+
+    def setUp(self):
+        self._folder = tempfile.TemporaryDirectory()
+        self.dir = self._folder.name
+        self.out = os.path.join(self.dir, "out.glb")
+        self.stats_path = os.path.join(self.dir, "stats.json")
+
+    def tearDown(self):
+        self._folder.cleanup()
+
+    def build(self, body):
+        recipe_path = os.path.join(self.dir, "recipe.json")
+        with open(recipe_path, "w", encoding="utf-8") as handle:
+            json.dump(body, handle)
+        return run_script("build.py", "--recipe", recipe_path, "--out", self.out, "--stats", self.stats_path)
+
+    def built(self, piece, style):
+        body = high_fixture(f"world-{piece}-{style}.json")
+        result = self.build(body)
+        self.assertEqual(result.returncode, 0, result.stderr[-1500:] + result.stdout[-500:])
+        with open(self.stats_path, encoding="utf-8") as handle:
+            self.stats = json.load(handle)
+        gltf, binary = read_glb_with_binary(self.out)
+        return body, gltf, binary
+
+    @staticmethod
+    def primitives(gltf, binary):
+        """[(positions, normals, triangles, material index)]: every primitive's vertices and its triangles as index triples."""
+        found = []
+        for mesh in gltf["meshes"]:
+            for primitive in mesh["primitives"]:
+                positions = accessor_values(gltf, binary, primitive["attributes"]["POSITION"])
+                normals = accessor_values(gltf, binary, primitive["attributes"]["NORMAL"])
+                flat = indices_of(gltf, binary, primitive["indices"])
+                found.append((positions, normals, [tuple(flat[i : i + 3]) for i in range(0, len(flat), 3)], primitive.get("material")))
+        return found
+
+    @staticmethod
+    def face_normal(positions, triangle):
+        a, b, c = (positions[i] for i in triangle)
+        u, v = [b[k] - a[k] for k in range(3)], [c[k] - a[k] for k in range(3)]
+        n = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+        length = max((n[0] ** 2 + n[1] ** 2 + n[2] ** 2) ** 0.5, 1e-12)
+        return tuple(c / length for c in n)
+
+    def test_every_world_piece_is_within_its_caps_its_estimate_and_its_file_size(self):
+        expected = high_fixture("expected-high.json")
+        for piece in self.PIECES:
+            for style in self.STYLES:
+                with self.subTest(piece=piece, style=style):
+                    _, gltf, binary = self.built(piece, style)
+                    caps = HIGH_CAPS["world"][piece]
+                    triangles = sum(gltf["accessors"][p["indices"]]["count"] // 3 for m in gltf["meshes"] for p in m["primitives"])
+                    vertices = sum(gltf["accessors"][p["attributes"]["POSITION"]]["count"] for m in gltf["meshes"] for p in m["primitives"])
+                    self.assertLessEqual(triangles, caps["triangles"])
+                    self.assertLessEqual(vertices, caps["vertices"])
+                    self.assertLessEqual(len(gltf["materials"]), HIGH_CAPS["materials"])
+                    self.assertEqual((self.stats["triangles"], self.stats["vertices"], self.stats["parts"], self.stats["clips"]), (triangles, vertices, 1, []))
+                    # the kit's number for a piece is the larger of its two styles' (they build different shapes): an upper bound, and not far above
+                    want = expected[f"world-{piece}-{style}.json"]
+                    self.assertLessEqual(triangles, want["triangles"])
+                    self.assertLessEqual(vertices, want["vertices"])
+                    self.assertGreaterEqual(triangles, want["triangles"] * 0.5)
+                    self.assertGreaterEqual(vertices, want["vertices"] * 0.5)
+                    self.assertLessEqual(os.path.getsize(self.out), self.KILOBYTES[piece] * 1024)
+                    self.assertNotIn("animations", gltf)
+                    self.assertEqual(sorted(n for n in node_names(gltf) if n), ["root", "root_mesh"])
+                    for mesh in gltf["meshes"]:
+                        for primitive in mesh["primitives"]:
+                            self.assertIn("COLOR_0", primitive["attributes"])
+                            self.assertNotIn("COLOR_1", primitive["attributes"])
+                            for color in accessor_normalized(gltf, binary, primitive["attributes"]["COLOR_0"]):
+                                for component in color[:3]:
+                                    self.assertGreaterEqual(component, 0.55 - 0.01)
+                                    self.assertLessEqual(component, 1.0 + 0.01)
+
+    def test_the_terrain_repeats_seamlessly(self):
+        for style in self.STYLES:
+            with self.subTest(style=style):
+                _, gltf, binary = self.built("terrain", style)
+                (positions, normals, _, _), = self.primitives(gltf, binary)
+                first = {round(p[0], 3): (p, normals[i]) for i, p in enumerate(positions) if abs(p[2]) < 0.001}
+                last = {round(p[0], 3): (p, normals[i]) for i, p in enumerate(positions) if abs(p[2] - 100.0) < 0.001}
+                self.assertEqual(len(first), 81)
+                self.assertEqual(set(first), set(last), "the first and last rows are not over the same columns")
+                for x, (p, n) in first.items():
+                    q, m = last[x]
+                    self.assertAlmostEqual(p[1], q[1], delta=0.001, msg=f"the heights differ at x = {x}")
+                    for k in range(3):
+                        self.assertAlmostEqual(n[k], m[k], delta=0.001, msg=f"the normals differ at x = {x}")
+                span = [max(p[k] for p in positions) - min(p[k] for p in positions) for k in range(3)]
+                self.assertAlmostEqual(span[0], 160.0, delta=0.01)
+                self.assertAlmostEqual(span[2], 100.0, delta=0.01)
+
+    def test_the_flat_strip_is_flat_and_the_land_rises_beyond_it(self):
+        for style in self.STYLES:
+            with self.subTest(style=style):
+                _, gltf, binary = self.built("terrain", style)
+                (positions, _, _, _), = self.primitives(gltf, binary)
+                for p in positions:
+                    if abs(p[0]) <= 9.0:
+                        self.assertAlmostEqual(p[1], 0.0, delta=0.001)
+                self.assertGreater(max(p[1] for p in positions), 2.0, "no dunes or hills")
+                self.assertGreaterEqual(min(p[1] for p in positions), -0.001)
+
+    def test_the_road_is_eight_meters_wide_faces_up_and_lies_just_above_the_ground(self):
+        for style in self.STYLES:
+            with self.subTest(style=style):
+                _, gltf, binary = self.built("road", style)
+                lowest, highest, widest = 1e9, -1e9, 0.0
+                for positions, _, triangles, _ in self.primitives(gltf, binary):
+                    for triangle in triangles:
+                        centroid_x = sum(positions[i][0] for i in triangle) / 3
+                        if abs(centroid_x) >= 3.99:
+                            continue  # a curb's side
+                        self.assertGreater(self.face_normal(positions, triangle)[1], 0.5, "a road triangle faces away from the sky")
+                    for p in positions:
+                        lowest, highest, widest = min(lowest, p[1]), max(highest, p[1]), max(widest, abs(p[0]))
+                self.assertGreater(lowest, 0.0)  # above the terrain's flat strip, so the two never fight
+                self.assertLess(highest, 0.6)
+                self.assertGreaterEqual(widest, 4.0)
+                self.assertLessEqual(widest, 5.0)
+
+    def test_the_backdrop_faces_the_center_and_sits_in_two_rings(self):
+        for style in self.STYLES:
+            with self.subTest(style=style):
+                _, gltf, binary = self.built("backdrop", style)
+                radii = []
+                for positions, _, triangles, _ in self.primitives(gltf, binary):
+                    for triangle in triangles:
+                        cx, cz = (sum(positions[i][k] for i in triangle) / 3 for k in (0, 2))
+                        radii.append((cx * cx + cz * cz) ** 0.5)
+                        n = self.face_normal(positions, triangle)
+                        if n[1] > 0.5:
+                            continue  # a top
+                        toward = (-cx, -cz)
+                        along = (n[0] * toward[0] + n[2] * toward[1]) / max((toward[0] ** 2 + toward[1] ** 2) ** 0.5, 1e-9)
+                        self.assertGreater(along, 0.0, "a side faces away from the middle")
+                self.assertGreater(min(radii), 85.0)  # a hill reaches 20 m or more toward the middle from its ring
+                self.assertLess(max(radii), 160.0)
+                near = sum(1 for r in radii if r < 120.0)
+                self.assertGreater(near, len(radii) * 0.2, "no inner ring")
+                self.assertGreater(len(radii) - near, len(radii) * 0.2, "no outer ring")
+
+    def test_the_palette_slots_color_the_pieces(self):
+        for piece in self.PIECES:
+            with self.subTest(piece=piece):
+                body, gltf, _ = self.built(piece, "desert")
+                wanted = {body["palette"][i].lower() for i in body["recipe"]["colors"].values()}
+                got = {hex_of(m["pbrMetallicRoughness"]["baseColorFactor"][:3]) for m in gltf["materials"]}
+                self.assertTrue(got, "no material")
+                for color in got:
+                    self.assertTrue(any(all(abs(int(color[i : i + 2], 16) - int(w[i : i + 2], 16)) <= 1 for i in (1, 3, 5)) for w in wanted), f"{color} is not a palette color of this piece")
+
+    def test_the_same_world_gives_the_same_counts_twice(self):
+        for piece in self.PIECES:
+            with self.subTest(piece=piece):
+                self.built(piece, "meadow")
+                first = dict(self.stats)
+                self.built(piece, "meadow")
+                self.assertEqual(first, self.stats)
+
+    def test_a_world_body_the_worker_would_refuse_exits_5(self):
+        def mutated(change, name="world-terrain-desert.json"):
+            body = high_fixture(name)
+            change(body)
+            return body
+
+        cases = {
+            "a Standard world": high_fixture("invalid-world-standard.json"),
+            "an unknown piece": mutated(lambda b: b["recipe"]["build"].update(piece="mountain")),
+            "an unknown style": mutated(lambda b: b["recipe"]["build"].update(style="arctic")),
+            "a scenery slot": mutated(lambda b: b["recipe"]["colors"].update(main=1)),
+            "a missing slot": mutated(lambda b: b["recipe"]["colors"].pop("far")),
+            "an unknown finish": mutated(lambda b: b["recipe"]["finishes"].update(ground="chrome")),
+            "a detail": mutated(lambda b: b["recipe"].update(details=["seams"])),
+            "an extra": mutated(lambda b: b["recipe"].update(extras=["tail"])),
+            "a clip": mutated(lambda b: b["motions"]["motions"].update(loop={"seconds": 2, "tracks": []})),
+            "a palette of four": mutated(lambda b: b["palette"].pop()),
+        }
+        for name, body in cases.items():
+            with self.subTest(name):
+                self.assertEqual(self.build(body).returncode, EXIT_BAD_RECIPE, name)
+
+
 if __name__ == "__main__":
     # Test names can follow a "--" (blender ... -P test_blender.py -- BlenderScripts.test_one_palette_color_paints_the_whole_model).
     names = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
