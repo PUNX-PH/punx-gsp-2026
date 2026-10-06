@@ -3,8 +3,41 @@
 // interleave, and a cached answer is a copy.
 import { personDocId, siteDocId } from "@/lib/ai/key";
 import type { AnswerCache, CachedAnswer, TakeResult, UsageLimits } from "@/lib/ai/ports";
+import { AiUnavailableError, type DesignReply, type Designer } from "@/lib/ai/types";
 
 const yieldToOthers = () => Promise.resolve();
+
+type DesignMethod = "designModel" | "designMotion" | "designEnvironment";
+
+/**
+ * A designer that answers from a script and remembers every request it was sent, in order. A method with no script is "not
+ * available", as the real one is when the key is missing.
+ */
+export class ScriptedDesigner implements Designer {
+  readonly calls: { method: DesignMethod; request: unknown }[] = [];
+
+  constructor(private readonly script: Partial<{ [M in DesignMethod]: (request: Parameters<Designer[M]>[0]) => Promise<DesignReply> }> = {}) {}
+
+  private async answer<M extends DesignMethod>(method: M, request: Parameters<Designer[M]>[0]): Promise<DesignReply> {
+    this.calls.push({ method, request });
+    await yieldToOthers();
+    const reply = this.script[method] as ((request: Parameters<Designer[M]>[0]) => Promise<DesignReply>) | undefined;
+    if (!reply) throw new AiUnavailableError();
+    return reply(request);
+  }
+
+  designModel(request: Parameters<Designer["designModel"]>[0]) {
+    return this.answer("designModel", request);
+  }
+
+  designMotion(request: Parameters<Designer["designMotion"]>[0]) {
+    return this.answer("designMotion", request);
+  }
+
+  designEnvironment(request: Parameters<Designer["designEnvironment"]>[0]) {
+    return this.answer("designEnvironment", request);
+  }
+}
 
 export class MemoryAnswerCache implements AnswerCache {
   readonly answers = new Map<string, CachedAnswer>();

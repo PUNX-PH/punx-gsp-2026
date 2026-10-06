@@ -1,7 +1,8 @@
-// The vocabulary of the Describe Game step: what the AI gives back, the service the step calls, the model behind it, and the
-// two ways the model can fail. The rules (limits, cache, checking the answer) live in the other files of lib/ai.
+// The vocabulary of the AI steps: what Describe Game gives back, the service the step calls, the model behind it, the designer
+// behind Build Model, and the two ways the model can fail. The rules (limits, cache, checking the answer) live in the other files of lib/ai.
 import type { User } from "@/lib/auth/ports";
-import type { Tuning } from "@/lib/graph/types";
+import type { ClipKey, ModelKind } from "@/lib/builder/kinds";
+import type { Role, Tuning } from "@/lib/graph/types";
 
 /** What Describe Game gives the graph. The palette is in the template's slot order and already readable; the numbers are playable. */
 export interface DescribedGame {
@@ -25,6 +26,22 @@ export interface DescribeGameService {
 /** The model behind it. `raw` is whatever the model said, parsed as JSON but not trusted; `picture` is already a small JPEG. */
 export interface DescribeGameModel {
   ask(request: { prompt: string; picture: Uint8Array | null; timeoutMs?: number }): Promise<{ raw: unknown; usage: { inputTokens: number; outputTokens: number } }>;
+}
+
+/** What Claude said, parsed as JSON but not trusted (`raw` is undefined when it was not JSON), and what the call cost in tokens. */
+export interface DesignReply {
+  raw: unknown;
+  usage: { inputTokens: number; outputTokens: number };
+}
+
+/**
+ * The model behind Build Model and Build Environment: it designs a model recipe, a set of motions or an environment from the person's
+ * words. Every answer is untrusted until `lib/builder/repair.ts` has checked it. Failures are `AiRefusedError` and `AiUnavailableError`.
+ */
+export interface Designer {
+  designModel(request: { description: string; role: Role; kind: ModelKind | null; picture: Uint8Array | null; timeoutMs?: number }): Promise<DesignReply>;
+  designMotion(request: { kind: ModelKind; joints: string[]; texts: Partial<Record<ClipKey, string>>; timeoutMs?: number }): Promise<DesignReply>;
+  designEnvironment(request: { theme: string; timeoutMs?: number }): Promise<DesignReply>;
 }
 
 /** The model declined to answer (its own safety rules). Carries no detail on purpose. */
