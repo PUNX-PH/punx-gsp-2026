@@ -3,6 +3,7 @@
     "rootNamespace": "Runner.Tests",
     "references": [
         "Runner.Runtime",
+        "MoonSharp",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

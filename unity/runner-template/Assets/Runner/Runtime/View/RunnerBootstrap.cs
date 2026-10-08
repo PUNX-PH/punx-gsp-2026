@@ -6,6 +6,7 @@ using GLTFast.Materials;
 using Runner.Engine;
 using Runner.Loading;
 using Runner.Quality;
+using Runner.Scripting;
 using Runner.Settings;
 using Runner.Sim;
 using UnityEngine;
@@ -35,9 +36,16 @@ namespace Runner.View
         public RunnerSim Sim { get; private set; }
         public RunnerView View => view;
         public EngineGame Game => game;
+        public ScriptView Script => scriptView;
+
+        /// <summary>Test hook: the first round's random seed (zero, the default, picks one from the clock).</summary>
+        public uint ScriptSeed;
 
         Hud hud;
         EngineGame game; // set when the settings carry a game spec: the engine plays instead of the runner
+        ScriptView scriptView; // set when the settings carry a script: the interpreter plays instead
+        ScriptHud scriptHud;
+        Vector2 lastPointer; // where the pointer was last seen, in pixels (the middle of the screen until there is one)
         RunnerView view;
         EnvironmentView environment; // null when the settings have no environment
         WorldView worldView; // null unless the settings have a High world
@@ -81,7 +89,16 @@ namespace Runner.View
                 throw new LoadException("settings (" + settingsUrl + "): " + e.Message);
             }
 
-            // A settings file with a "game" key is a game spec for the engine; without one it is the runner, exactly as before.
+            // A settings file with a "script" key is a Lua game; with a "game" key a spec for the rules engine; with neither it is the runner, exactly as before.
+            var scriptRead = ScriptSettings.Read(json);
+            if (scriptRead.Present)
+            {
+                if (scriptRead.Error != null) throw new LoadException(scriptRead.Error);
+                await BootScript(scriptRead, settingsUrl);
+                Debug.Log("RUNNER ready in " + stopwatch.ElapsedMilliseconds + " ms");
+                return;
+            }
+
             var read = EngineGame.Read(json);
             if (read.Present)
             {
@@ -200,6 +217,70 @@ namespace Runner.View
                 hud.PanelColor = game.Slot(2);
                 hud.PanelTextColor = game.Slot(0);
                 hud.ScoreColor = game.Slot(Mathf.Min(4, spec.Palette.Count - 1));
+            }
+            catch
+            {
+                Destroy(root.gameObject);
+                throw;
+            }
+            hud.Loading = false;
+            State = BootState.Ready;
+        }
+
+        /// <summary>
+        /// Builds a script game: the Lua file next to the settings, and for each model name entity-NAME.glb next to the settings, fitted one unit tall (a
+        /// missing or broken file is a box instead). The script runs only here, in the sandboxed interpreter, never on a server.
+        /// </summary>
+        async Task BootScript(ScriptRead read, string settingsUrl)
+        {
+            var root = new GameObject("World").transform;
+            root.SetParent(transform, false);
+            try
+            {
+                string source;
+                try
+                {
+                    source = await AssetLoader.FetchText(UrlTools.SiblingUrl(settingsUrl, read.File));
+                }
+                catch (LoadException e)
+                {
+                    throw new LoadException(read.File + ": " + e.Message);
+                }
+                if (System.Text.Encoding.UTF8.GetByteCount(source) > 65536) throw new LoadException(read.File + ": the script is over 64 KiB");
+
+                var flatShader = Shader.Find("Runner/Flat");
+                if (flatShader == null) throw new LoadException("the Runner/Flat shader is missing from this build");
+                var flat = new Material(flatShader);
+                IMaterialGenerator generator = new FlatMaterialGenerator(flat);
+                var models = new Dictionary<string, GameObject>();
+                foreach (var name in read.Models)
+                {
+                    var file = "entity-" + name + ".glb";
+                    try
+                    {
+                        var content = await AssetLoader.LoadModel(UrlTools.SiblingUrl(settingsUrl, file), root, generator);
+                        models[name] = FitTo(content, 1f, 2f);
+                    }
+                    catch (Exception ex) when (ex is LoadException || ex is ArgumentException)
+                    {
+                        Debug.LogWarning("Runner: " + file + " could not be used (" + ex.Message + "), drawing a box instead");
+                    }
+                }
+
+                var palette = new List<Color>();
+                foreach (var hex in read.Palette)
+                {
+                    ColorUtility.TryParseHtmlString(hex, out var color); // validated as #rrggbb
+                    palette.Add(color);
+                }
+                lastPointer = new Vector2(Screen.width / 2f, Screen.height / 2f);
+                var seed = ScriptSeed != 0 ? ScriptSeed : (uint)(Environment.TickCount | 1);
+                scriptView = new ScriptView(root, () => new ScriptRunner(source, seed++), models, flat, palette);
+                scriptHud = gameObject.AddComponent<ScriptHud>();
+                scriptHud.View = scriptView;
+                hud.PanelColor = palette[2];
+                hud.PanelTextColor = palette[0];
+                hud.ScoreColor = palette[4];
             }
             catch
             {
@@ -336,6 +417,21 @@ namespace Runner.View
             if (State != BootState.Ready) return;
 
             var pressed = Pressed();
+            if (scriptView != null)
+            {
+                if (Pointer.current != null) lastPointer = Pointer.current.position.ReadValue();
+                scriptView.Tick(Time.deltaTime, lastPointer, Held());
+                hud.Score = scriptView.Score;
+                hud.Subtitle = null;
+                hud.GameOver = scriptView.Over;
+                hud.EndText = scriptView.EndText;
+                if (scriptView.Failed && hud.ErrorMessage == null)
+                {
+                    hud.ErrorMessage = "The game stopped: " + scriptView.Error + "\n\nDescribe the game again to change it.";
+                    Debug.LogError("Runner: the script stopped: " + scriptView.Error);
+                }
+                return;
+            }
             if (game != null)
             {
                 game.Tick(Time.deltaTime, pressed, Held());
