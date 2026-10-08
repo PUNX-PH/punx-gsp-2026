@@ -4,7 +4,7 @@ import { parseGraph } from "@/lib/graph/schema";
 import { builtStarterGraph, describedStarterGraph, starterGraph } from "@/lib/graph/starter";
 
 describe("describedStarterGraph", () => {
-  it("is a graph the parser accepts: a picture, Describe Game, the Game Template and the Preview, wired with a palette and a feel", () => {
+  it("is a graph the parser accepts: a picture, Describe Game, the Game Template and the Preview, wired with the whole game", () => {
     const graph = describedStarterGraph();
     expect(parseGraph(graph).ok).toBe(true);
     expect(graph.nodes.map((n) => [n.id, n.type])).toEqual([
@@ -15,8 +15,7 @@ describe("describedStarterGraph", () => {
     ]);
     expect(graph.edges.map((e) => `${e.from.node}.${e.from.port}->${e.to.node}.${e.to.port}`)).toEqual([
       "n1.image->n2.image",
-      "n2.palette->n3.palette",
-      "n2.feel->n3.feel",
+      "n2.game->n3.game",
       "n3.settings->n4.settings",
     ]);
   });
@@ -32,7 +31,7 @@ describe("describedStarterGraph", () => {
     expect(describedStarterGraph().nodes.map((n) => n.position)).toEqual([0, 260, 520, 780].map((x) => ({ x, y: 0 })));
     const a = describedStarterGraph();
     a.nodes[1].params = { prompt: "changed" };
-    expect(describedStarterGraph().nodes[1].params).toEqual({ prompt: "" });
+    expect(describedStarterGraph().nodes[1].params).toEqual({ prompt: "", makeGame: true });
   });
 
   it("is not the same graph as the original starter, which keeps working with no AI", () => {

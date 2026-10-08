@@ -410,7 +410,17 @@ export function SettingsPanel({ node, data, uploading, error, onChooseFile, onTu
       )}
       {node.type === "build-model" && <BuildModelPanel node={node} onSettings={onSettings} />}
       {node.type === "build-environment" && <BuildEnvironmentPanel node={node} data={data} onSettings={onSettings} />}
-      {node.type === "describe-game" && <PromptBox nodeId={node.id} prompt={typeof node.params.prompt === "string" ? node.params.prompt : ""} onPrompt={onPrompt} />}
+      {node.type === "describe-game" && (
+        <>
+          <ChoiceGroup
+            label="Make a game"
+            choices={[{ value: "on", name: "On: a whole game" }, { value: "off", name: "Off: colors and feel" }]}
+            current={node.params.makeGame === true ? "on" : "off"}
+            onPick={(value) => onSettings(node.id, { makeGame: value === "on" })}
+          />
+          <PromptBox nodeId={node.id} prompt={typeof node.params.prompt === "string" ? node.params.prompt : ""} onPrompt={onPrompt} />
+        </>
+      )}
       {node.type === "game-template" && <TuningSliders node={node} data={data} onTune={onTune} />}
       {node.type === "palette-from-image" && colors.length > 0 && (
         <ul className={cx(styles.swatches, styles.panelSwatches)}>

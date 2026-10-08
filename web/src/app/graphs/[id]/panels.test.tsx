@@ -166,6 +166,14 @@ describe("SettingsPanel for Describe Game and a locked Game Template", () => {
   });
   const rangeInputs = (html: string) => html.split("<input").filter((part) => part.includes('type="range"'));
 
+  it("has a Make a game choice, on for a step saved with it on and off for one saved without it", () => {
+    const on = panel("n2", { graph: { ...described(""), nodes: described("").nodes.map((n) => (n.id === "n2" ? { ...n, params: { prompt: "", makeGame: true } } : n)) } });
+    expect(on).toContain("Make a game");
+    expect(on).toMatch(/aria-pressed="true"[^>]*>On: a whole game/);
+    const off = panel("n2", { graph: described("") });
+    expect(off).toMatch(/aria-pressed="true"[^>]*>Off: colors and feel/);
+  });
+
   it("has a box for the prompt (at most 500 characters), holding what was typed, with the characters left", () => {
     const html = panel("n2", { graph: described("a fast neon night run") });
     expect(html).toContain("Describe Game");

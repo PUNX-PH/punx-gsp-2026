@@ -10,6 +10,7 @@ import { AiRefusedError, AiUnavailableError, type DesignReply } from "@/lib/ai/t
 import { MODEL_KINDS, type ModelKind } from "@/lib/builder/kinds";
 import type { RecipeCache } from "@/lib/builder/ports";
 import { MIN_START_MS, RAN_OUT_OF_TIME, timeLeft } from "@/lib/graph/playTime";
+import { MAX_PROMPT_CHARACTERS } from "@/lib/graph/registry";
 import { NodeError } from "@/lib/graph/types";
 import type { GameAuthor } from "./author";
 import { checkSpec } from "./check";
@@ -151,7 +152,8 @@ export function makeGameService(deps: GameDeps): GameService {
 
   return {
     async create(job, input) {
-      const description = cleanPrompt(input.description);
+      // The step already limits the words; a caller that does not gets the same limit here, before anything is keyed or sent.
+      const description = Array.from(cleanPrompt(input.description)).slice(0, MAX_PROMPT_CHARACTERS).join("");
       if (description === "") throw problem("describe the game you want.");
 
       const key = await gameKey({ model: deps.modelId, uid: job.user.uid, description, pictureSha: input.picture?.sha256 ?? null, models: input.models });

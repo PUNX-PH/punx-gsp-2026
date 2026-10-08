@@ -102,6 +102,12 @@ const isNumber = (value: unknown): value is number => typeof value === "number" 
 
 // What a finished Describe Game step handed over (lib/graph/nodes/describeGame.ts), or null when the result is not that.
 function described(result: unknown): ResultView | null {
+  // A whole game (Make a game on): how much it has and what Claude left out, in words.
+  const g = result as { game?: unknown; entities?: unknown; rules?: unknown; leftOut?: unknown; reused?: unknown } | null | undefined;
+  if (typeof g === "object" && g !== null && g.game === true && isNumber(g.entities) && isNumber(g.rules)) {
+    const left = typeof g.leftOut === "string" && g.leftOut !== "" ? ` Left out: ${g.leftOut}` : "";
+    return { kind: "text", text: `A game with ${g.entities} things and ${g.rules} rules.${left}${g.reused === true ? " Reused your earlier result." : ""}` };
+  }
   const r = result as { palette?: unknown; tuning?: Partial<Record<keyof Tuning, unknown>>; summary?: unknown; reused?: unknown } | null | undefined;
   if (typeof r !== "object" || r === null) return null;
   const { palette, tuning, summary, reused } = r;

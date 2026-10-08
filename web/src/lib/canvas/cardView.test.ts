@@ -239,6 +239,16 @@ describe("a Describe Game step", () => {
     expect(step("n2", { graph: described(), run: runWith(failed) })).toMatchObject({ status: "failed", statusText: "Describe Game: The AI service did not answer. Try again." });
   });
 
+  it("describes a whole game by its size, what was left out, and whether it was reused", () => {
+    const result = { game: true, entities: 5, rules: 2, leftOut: "no 3D worlds", palette: [], reused: true };
+    expect(step("n2", { graph: described(), run: runWith({ state: "done", result }) }).result).toEqual({
+      kind: "text",
+      text: "A game with 5 things and 2 rules. Left out: no 3D worlds Reused your earlier result.",
+    });
+    const plain = step("n2", { graph: described(), run: runWith({ state: "done", result: { ...result, leftOut: "", reused: false } }) }).result;
+    expect(plain).toEqual({ kind: "text", text: "A game with 5 things and 2 rules." });
+  });
+
   it("lists a picture input that is optional, and a palette, a feel and a game output", () => {
     const card = step("n2", { graph: described() });
     expect(card.inputs.map((p) => [p.name, p.type, p.required, p.wired])).toEqual([["image", "image", false, true]]);
