@@ -6,7 +6,7 @@
 > or deploy.** Work on a new branch `slice-7-game-engine` from `slice-6-built-models`.
 >
 > **Steps that need the studio** (ask first; if unavailable ledger `Task N: <step> deferred (needs the studio)` and carry on; Task 32 repeats them):
-> an active **Unity Hub sign-in** for any Unity batch run (Tasks 12 to 15, 22, 27, 28); without it the C# is written test-first, compiled against
+> an active **Unity Hub sign-in** for any Unity batch run (Tasks 9, 10, 12, 13, 21, 28, 29); without it the C# is written test-first, compiled against
 > Unity's reference assemblies and run on the .NET stand-in (rebuild `compile-runtime.sh` into `unity/tools/`, committed this time); the **funded
 > Anthropic key** (Task 32); **a phone**; Google Cloud steps (Task 26); the studio's **Android keystore** (Task 27); Unity's **Windows and Android
 > build support** installed (Task 28).
@@ -42,10 +42,10 @@ writes the spec into the settings file; no `game` key means today's runner. A sm
 ## Review Focus
 
 1. A description that cannot be expressed (3D navigation, text input, multi-touch): the nearest game plus a plain `left out` note, never a crash. (Task 19)
-2. A spec that is lost instantly, never ends, or spawns past the caps: rejected by the playtest, one retry, then a plain message. (Tasks 7, 8, 19)
-3. A hostile or malformed spec text at the player (prototype keys, huge numbers, cyclic references): refused with the web's message. (Tasks 3, 12)
-4. Entity asset builds that fail or exceed the budget: that entity falls back to a primitive and the game still plays. (Tasks 21, 22)
-5. An old settings file and the built-in runner spec: identical play on a recorded input log. (Tasks 23, 24)
+2. A spec that is lost instantly, never ends, or spawns past the caps: rejected by the playtest, one retry, then a plain message. (Tasks 7, 15, 19)
+3. A hostile or malformed spec text at the player (prototype keys, huge numbers, cyclic references): refused with the web's message. (Tasks 2, 3, 9)
+4. Entity asset builds that fail or exceed the budget: that entity falls back to a primitive and the game still plays. (Tasks 23, 24)
+5. An old settings file and the built-in runner spec: identical play on a recorded input log. (Tasks 20 to 22)
 
 ---
 
@@ -56,7 +56,7 @@ writes the spec into the settings file; no `game` key means today's runner. A sm
 **Produces:** `GameSpec`, `Entity`, `Behavior`, `Rule`, `Event`, `Action`, `Condition` (types as in the spec); constants `ENGINE_CAPS`,
 `ENGINE_VERSION`; `type Milli = number` (integer thousandths).
 - [ ] Write the note: step order, fixed point, `xorshift32`, each behavior, event, action and condition, collision rule (box and circle, closed
-  intervals), rule ordering, end resolution (`win` beats `lose` in the same step is **no**: first one reached ends), counter clamp **-1,000,000 to 1,000,000**.
+  intervals), rule ordering, end resolution (the first end reached in rule order wins), counter clamp **-1,000,000 to 1,000,000**.
 - [ ] Test `ENGINE_CAPS` values and that every vocabulary list in `spec.ts` equals the note's tables (parse the note's tables in the test).
 - [ ] Implement `spec.ts` types and constants. Commit.
 
