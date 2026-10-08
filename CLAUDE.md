@@ -25,11 +25,10 @@ or OBJ into a small flat-colored GLB, Make Shape builds low-poly shapes, both in
 merged into `main`; the worker is deployed and passes its smoke test, but the live checks are not run (`slice5-handoff.md`,
 `slice5-setup-progress.md`, `blender-worker/README.md`). **Slice 6 (Build Model and Build Environment: Claude writes a recipe from words, the
 Blender worker builds it into a rigged low-poly model or a world with animated scenery, plus a High quality setting that gives Unity a lit look
-with a quality governor) is built and tested on branch `slice-6-built-models`:** `main` holds its first 34 tasks (the Standard steps) and the
-rest was pushed to the branch only (not merged), and its whole-branch review is not done. Unity could not run since Task 32 (no Hub sign-in), the published template is still the one from 2026-10-02, and
-nothing is run on the live site (`slice6-handoff.md`).
+with a quality governor) is built, tested, reviewed (no Critical or Important findings) and merged into `main` (2026-10-08, with slice 7):** Unity could not
+run since Task 32 (no Hub sign-in), the published template is still the one from 2026-10-02, and nothing is run on the live site (`slice6-handoff.md`).
 
-**Slice 7 (the game engine) is built and tested on branch `slice-7-game-engine`, not merged or pushed:** Describe Game with Make a game writes a whole
+**Slice 7 (the game engine) is built, tested, reviewed and merged into `main` (2026-10-08, `f17b9f0`, deployed):** Describe Game with Make a game writes a whole
 game (a checked, playtested spec in a closed vocabulary) plus Claude-made models; the pre-built Unity player runs it with its own engine (TypeScript and C#
 implementations kept equal by shared fixtures: `unity/tools/engine-check.sh`); a private packager adds a game to a Windows or Android player, and the Preview
 panel has Build for buttons. Unity has not run any of it (no Hub sign-in) and the packager is not deployed (`slice7-handoff.md`).
@@ -61,8 +60,9 @@ decision, `ANTHROPIC_API_KEY` as a Sensitive Production variable in Vercel, then
 variables and the Anthropic key are set and the Firebase project is back on Blaze (uploads need it); what is left is a budget alert, then the live checks
 and `slice5-results.md` (and slice 4's, `slice4-results.md`). Slice 6's code is done and its whole-branch review found nothing Critical or Important;
 what is left is the studio's Unity Hub sign-in (so I can run its Unity tests, rebuild and publish the template and measure), a phone, then the live
-checks and `slice6-results.md`, and a push and merge when the user asks. Ask before any
-push: pushing `main` starts a production build. Also open (none of it blocks slice 7, if there is one): the password
+checks and `slice6-results.md`. Slice 7 waits for the same Unity sign-in (engine runs, `.meta` files, the Windows and Android players, the rebuilt template), the
+packager's deployment (`packager/README.md`, then `PACKAGER_URL` and `PACKAGER_KEY` in Vercel), then its live checks and `slice7-results.md`. `main` holds slices 2
+to 7; the slice branches were deleted after the merge. Ask before any push: pushing `main` starts a production build. Also open: the password
 pre-registration decision (the Email/Password provider is still enabled next to Google), the checks listed as not run in the results notes,
 and slice 1's player-hardening gate before any use beyond punx.ai. Read `docs/superpowers/notes/slice7-handoff.md`, then `slice6-handoff.md`, then
 `slice5-handoff.md` and `slice4-handoff.md` first, then `slice2-results.md` (it also has what went wrong deploying to

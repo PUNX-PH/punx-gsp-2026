@@ -95,7 +95,8 @@ changes) are described in the ledger; three survivors are equivalent mutants.
    and rebuild and publish the WebGL template (Task 29).
 3. **Deploy the packager** (`packager/README.md`): the players and `players.json` in a bucket, an Android keystore and its password in Secret Manager,
    `PACKAGER_URL` and `PACKAGER_KEY` in Vercel (Sensitive), a budget alert.
-4. **Push and merge** `slice-7-game-engine` (it holds slice 6's remaining tasks underneath it) on the user's word.
+4. **DONE 2026-10-08: pushed and merged into `main`** (`f17b9f0`, with slice 6's remaining tasks underneath it); the production build is live and the slice branches
+   were deleted. A new Describe Game step now defaults to Make a game, whose game cannot play in the live Preview until step 2 publishes the rebuilt template.
 5. **Live acceptance (Task 32):** describe a lane runner, a tap-to-flap flier and a falling-object catcher (each plays right in Preview with no new build); a
    request that cannot be expressed gets "Left out"; a second Play unchanged says reused; Build for Windows (unzip, run) and Android (install on a phone);
    `git grep` finds no key material; then write `slice7-results.md`.

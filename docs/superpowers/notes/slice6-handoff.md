@@ -41,10 +41,9 @@ build it; both run only inside Play, and both work with **no AI at all** when a 
 
 ## Where it stands
 
-- Branch `slice-6-built-models`. `main`, `origin/main` and `origin/slice-6-built-models` are all at `90e8c0e`: that holds Tasks 1 to 34 (Build
-  Model, the designer, Build Environment, the scenery in Unity) and the High kit and both recipe checks (the start of Task 36), so the site on Vercel
-  already has the Standard steps. **Everything after it (Tasks 36's builders, 37 to 43, the not-set-up message, the docs, the tools and this note) is
-  local and not pushed.** Ask before any push (the repo is public; pushing `main` starts a production build).
+- **Merged into `main` on 2026-10-08** (fast-forward together with slice 7, `main` at `f17b9f0`, deployed); the branch `slice-6-built-models` was deleted. Before
+  that, `main` held Tasks 1 to 34 and the High kit; everything else (Tasks 36's builders, 37 to 43, the not-set-up message, the docs, the tools and this note)
+  was on the branch only. Ask before any push (the repo is public; pushing `main` starts a production build).
 - **Plan tasks 1 to 34 and 36 to 43 are done, with their tests, on this branch.** Not done: Task 35 and Task 44 (they need Unity to build and publish
   the template, and a phone), Task 48 (live acceptance, the studio's). So **the published Unity template is still the one from before this slice**:
   a built game cannot play in the live Preview until Task 44 publishes the rebuilt template. The whole-branch review (Task 46) is NOT done; see
@@ -137,7 +136,7 @@ Only the live site, a Unity run and a phone can show these:
    is still open. Deploys can be automated (a Cloud Build trigger on `main` for `blender-worker/`); the studio has not asked for that yet.
 3. **A funded Anthropic key** (a Claude Console workspace with a monthly spend limit): `ANTHROPIC_API_KEY` as a Sensitive Production variable in
    Vercel, then redeploy. Without it the AI half says "did not answer" and nothing is charged; the default models still build.
-4. **Push and merge on the user's word** (`slice-6-built-models` into `main`), then wait for the production build.
+4. **DONE 2026-10-08: pushed and merged into `main`** (with slice 7); the production build is live.
 5. **A phone** on the same Wi-Fi (and an administrator shell for the local server) for the 30 frames per second check.
 
 ## The live checks (plan Task 48)
