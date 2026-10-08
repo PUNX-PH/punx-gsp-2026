@@ -31,7 +31,9 @@ run since Task 32 (no Hub sign-in), the published template is still the one from
 **Slice 7 (the game engine) is built, tested, reviewed and merged into `main` (2026-10-08, `f17b9f0`, deployed):** Describe Game with Make a game writes a whole
 game (a checked, playtested spec in a closed vocabulary) plus Claude-made models; the pre-built Unity player runs it with its own engine (TypeScript and C#
 implementations kept equal by shared fixtures: `unity/tools/engine-check.sh`); a private packager adds a game to a Windows or Android player, and the Preview
-panel has Build for buttons. Unity has not run any of it (no Hub sign-in) and the packager is not deployed (`slice7-handoff.md`).
+panel has Build for buttons. Unity has not run any of it (no Hub sign-in). The packager is deployed (2026-10-08, private Cloud Run, `PACKAGER_URL` and `PACKAGER_KEY` set in Vercel) but holds no players yet (`slice7-handoff.md`).
+
+**Next, designed but not built (specs only, awaiting approval):** slice 8 (`specs/2026-10-08-lua-games-design.md`: Claude writes the game as a Lua script run by a sandboxed interpreter inside the player, 2D or 3D, no limits on the game) and slice 9 (`specs/2026-10-08-art-pipeline-design.md`: budgeted detail per target instead of low-poly, a richer Blender kit, textures, PC and mobile variants, sprites for 2D). The product goal is in the memory note `project-product-goal`: a user prompts an idea and the platform generates the game and its models, for PC or Android.
 
 ## Skills (in `.claude/skills/`; origins in `.claude/skills-sources/SOURCES.md`)
 
@@ -61,7 +63,7 @@ variables and the Anthropic key are set and the Firebase project is back on Blaz
 and `slice5-results.md` (and slice 4's, `slice4-results.md`). Slice 6's code is done and its whole-branch review found nothing Critical or Important;
 what is left is the studio's Unity Hub sign-in (so I can run its Unity tests, rebuild and publish the template and measure), a phone, then the live
 checks and `slice6-results.md`. Slice 7 waits for the same Unity sign-in (engine runs, `.meta` files, the Windows and Android players, the rebuilt template), the
-packager's deployment (`packager/README.md`, then `PACKAGER_URL` and `PACKAGER_KEY` in Vercel), then its live checks and `slice7-results.md`. `main` holds slices 2
+players (built with `tools/build-players.ps1`, uploaded to the packager's bucket with a `players.json`), then its live checks and `slice7-results.md`. `main` holds slices 2
 to 7; the slice branches were deleted after the merge. Ask before any push: pushing `main` starts a production build. Also open: the password
 pre-registration decision (the Email/Password provider is still enabled next to Google), the checks listed as not run in the results notes,
 and slice 1's player-hardening gate before any use beyond punx.ai. Read `docs/superpowers/notes/slice7-handoff.md`, then `slice6-handoff.md`, then
