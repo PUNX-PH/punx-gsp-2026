@@ -29,6 +29,11 @@ with a quality governor) is built and tested on branch `slice-6-built-models`:**
 rest was pushed to the branch only (not merged), and its whole-branch review is not done. Unity could not run since Task 32 (no Hub sign-in), the published template is still the one from 2026-10-02, and
 nothing is run on the live site (`slice6-handoff.md`).
 
+**Slice 7 (the game engine) is built and tested on branch `slice-7-game-engine`, not merged or pushed:** Describe Game with Make a game writes a whole
+game (a checked, playtested spec in a closed vocabulary) plus Claude-made models; the pre-built Unity player runs it with its own engine (TypeScript and C#
+implementations kept equal by shared fixtures: `unity/tools/engine-check.sh`); a private packager adds a game to a Windows or Android player, and the Preview
+panel has Build for buttons. Unity has not run any of it (no Hub sign-in) and the packager is not deployed (`slice7-handoff.md`).
+
 ## Skills (in `.claude/skills/`; origins in `.claude/skills-sources/SOURCES.md`)
 
 | Situation | Use |
@@ -59,7 +64,7 @@ what is left is the studio's Unity Hub sign-in (so I can run its Unity tests, re
 checks and `slice6-results.md`, and a push and merge when the user asks. Ask before any
 push: pushing `main` starts a production build. Also open (none of it blocks slice 7, if there is one): the password
 pre-registration decision (the Email/Password provider is still enabled next to Google), the checks listed as not run in the results notes,
-and slice 1's player-hardening gate before any use beyond punx.ai. Read `docs/superpowers/notes/slice6-handoff.md`, then
+and slice 1's player-hardening gate before any use beyond punx.ai. Read `docs/superpowers/notes/slice7-handoff.md`, then `slice6-handoff.md`, then
 `slice5-handoff.md` and `slice4-handoff.md` first, then `slice2-results.md` (it also has what went wrong deploying to
 Vercel and how it was fixed), `slice3a-results.md`, `slice3b-results.md` and the handoffs (`slice2-handoff.md`, `slice3a-handoff.md`,
 `slice3b-handoff.md`, `2026-10-02-slice1-handoff.md`) before doing anything else.

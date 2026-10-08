@@ -26,6 +26,7 @@ export const BAD_CASES: { name: string; text: () => string }[] = [
   { name: "huge width", text: () => { const s = runner(); s.world.width = 1e9; return JSON.stringify(s); } },
   { name: "prototype key as entity name", text: () => JSON.stringify(runner()).replace('"coin":{', '"__proto__":{').replace('"coin"', '"__proto__"') },
   { name: "over 64 KiB", text: () => { const s = runner(); s.padding = "x".repeat(70000); return JSON.stringify(s); } },
+  { name: "entity names that differ only by capitals", text: () => { const s = runner(); s.entities.aB = { ...s.entities.spike }; s.entities.ab = { ...s.entities.spike }; return JSON.stringify(s); } },
   { name: "spawner of a spawner", text: () => { const s = runner(); s.entities.spikes.behaviors[0].entity = "coins"; return JSON.stringify(s); } },
   { name: "size zero without spawn", text: () => { const s = runner(); s.entities.spike.w = 0; return JSON.stringify(s); } },
   { name: "bad palette", text: () => { const s = runner(); s.look.palette = ["red"]; return JSON.stringify(s); } },

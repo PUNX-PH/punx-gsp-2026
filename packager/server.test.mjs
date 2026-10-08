@@ -35,7 +35,7 @@ before(async () => {
   const signer = path.join(dir, "fake-apksigner.mjs");
   await writeFile(signer, fake(fakeLog, path.join(dir, "fail")));
   const windows = rebuildZip(emptyZip(), { add: [{ name: "Runner.exe", data: Buffer.from("MZ") }, { name: "Runner_Data/app.info", data: Buffer.from("info") }] });
-  const android = rebuildZip(emptyZip(), { add: [{ name: "AndroidManifest.xml", data: Buffer.from("m") }, { name: "META-INF/CERT.RSA", data: Buffer.from("old") }, { name: "META-INF/MANIFEST.MF", data: Buffer.from("old") }] });
+  const android = rebuildZip(emptyZip(), { add: [{ name: "AndroidManifest.xml", data: Buffer.from("m") }, { name: "META-INF/CERT.RSA", data: Buffer.from("old") }, { name: "META-INF/MANIFEST.MF", data: Buffer.from("old") }, { name: "META-INF/services/lib.Thing", data: Buffer.from("keep") }, { name: "META-INF/lib.version", data: Buffer.from("1") }] });
   await writeFile(path.join(dir, "windows.zip"), windows);
   await writeFile(path.join(dir, "android.apk"), android);
   await writeFile(path.join(dir, "players.json"), JSON.stringify({ windows: { file: "windows.zip", gamePath: "Runner_Data/StreamingAssets/game/" }, android: { file: "android.apk", gamePath: "assets/game/" } }));
@@ -63,13 +63,13 @@ test("windows: the player's zip with the game's files under its StreamingAssets/
   assert.equal(readStored(zip, "Runner_Data/StreamingAssets/game/settings.json").toString(), '{"schemaVersion":1}');
 });
 
-test("android: the old signature is removed, the game goes under assets/game, and apksigner signs with the studio's key from the environment", async () => {
+test("android: the old signature files are removed (the rest of META-INF stays), the game goes under assets/game, and apksigner signs with the studio's key from the environment", async () => {
   const res = await post("android", ok);
   assert.equal(res.status, 200);
   assert.equal(res.headers.get("content-type"), "application/vnd.android.package-archive");
   assert.equal(res.headers.get("x-file-name"), "game-android.apk");
   const apk = Buffer.from(await res.arrayBuffer());
-  assert.deepEqual(listZip(apk).entries.map((e) => e.name), ["AndroidManifest.xml", "assets/game/settings.json", "assets/game/entity-hero.glb"]);
+  assert.deepEqual(listZip(apk).entries.map((e) => e.name), ["AndroidManifest.xml", "META-INF/services/lib.Thing", "META-INF/lib.version", "assets/game/settings.json", "assets/game/entity-hero.glb"]);
   const call = JSON.parse(await readFile(fakeLog, "utf8"));
   assert.equal(call.ks, "/secrets/studio.keystore");
   assert.equal(call.pass, "s3cret-pass");

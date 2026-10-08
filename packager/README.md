@@ -10,7 +10,7 @@ GET  /health
 ```
 
 Windows: the zip of the player with the files under the player's `gamePath` (for example `Runner_Data/StreamingAssets/game/`). Android: the same under
-`assets/game/` inside the APK, the old signature (`META-INF/`) removed, and a new one made by `apksigner` with the studio's key. A good answer is 200 with
+`assets/game/` inside the APK, the old signature files (`META-INF/MANIFEST.MF`, `*.SF`, `*.RSA`, `*.DSA`, `*.EC`) removed, and a new one made by `apksigner` with the studio's key. A good answer is 200 with
 the file; a failure is a status and `{"code": ...}`: 400 bad request, 413 too big, 422 bad files, 503 not set up (no player, or no key), 500 failed.
 Nothing a tool said is sent or logged. The body is checked again here (names, sizes, GLB headers, settings.json as JSON).
 
@@ -29,7 +29,7 @@ Nothing a tool said is sent or logged. The body is checked again here (names, si
 4. **Deploy** from Cloud Shell, private like the Blender worker (the website's invoker account calls it):
    ```
    gcloud run deploy packager --source packager --region us-east1 --no-allow-unauthenticated --service-account <invoker-runner account> \
-     --memory 1Gi --max-instances 2 --concurrency 4 --timeout 120 \
+     --memory 1Gi --max-instances 2 --concurrency 2 --timeout 120 \
      --add-volume name=players,type=cloud-storage,bucket=<players bucket> --add-volume-mount volume=players,mount-path=/players \
      --set-secrets /secrets/studio.keystore=<keystore secret>:latest,KEYSTORE_PASS=<password secret>:latest --set-env-vars KEYSTORE_PATH=/secrets/studio.keystore
    ```

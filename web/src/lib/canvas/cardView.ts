@@ -106,7 +106,10 @@ function described(result: unknown): ResultView | null {
   const g = result as { game?: unknown; entities?: unknown; rules?: unknown; leftOut?: unknown; reused?: unknown } | null | undefined;
   if (typeof g === "object" && g !== null && g.game === true && isNumber(g.entities) && isNumber(g.rules)) {
     const left = typeof g.leftOut === "string" && g.leftOut !== "" ? ` Left out: ${g.leftOut}` : "";
-    return { kind: "text", text: `A game with ${g.entities} things and ${g.rules} rules.${left}${g.reused === true ? " Reused your earlier result." : ""}` };
+    const plain = (g as { plainShapes?: unknown }).plainShapes;
+    const shapes = Array.isArray(plain) ? plain.flatMap((p) => (typeof p === "object" && p !== null && typeof (p as { entity?: unknown }).entity === "string" ? [(p as { entity: string }).entity] : [])) : [];
+    const drawn = shapes.length > 0 ? ` Drawn as plain shapes for now: ${shapes.join(", ")}. Press Play again to try building them.` : "";
+    return { kind: "text", text: `A game with ${g.entities} things and ${g.rules} rules.${left}${drawn}${g.reused === true ? " Reused your earlier result." : ""}` };
   }
   const r = result as { palette?: unknown; tuning?: Partial<Record<keyof Tuning, unknown>>; summary?: unknown; reused?: unknown } | null | undefined;
   if (typeof r !== "object" || r === null) return null;

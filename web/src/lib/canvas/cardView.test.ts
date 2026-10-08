@@ -245,6 +245,8 @@ describe("a Describe Game step", () => {
       kind: "text",
       text: "A game with 5 things and 2 rules. Left out: no 3D worlds Reused your earlier result.",
     });
+    const shapes = step("n2", { graph: described(), run: runWith({ state: "done", result: { ...result, leftOut: "", reused: false, plainShapes: [{ entity: "hero", message: "x" }, { entity: "coin", message: "y" }] } }) }).result;
+    expect(shapes).toEqual({ kind: "text", text: "A game with 5 things and 2 rules. Drawn as plain shapes for now: hero, coin. Press Play again to try building them." });
     const plain = step("n2", { graph: described(), run: runWith({ state: "done", result: { ...result, leftOut: "", reused: false } }) }).result;
     expect(plain).toEqual({ kind: "text", text: "A game with 5 things and 2 rules." });
   });

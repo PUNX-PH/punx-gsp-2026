@@ -9,10 +9,10 @@ import { aiConfigFromEnv, logOutcome } from "@/lib/ai/server";
 import { FirestoreRecipeCache } from "@/lib/builder/firebase";
 import type { RecipeCache } from "@/lib/builder/ports";
 import { makeClaudeGameAuthor, type GameAuthor } from "./author";
-import { makeGameService, type GameService, type StoredGame } from "./service";
+import { makeGameService, type CachedGame, type GameService } from "./service";
 
 /** The service Play uses. The stores can be handed in for a test; in production they are Firestore's. */
-export function getGameService(stores: { cache?: RecipeCache<StoredGame>; limits?: UsageLimits } = {}): GameService {
+export function getGameService(stores: { cache?: RecipeCache<CachedGame>; limits?: UsageLimits } = {}): GameService {
   const config = aiConfigFromEnv(process.env);
   // The Claude client, which needs the key, is only made when Claude has to be asked (a cache hit never needs it). A missing key is the same
   // "did not answer" as any other failure to reach Claude, and gives the person's AI count back.
@@ -21,7 +21,7 @@ export function getGameService(stores: { cache?: RecipeCache<StoredGame>; limits
   };
   return makeGameService({
     author,
-    cache: stores.cache ?? new FirestoreRecipeCache<StoredGame>("gameSpecs"),
+    cache: stores.cache ?? new FirestoreRecipeCache<CachedGame>("gameSpecs"),
     limits: stores.limits ?? new FirestoreUsageLimits(),
     modelId: config.modelId,
     perPerson: config.perPerson,

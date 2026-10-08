@@ -24,6 +24,8 @@ const MAX_SETTINGS_BYTES = 128 * 1024;
 const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}\.(json|glb)$/;
 const SIGN_LIMIT_MS = 60_000;
 const PLATFORMS = ["windows", "android"];
+// What a signature is made of; the rest of META-INF (service files, version files) is the player's and stays.
+const SIGNATURE_FILE = /^META-INF\/(MANIFEST\.MF|[^/]+\.(SF|RSA|DSA|EC))$/i;
 
 class Refusal extends Error {
   constructor(status, code) {
@@ -161,7 +163,7 @@ export function createPackager(options) {
       if (android && !options.keystorePath) throw new Refusal(503, "not-set-up");
 
       const packed = rebuildZip(player.bytes, {
-        drop: (name) => android && name.startsWith("META-INF/"),
+        drop: (name) => android && SIGNATURE_FILE.test(name),
         add: files.map((f) => ({ name: player.gamePath + f.name, data: f.data })),
       });
 

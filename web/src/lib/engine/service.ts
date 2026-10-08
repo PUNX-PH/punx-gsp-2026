@@ -36,9 +36,20 @@ export interface StoredGame {
   notes: string[];
 }
 
+/**
+ * What the cache holds. The spec is kept as text: a store such as Firestore may hand a map's keys back sorted, and the order of the entities decides
+ * which events and collisions come first in the engine, so a cached game must be exactly the one that was playtested.
+ */
+export interface CachedGame {
+  spec: string;
+  leftOut: string;
+  assets: AssetRequest[];
+  notes: string[];
+}
+
 export interface GameDeps {
   author: GameAuthor;
-  cache: RecipeCache<StoredGame>;
+  cache: RecipeCache<CachedGame>;
   limits: UsageLimits;
   /** Claude's model name: part of every cache key and stored with every answer. */
   modelId: string;
@@ -105,6 +116,16 @@ function bindModels(spec: GameSpec, assets: AssetRequest[], wired: string[]): Ga
   return { ...spec, entities };
 }
 
+/** A stored game back as a checked one, or null when what the cache holds is not one (it is then asked again). */
+function readCached(value: CachedGame): StoredGame | null {
+  try {
+    const checked = checkSpec(JSON.parse(value.spec));
+    return checked.ok ? { spec: checked.spec, leftOut: value.leftOut, assets: value.assets, notes: value.notes } : null;
+  } catch {
+    return null;
+  }
+}
+
 export function makeGameService(deps: GameDeps): GameService {
   const log = deps.log ?? (() => {});
   const problem = (message: string) => new NodeError(`${LABEL}: ${message}`);
@@ -158,9 +179,10 @@ export function makeGameService(deps: GameDeps): GameService {
 
       const key = await gameKey({ model: deps.modelId, uid: job.user.uid, description, pictureSha: input.picture?.sha256 ?? null, models: input.models });
       const found = await deps.cache.get(key);
-      if (found) {
+      const cached = found ? readCached(found.value) : null;
+      if (cached) {
         log({ step: "describe-game", call: "game", outcome: "reused" });
-        return { ...found.value, asked: false };
+        return { ...cached, asked: false };
       }
 
       const author = (retryReason?: string) => (timeoutMs: number) =>
@@ -186,7 +208,7 @@ export function makeGameService(deps: GameDeps): GameService {
         }
       }
 
-      await deps.cache.put(key, { value: result.game, model: deps.modelId, createdAt: deps.now(), inputTokens: usage.inputTokens, outputTokens: usage.outputTokens });
+      await deps.cache.put(key, { value: { ...result.game, spec: JSON.stringify(result.game.spec) }, model: deps.modelId, createdAt: deps.now(), inputTokens: usage.inputTokens, outputTokens: usage.outputTokens });
       log({ step: "describe-game", call: "game", outcome: "asked", ...usage });
       return { ...result.game, asked: true };
     },

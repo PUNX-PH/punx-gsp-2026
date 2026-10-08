@@ -28,6 +28,8 @@ const publicGraph = (r: GraphRecord) => ({
   assets: r.assets,
   lastRunId: r.lastRunId,
 });
+const DOWNLOAD_PIECE = 64 * 1024;
+
 const summary = (r: GraphRecord) => ({ id: r.id, name: r.name, createdAt: r.createdAt, updatedAt: r.updatedAt, lastRunId: r.lastRunId });
 
 type Body = { ok: true; value: unknown } | { ok: false; response: Response };
@@ -122,7 +124,17 @@ export function makeGraphApi({ auth, graphs, domain }: GraphApiDeps) {
         const platform = new URL(req.url).searchParams.get("platform");
         if (!(PLATFORMS as readonly string[]).includes(platform ?? "")) return json(400, { error: "platform must be windows or android." });
         const packed = await graphs.exportGame(user, id, platform as Platform);
-        return new Response(packed.bytes as BodyInit, {
+        // Sent as a stream in pieces: a player is tens of megabytes, and a response held whole is capped at 4.5 MB on Vercel.
+        const bytes = packed.bytes;
+        let offset = 0;
+        const body = new ReadableStream<Uint8Array>({
+          pull(controller) {
+            if (offset >= bytes.length) return controller.close();
+            controller.enqueue(bytes.subarray(offset, offset + DOWNLOAD_PIECE));
+            offset += DOWNLOAD_PIECE;
+          },
+        });
+        return new Response(body, {
           status: 200,
           headers: { "Content-Type": packed.contentType, "Content-Disposition": `attachment; filename="${packed.fileName}"`, "X-Content-Type-Options": "nosniff", "Cache-Control": "no-store" },
         });

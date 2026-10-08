@@ -132,6 +132,13 @@ function checkAll(input: unknown): GameSpec {
   for (const [name, v] of Object.entries(counters)) whole(v, -COUNTER_LIMIT, COUNTER_LIMIT, `counters.${name}`);
 
   const entities = checkMap(input.entities, "entities", ENGINE_CAPS.entities, "entities");
+  // An entity's file is entity-NAME.glb, and file names that differ only by capitals are one file on Windows.
+  const lowered = new Map<string, string>();
+  for (const name of Object.keys(entities)) {
+    const other = lowered.get(name.toLowerCase());
+    if (other !== undefined) refuse("entities", `"${other}" and "${name}" differ only by capital letters`);
+    lowered.set(name.toLowerCase(), name);
+  }
   const refs: Refs = { entities: [], counters: [] };
   for (const [name, e] of Object.entries(entities)) checkEntity(e, `entities.${name}`, refs);
   const heroes = Object.values(entities).filter((e) => isObject(e) && e.role === "hero").length;

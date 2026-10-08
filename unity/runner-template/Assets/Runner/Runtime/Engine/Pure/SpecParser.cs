@@ -251,6 +251,13 @@ namespace Runner.Engine
             foreach (var name in counters.Keys) spec.Counters.Add(new KeyValuePair<string, long>(name, Whole(counters.Get(name), -EngineVocab.CounterLimit, EngineVocab.CounterLimit, "counters." + name)));
 
             var entities = CheckMap(top.Get("entities"), "entities", EngineVocab.Entities, "entities");
+            var lowered = new Dictionary<string, string>();
+            foreach (var name in entities.Keys)
+            {
+                var key = name.ToLowerInvariant();
+                if (lowered.TryGetValue(key, out var other)) throw Refuse("entities", "\"" + other + "\" and \"" + name + "\" differ only by capital letters");
+                lowered[key] = name;
+            }
             var refs = new Refs();
             foreach (var name in entities.Keys) CheckEntity(entities.Get(name), "entities." + name, refs);
             var heroes = 0;

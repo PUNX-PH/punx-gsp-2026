@@ -9,7 +9,7 @@ import { NodeError } from "@/lib/graph/types";
 import type { GameAuthor } from "./author";
 import { checkSpec } from "./check";
 import { gameKey } from "./keys";
-import { makeGameService, type StoredGame } from "./service";
+import { type CachedGame, makeGameService } from "./service";
 
 // The tests edit a parsed fixture freely, so it is deliberately untyped.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,7 +48,7 @@ const input = { description: "a fox that jumps over logs", picture: null, models
 
 function make(steps: Step[], over: { perPerson?: number; total?: number; reverseKeys?: boolean } = {}) {
   const author = new ScriptedAuthor(steps);
-  const cache = new MemoryRecipeCache<StoredGame>({ reverseKeys: over.reverseKeys });
+  const cache = new MemoryRecipeCache<CachedGame>({ reverseKeys: over.reverseKeys });
   const limits = new MemoryUsageLimits();
   const logs: object[] = [];
   const service = makeGameService({ author, cache, limits, modelId: "claude-test", perPerson: over.perPerson ?? 30, total: over.total ?? 300, now: () => NOW, log: (i) => logs.push(i) });
@@ -91,6 +91,24 @@ describe("the game service", () => {
     expect(again.asked).toBe(false);
     expect(author.calls).toHaveLength(1);
     expect(used(limits)).toBe(1);
+  });
+
+  it("gives back, from the cache, the very game that was made: the entities in the same order, whatever order the store keeps", async () => {
+    const { service } = make([answer(fixture("runner"))], { reverseKeys: true });
+    const first = await service.create(job, input);
+    const again = await service.create(job, input);
+    expect(again.asked).toBe(false);
+    expect(Object.keys(again.spec.entities)).toEqual(Object.keys(first.spec.entities));
+    expect(again.spec).toEqual(first.spec);
+  });
+
+  it("asks again when what the cache holds is not a game", async () => {
+    const { service, cache, author } = make([answer(fixture("runner")), answer(fixture("runner"))]);
+    await service.create(job, input);
+    for (const [key, entry] of cache.entries) cache.entries.set(key, { ...entry, value: { ...entry.value, spec: "{not json" } });
+    const again = await service.create(job, input);
+    expect(again.asked).toBe(true);
+    expect(author.calls).toHaveLength(2);
   });
 
   it("keeps assets that name a real entity, drops the rest, caps them, and gives their entities a model name", async () => {

@@ -96,6 +96,16 @@ describe("repairSpec", () => {
     expect(checkSpec(r.spec).ok).toBe(true);
   });
 
+  it("drops an entity whose name is another's apart from capital letters, so no two files collide", () => {
+    const raw = asClaudeWrites(load("runner"));
+    raw.entities.push({ ...raw.entities[1], name: "aB" }, { ...raw.entities[1], name: "ab" });
+    const r = repairSpec(raw)!;
+    expect(Object.keys(r.spec.entities)).toContain("aB");
+    expect(Object.keys(r.spec.entities)).not.toContain("ab");
+    expect(r.notes.join(" ")).toMatch(/capital letters/);
+    expect(checkSpec(r.spec).ok).toBe(true);
+  });
+
   it("gives null when nothing usable is left", () => {
     expect(repairSpec(null)).toBeNull();
     expect(repairSpec("a game")).toBeNull();

@@ -91,6 +91,10 @@ export function repairSpec(raw: unknown): { spec: GameSpec; notes: string[] } | 
     delete rest.name;
     return rest;
   })) {
+    if (Object.keys(entities).some((kept) => kept.toLowerCase() === name.toLowerCase())) {
+      fx.notes.push(`entities: dropped "${name}" (the same name as another, apart from capital letters)`);
+      continue;
+    }
     if (!NAME.test(name) || !isObject(value)) {
       fx.notes.push(`entities: dropped "${name}" (not a valid entity)`);
       continue;

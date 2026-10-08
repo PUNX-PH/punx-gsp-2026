@@ -43,7 +43,8 @@ namespace Runner.Engine
         {
             if (!MiniJson.TryParse(settingsJson, out var root, out _) || !(root is JsonObject top) || !top.Has("game")) return new GameRead();
             var read = new GameRead { Present = true };
-            if (SpecParser.TryParseValue(top.Get("game"), settingsJson.Length, out read.Spec, out read.Error)) read.Error = null;
+            // The 64 KiB limit is on the game alone and the website has checked it; the settings file around it is not measured here.
+            if (SpecParser.TryParseValue(top.Get("game"), 0, out read.Spec, out read.Error)) read.Error = null;
             return read;
         }
 
