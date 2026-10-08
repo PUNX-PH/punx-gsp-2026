@@ -7,6 +7,7 @@ import type { BlenderService } from "@/lib/blender/types";
 import { makeBuilderService } from "@/lib/builder/service";
 import type { BuilderService } from "@/lib/builder/types";
 import type { GameService } from "@/lib/engine/service";
+import { ExportError, type ExportService, type PackedGame, type Platform, PLATFORM_NAMES } from "@/lib/export/types";
 import type { User } from "@/lib/auth/ports";
 import { checkGlb } from "@/lib/glb";
 import { checkGraph } from "@/lib/graph/checks";
@@ -57,6 +58,8 @@ export interface GraphService {
   readAsset(user: User, id: string, sha256: string): Promise<{ bytes: Uint8Array; contentType: string }>;
   /** Checks the SAVED graph, runs it, and keeps the graph's one run. */
   play(user: User, id: string): Promise<PlayResult>;
+  /** Packs the graph's last game (made with Describe Game) for a computer or a phone. */
+  exportGame(user: User, id: string, platform: Platform): Promise<PackedGame>;
 }
 
 export interface GraphServiceDeps {
@@ -74,6 +77,8 @@ export interface GraphServiceDeps {
   builder?: BuilderService;
   /** Describe Game with Make a game on. Without one that step says it is not set up. */
   games?: GameService;
+  /** The download of a finished game. Without one, asking for it says it is not set up. */
+  exporter?: ExportService;
 }
 
 // What Describe Game gets when no AI service is wired (a deployment without the key): the step fails in plain words, nothing else does.
@@ -263,6 +268,18 @@ export function makeGraphService(deps: GraphServiceDeps): GraphService {
       const bytes = await files.get(id, sha256);
       if (!bytes) throw notFound();
       return { bytes, contentType: record.assets[sha256].contentType };
+    },
+
+    async exportGame(user, id, platform) {
+      const record = await ownedGraph(user, id);
+      if (!record.lastRunId) throw new GraphError(409, "There is no game to build yet. Press Play first.");
+      if (!deps.exporter) throw new GraphError(503, `Building for ${PLATFORM_NAMES[platform]} is not set up on this site yet.`);
+      try {
+        return await deps.exporter.exportGame(user, record.lastRunId, platform);
+      } catch (error) {
+        if (error instanceof ExportError) throw new GraphError(error.status === 404 ? 409 : error.status, error.message);
+        throw error;
+      }
     },
 
     async play(user, id) {

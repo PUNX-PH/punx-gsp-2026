@@ -231,6 +231,12 @@ namespace Runner.View
             {
 #if UNITY_EDITOR
                 url = new Uri(Path.Combine(Application.streamingAssetsPath, "sample", "settings.json")).AbsoluteUri;
+#elif UNITY_ANDROID
+                // A game packed into the APK by the packager: its files are in assets/game, which StreamingAssets reaches as a jar: address.
+                url = Application.streamingAssetsPath + "/game/settings.json";
+#elif UNITY_STANDALONE
+                // A game packed next to the Windows player by the packager: <Name>_Data/StreamingAssets/game.
+                url = new Uri(Path.Combine(Application.streamingAssetsPath, "game", "settings.json")).AbsoluteUri;
 #else
                 throw new LoadException("No game settings were given. Open this page with ?settings=<url>");
 #endif

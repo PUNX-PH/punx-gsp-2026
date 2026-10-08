@@ -87,7 +87,7 @@ export interface Problem {
 /** A failure with a status and a message that is safe to show the person. */
 export class GraphError extends Error {
   constructor(
-    readonly status: 400 | 404 | 409,
+    readonly status: 400 | 404 | 409 | 429 | 503,
     message: string,
   ) {
     super(message);

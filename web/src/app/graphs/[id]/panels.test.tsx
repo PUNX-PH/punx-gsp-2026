@@ -147,6 +147,16 @@ describe("AddMenu", () => {
   });
 });
 
+describe("SettingsPanel for the Preview", () => {
+  it("offers a download for a computer and for an Android phone, and says when it works", () => {
+    const html = panel(starterGraph().nodes.find((n) => n.type === "preview")!.id);
+    expect(html).toContain("Build for");
+    expect(html).toContain("A computer (Windows)");
+    expect(html).toContain("An Android phone");
+    expect(html).toContain("Works for a game made with Describe Game");
+  });
+});
+
 describe("SettingsPanel for Describe Game and a locked Game Template", () => {
   const node = (id: string, type: string, params: Record<string, unknown>) => ({ id, type, params, position: { x: 0, y: 0 } });
   const described = (prompt: string): Graph => ({

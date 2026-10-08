@@ -4,6 +4,7 @@
 import { json, makeGuard } from "@/lib/api/guard";
 import type { AuthPort } from "@/lib/auth/ports";
 import { readBodyCapped, TooLargeError } from "@/lib/body";
+import { type Platform, PLATFORMS } from "@/lib/export/types";
 import type { GraphService } from "@/lib/graph/service";
 import { GraphError, type GraphRecord } from "@/lib/graph/types";
 
@@ -113,6 +114,17 @@ export function makeGraphApi({ auth, graphs, domain }: GraphApiDeps) {
         return new Response(bytes as BodyInit, {
           status: 200,
           headers: { "Content-Type": contentType, "X-Content-Type-Options": "nosniff", "Cache-Control": "private" },
+        });
+      }),
+
+    exportGame: (req: Request, id: string) =>
+      guarded(req, "exportGame", { changes: true, id }, async (user) => {
+        const platform = new URL(req.url).searchParams.get("platform");
+        if (!(PLATFORMS as readonly string[]).includes(platform ?? "")) return json(400, { error: "platform must be windows or android." });
+        const packed = await graphs.exportGame(user, id, platform as Platform);
+        return new Response(packed.bytes as BodyInit, {
+          status: 200,
+          headers: { "Content-Type": packed.contentType, "Content-Disposition": `attachment; filename="${packed.fileName}"`, "X-Content-Type-Options": "nosniff", "Cache-Control": "no-store" },
         });
       }),
 

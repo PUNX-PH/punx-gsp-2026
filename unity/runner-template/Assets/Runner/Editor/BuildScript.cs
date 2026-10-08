@@ -52,7 +52,19 @@ namespace Runner.EditorTools
                 throw new Exception("A build is over the " + BudgetBytes + " byte budget; see Builds/size-report.json");
         }
 
+        /// <summary>What a Windows or Android player needs before it is built (BuildPlayers): the bootstrap scene and the shaders. The player reads its game from StreamingAssets/game.</summary>
+        internal static void PreparePlayer()
+        {
+            EnsureScene();
+            EnsureShadersIncluded("Runner/Flat", "Runner/Lit", "Runner/Sky", "Runner/BlobShadow");
+            PlayerSettings.SplashScreen.show = false;
+        }
+
+        internal const string PlayerScenePath = ScenePath;
+
         // Application.dataPath is <repo>/unity/runner-template/Assets
+        internal static string PlayersRoot() => BuildsRoot();
+
         static string BuildsRoot() => Path.GetFullPath(Path.Combine(Application.dataPath, "../../../Builds"));
 
         static void Configure()

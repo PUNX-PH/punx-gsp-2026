@@ -3,6 +3,7 @@
 // The settings of the selected step, in plain words: a file picker for the steps that take a file, three sliders for the
 // Game Template (with a live line when the combination cannot be played), and a short explanation for the others.
 import { useId, useState } from "react";
+import type { Platform } from "@/lib/export/types";
 import { cx } from "@/app/graphs/[id]/cx";
 import styles from "@/app/graphs/[id]/editor.module.css";
 import { Icon } from "@/app/graphs/[id]/icons";
@@ -353,7 +354,49 @@ function TuningSliders({ node, data, onTune }: { node: GraphNode; data: StepData
   );
 }
 
-export function SettingsPanel({ node, data, uploading, error, onChooseFile, onTune, onPrompt, onSettings }: SettingsPanelProps) {
+// Build for a computer or a phone: the last game made with Describe Game, packed into a prebuilt player and downloaded. The site says what is wrong in
+// plain words (no game yet, not a Describe Game game, not set up, today's downloads used up).
+function ExportButtons({ graphId }: { graphId: string }) {
+  const [busy, setBusy] = useState<Platform | null>(null);
+  const [message, setMessage] = useState("");
+  async function download(platform: Platform) {
+    setBusy(platform);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/graphs/${encodeURIComponent(graphId)}/export?platform=${platform}`, { method: "POST" });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
+        setMessage(typeof body?.error === "string" ? body.error : "Something went wrong on our side");
+        return;
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = platform === "windows" ? "game-windows.zip" : "game-android.apk";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setMessage("The download did not work. Check your connection and try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
+  return (
+    <div className={styles.field}>
+      <span className={styles.fieldLabel}>Build for</span>
+      <button type="button" className={styles.choice} disabled={busy !== null} onClick={() => void download("windows")}>
+        {busy === "windows" ? "Building..." : "A computer (Windows)"}
+      </button>{" "}
+      <button type="button" className={styles.choice} disabled={busy !== null} onClick={() => void download("android")}>
+        {busy === "android" ? "Building..." : "An Android phone"}
+      </button>
+      <p className={styles.hint}>Works for a game made with Describe Game, after you press Play.</p>
+      {message !== "" && <p role="alert" className={styles.errorText}>{message}</p>}
+    </div>
+  );
+}
+
+export function SettingsPanel({ node, data, uploading, error, onChooseFile, onTune, onPrompt, onSettings, graphId }: SettingsPanelProps) {
   if (!node || !data) {
     return (
       <div className={styles.panel}>
@@ -429,7 +472,12 @@ export function SettingsPanel({ node, data, uploading, error, onChooseFile, onTu
           ))}
         </ul>
       )}
-      {node.type === "preview" && <p className={styles.hint}>Press Play to make the game, then play it in the Game tab.</p>}
+      {node.type === "preview" && (
+        <>
+          <p className={styles.hint}>Press Play to make the game, then play it in the Game tab.</p>
+          <ExportButtons graphId={graphId} />
+        </>
+      )}
     </div>
   );
 }
