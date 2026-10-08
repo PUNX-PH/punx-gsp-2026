@@ -5,8 +5,8 @@ Status: draft for review (2026-10-08). Adds a second way for Describe Game to ma
 ## Purpose
 
 A creator describes **any** game in words, with pictures, and gets that game. The fixed vocabulary of slice 7's rules engine will always have limits; here Claude writes the game's logic as a script,
-so a platformer, a shooter, a puzzle or something nobody has named is limited only by the game API below. Success: five games a creator would call unlike each other (for example a lane runner, a
-top-down shooter with several enemy kinds, a platformer with moving platforms, a bouncing-ball breaker, a timing game with a health bar), each described in words, play correctly in the published
+so a platformer, a shooter, a puzzle or something nobody has named is limited only by the game API below. The game may be **2D or 3D** (Claude chooses from the description) and the project builds for **PC or Android**. Success: five games a creator would call unlike each other (for example a 3D lane runner, a
+2D top-down shooter with several enemy kinds, a 2D platformer with moving platforms, a 3D bouncing-ball breaker, a timing game with a health bar), each described in words, play correctly in the published
 player with **no new Unity build**, and the same files make a Windows zip and an Android APK.
 
 ## Constraints (carried over)
@@ -30,8 +30,8 @@ Globals (units are whole game units, y up, z away from the screen):
 | Table | What it offers |
 |---|---|
 | `game` | `game.win(message)`, `game.lose(message)`, `game.score`, `game.lives` (read and write numbers), `game.time` (seconds played), `game.width`, `game.height`, `game.over` |
-| `world` | `world.spawn(kind, props)` returns an object; `world.find(tag)`, `world.count(tag)`, `world.clear()`, `world.gravity(g)`, `world.bounds(w, h)`, `world.camera{ mode = "side"\|"top"\|"chase"\|"fixed", follow = obj, x, y, z, zoom }` |
-| objects | fields `x y z vx vy vz w h d tag alive color data` (`data` is the script's own table); methods `obj:destroy()`, `obj:set_color(c)`, `obj:play(animation)`, `obj:distance(other)`. `kind` is a model name from the game's assets or a primitive (`box sphere capsule cylinder cone plane`). Props: position, size, color (palette slot 1 to 5 or `#rrggbb`), velocity, `gravity`, `solid`, `tag`, `life` (seconds), `spin` (degrees a second) |
+| `world` | `world.spawn(kind, props)` returns an object; `world.find(tag)`, `world.count(tag)`, `world.clear()`, `world.gravity(g)`, `world.bounds(w, h)`, `world.camera{ mode = "side"\|"top"\|"chase"\|"fixed"\|"side2d"\|"top2d", follow = obj, x, y, z, zoom }` (the `2d` modes are orthographic and draw sprites) |
+| objects | fields `x y z vx vy vz w h d tag alive color data` (`data` is the script's own table); methods `obj:destroy()`, `obj:set_color(c)`, `obj:play(animation)`, `obj:distance(other)`. `kind` is a model or sprite name from the game's assets or a primitive (`box sphere capsule cylinder cone plane`, and `quad` for a flat colored rectangle). In a `2d` camera an object that has a sprite sheet draws it, and `obj:play(animation)` plays its frames. Props: position, size, color (palette slot 1 to 5 or `#rrggbb`), velocity, `gravity`, `solid`, `tag`, `life` (seconds), `spin` (degrees a second) |
 | `input` | `input.x`, `input.y` (pointer in field units), `input.down`, `input.dx`, `input.dy` |
 | `ui` | `ui.text(id, string, { x, y, size, color, align })`, `ui.bar(id, value, max, { x, y, w, h, color })`, `ui.clear(id)` |
 | `timer` | `timer.after(seconds, fn)`, `timer.every(seconds, fn)` return an id; `timer.cancel(id)` |
@@ -40,6 +40,12 @@ Globals (units are whole game units, y up, z away from the screen):
 Collisions and gravity are the player's own light implementation (boxes and circles, no Unity physics module). `on_collide` is raised for pairs of `solid` objects that overlap.
 
 **Not available:** `os`, `io`, `debug`, `require`, `load`, `loadstring`, `dofile`, `collectgarbage`, `coroutine`, `setmetatable` on globals, anything not listed. MoonSharp's hard sandbox preset is the base; the host removes the rest.
+
+## 2D and 3D, and the two targets
+
+The camera decides the look: the 3D modes draw models, the `2d` modes draw sprites (slice 9 renders them from the same Blender models, so a 2D game and a 3D game look related). A script may switch camera mode when the game does (a 2D menu, a 3D level). The game logic is the same either way: `x` and `y` are the field plane, `z` is depth and is ignored by the `2d` modes.
+
+The player builds for **WebGL (Preview), Windows (PC) and Android**. Detail budgets per target, and which asset variant each build carries, are slice 9's (`2026-10-08-art-pipeline-design.md`); this slice only has the player choose the variant by platform and read the budgets the settings file states.
 
 ## Limits (enforced by the player)
 
