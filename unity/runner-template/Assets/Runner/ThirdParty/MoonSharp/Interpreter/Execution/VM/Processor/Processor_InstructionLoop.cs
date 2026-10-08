@@ -13,6 +13,9 @@ namespace MoonSharp.Interpreter.Execution.VM
 
 		internal long AutoYieldCounter = 0;
 
+		/// <summary>slice 8: the longest string a concatenation may make.</summary>
+		internal const int MaxStringLength = 10000;
+
 		private DynValue Processing_Loop(int instructionPtr)
 		{
 			// This is the main loop of the processor, has a weird control flow and needs to be as fast as possible.
@@ -1162,6 +1165,7 @@ namespace MoonSharp.Interpreter.Execution.VM
 
 			if (rs != null && ls != null)
 			{
+				if (ls.Length + rs.Length > MaxStringLength) throw new ScriptRuntimeException("string too long (over " + MaxStringLength + " characters)"); // slice 8: no memory bomb by doubling a string
 				m_ValueStack.Push(DynValue.NewString(ls + rs));
 				return instructionPtr;
 			}

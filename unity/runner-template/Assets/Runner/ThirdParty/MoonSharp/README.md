@@ -11,3 +11,4 @@ The Lua interpreter that runs a generated game's script inside the Unity player 
 
 - `Interpreter/Platforms/PlatformAutoDetector.cs`: `GetDefaultScriptLoader` returns `InvalidScriptLoader` on Unity instead of `UnityAssetsScriptLoader` (not vendored: it reads Unity assets, and the sandbox must load no files).
 - `Interpreter/Loaders/UnityAssetsScriptLoader.cs` is not included.
+- `Interpreter/Execution/VM/Processor/Processor_InstructionLoop.cs`: `ExecConcat` refuses a result longer than `MaxStringLength` (10,000 characters, a constant added next to `AutoYieldCounter`), so doubling a string cannot allocate gigabytes in a few instructions.
