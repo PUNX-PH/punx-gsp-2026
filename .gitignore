@@ -37,3 +37,6 @@ blender-invoker-key*.json
 __pycache__/
 *.pyc
 unity/tools/out/
+
+# Scripts written by the live prompt check (web/src/lib/script/tryPrompt.live.test.ts)
+/web/.live-scripts/
