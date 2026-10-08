@@ -69,6 +69,7 @@ describe("the Build Model node", () => {
     expect(done.result).toEqual({
       role: "hero",
       kind: "biped",
+      sha256: BUILT_SHA,
       parts: 15,
       triangles: 180,
       size: 24_824,
@@ -101,6 +102,7 @@ describe("the Build Model node", () => {
       expect(done.result).toEqual({
         role: "hero",
         kind: "biped",
+        sha256: BUILT_SHA,
         parts: 76,
         triangles: 7880,
         size: 24_824,

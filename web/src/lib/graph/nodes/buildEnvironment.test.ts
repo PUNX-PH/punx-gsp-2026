@@ -160,7 +160,18 @@ describe("the Build Environment node", () => {
     const colors = ["#000000", "#111111", "#222222", "#333333", "#444444"];
     const { ctx } = context();
     const { result } = await buildEnvironment({ palette: { type: "palette", colors } }, params(), ctx);
-    expect(result).toEqual({ sky: "#111111", field: "#222222", stripe: "#444444", density: "some", scenery: ["tree", "rock"], reused: false });
+    expect(result).toEqual({
+      sky: "#111111",
+      field: "#222222",
+      stripe: "#444444",
+      density: "some",
+      scenery: ["tree", "rock"],
+      pieces: [
+        { name: "tree", sha256: TREE_SHA },
+        { name: "rock", sha256: ROCK_SHA },
+      ],
+      reused: false,
+    });
   });
 
   it("shows the sample palette's colors when none is wired", async () => {
