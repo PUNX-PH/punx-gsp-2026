@@ -5,7 +5,7 @@ The one description of how a GameSpec plays. The TypeScript simulator (`web/src/
 
 ## Numbers and time
 
-- One step is 1/60 s. Time in the spec is in milliseconds; the engine converts with `steps = round(ms * 60 / 1000)`, at least 1.
+- One step is 1/60 s. Time in the spec is in milliseconds; the engine converts with `steps = floor((ms * 60 + 500) / 1000)`, at least 1. The first step runs with `step = 1`.
 - **Milli**: every position, size, speed and counter is an integer in thousandths of a unit (1 unit = 1000). Speeds are Milli per second; a step moves
   `speed / 60` truncated toward zero (C# `long` division, TS `Math.trunc`). Products use 64-bit integers (TS: values stay under 2^53 by the clamps).
 - Counters clamp to **-1,000,000 to 1,000,000** after every change.
@@ -24,12 +24,18 @@ The play field is `0..width` by `0..height` Milli, origin at the lower left, y u
 (camera `side`) or -y (`top`, `behind`) by `scroll / 60` per step, added to its own moves. `gravity` (Milli per second squared, may be 0) adds to the
 hero's vertical speed each step when the hero has a `jump` or `flip` control: `vy -= gravity / 60`.
 
+## Who exists at the start
+
+The hero, every spawner, and every entity that is not a **template** exist at step 0, in declaration order, at their `x`,`y`. A template is an entity that a `spawn` behavior or `spawn` action names, or the first `projectile`: it exists only as the objects made from it. A made object starts at the position its spawner or action gives and takes its velocity from its own `move` or `fall` (scaled by the ramp and `speedUp`, or replaced by the spawner's nonzero `speed`).
+
+A counter named `time` is set to the whole seconds elapsed (`step / 60`, truncated) at the start of phase 1.
+
 ## Behaviors
 
 | name | parameters | meaning |
 |---|---|---|
 | `move` | `dir` (`left`,`right`,`up`,`down`), `speed` | constant velocity in `dir` |
-| `lane` | `count` (2 to 5), `switchMs` | the entity sits in one of `count` equal lanes across the field's short axis; a `switchLane` control moves it one lane over `switchMs` |
+| `lane` | `count` (2 to 5), `switchMs` | the entity sits in one of `count` equal lanes across the axis perpendicular to travel (y for camera `side`, x for `top` and `behind`), starting in lane `count / 2` rounded down; lane i has its center at `span * (2i + 1) / (2 * count)`; a `switchLane` control moves it one lane over `switchMs` |
 | `oscillate` | `axis` (`x`,`y`), `amplitude`, `periodMs` | triangle-wave offset around the start position, integer math |
 | `fall` | `speed` | constant downward speed (like `move` `down`) |
 | `follow` | `target`, `speed` | each step moves toward the nearest live entity of type `target` at `speed`, per axis, never overshooting |
@@ -41,7 +47,7 @@ hero's vertical speed each step when the hero has a `jump` or `flip` control: `v
 
 | name | meaning |
 |---|---|
-| `jump` | on input, if the entity is on the floor (y at its start y or on a platform), `vy = power` |
+| `jump` | on input, if the entity is on the floor (its y is at or below its start y), `vy = power`; a jumper cannot fall below its start y |
 | `flap` | on input, `vy = power` wherever the entity is |
 | `flip` | on input, gravity direction for this entity flips sign |
 | `fire` | on input, spawns the first `projectile` entity type at the entity with `vy = power` (cooldown 10 steps) |
@@ -52,10 +58,10 @@ hero's vertical speed each step when the hero has a `jump` or `flip` control: `v
 
 | name | meaning |
 |---|---|
-| `random` | at the far edge, at a random position along the field's other axis |
-| `lanes` | at the far edge, in a random lane of the hero's `lane` count |
-| `wave` | `random`, but y follows a triangle wave with period 2000 ms |
-| `rain` | at the top edge, random x |
+| `random` | at the far edge (x = width for `side`, y = height for `top` and `behind`), along the other axis at `next() mod (span - size + 1)` (0 when the span is smaller than the size) |
+| `lanes` | at the far edge, in lane `next() mod count` of the hero's `lane` count, positioned like the lane behavior (its center on the lane center) |
+| `wave` | along the edge at `trunc((span - size) * v / 60)` where `ph = step mod 120`, `v = ph <= 60 ? ph : 120 - ph`; no random draw |
+| `rain` | at the top edge (y = height), x as `random` along the width |
 | `stream` | at the far edge, at the spawner's own position |
 
 Spawn timing: the first spawn after `intervalMs`, then every `intervalMs`. With `ramp`, the interval shrinks and the speed grows by the difficulty ramp.
