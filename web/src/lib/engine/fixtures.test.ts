@@ -1,9 +1,12 @@
-// The shared fixtures: specs and input logs with the state digest the engine must have at every checkpoint. The C# engine replays the very same
-// files (copied to the Unity project), so a mismatch between the two implementations fails on one side. To record new expectations after an
-// intended change to the semantics: UPDATE_ENGINE_FIXTURES=1 npx vitest run src/lib/engine/fixtures.test.ts
+// The shared fixtures: specs and input logs with the state digest the engine must have at every checkpoint, and refused specs with the sentence
+// the checker gives. The C# engine replays and parses the very same files (copied to the Unity project), so a mismatch between the two
+// implementations fails on one side. To record new expectations after an intended change:
+//   UPDATE_ENGINE_FIXTURES=1 npx vitest run src/lib/engine/fixtures.test.ts
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { BAD_CASES } from "./badCases";
+import { checkSpec } from "./check";
 import { runLog, stateDigest, type InputLog } from "./log";
 import type { GameSpec } from "./spec";
 
@@ -14,21 +17,30 @@ const read = <T>(file: string): T => JSON.parse(readFileSync(file, "utf8")) as T
 
 type Expected = Record<string, { step: number; digest: string }[]>;
 
-function record(): Expected {
-  const out: Expected = {};
-  for (const name of names) {
-    const spec = read<GameSpec>(join(here, "specs", `${name}.json`));
-    const log = read<InputLog>(join(here, "logs", `${name}.json`));
-    out[name] = runLog(spec, log).map((s) => ({ step: s.step, digest: stateDigest(s) }));
-  }
-  return out;
+function digests(name: string): { step: number; digest: string }[] {
+  const spec = read<GameSpec>(join(here, "specs", `${name}.json`));
+  const log = read<InputLog>(join(here, "logs", `${name}.json`));
+  return runLog(spec, log).map((s) => ({ step: s.step, digest: stateDigest(s) }));
+}
+
+/** Each bad case with the sentence the checker gives for it. */
+function badSpecs(): { name: string; text: string; error: string }[] {
+  return BAD_CASES.map(({ name, text }) => {
+    const t = text();
+    const r = checkSpec(JSON.parse(t));
+    if (r.ok) throw new Error(`bad case "${name}" was accepted`);
+    return { name, text: t, error: r.error };
+  });
 }
 
 if (process.env.UPDATE_ENGINE_FIXTURES === "1") {
-  writeFileSync(join(here, "expected.json"), JSON.stringify(record(), null, 1) + "\n");
+  const expected: Expected = {};
+  for (const name of names) expected[name] = digests(name);
+  writeFileSync(join(here, "expected.json"), JSON.stringify(expected, null, 1) + "\n");
+  writeFileSync(join(here, "bad-specs.json"), JSON.stringify(badSpecs()) + "\n");
   mkdirSync(unity, { recursive: true });
   for (const part of ["specs", "logs"]) cpSync(join(here, part), join(unity, part), { recursive: true });
-  cpSync(join(here, "expected.json"), join(unity, "expected.json"));
+  for (const f of ["expected.json", "bad-specs.json"]) cpSync(join(here, f), join(unity, f));
 }
 
 describe("shared engine fixtures", () => {
@@ -37,8 +49,7 @@ describe("shared engine fixtures", () => {
   });
 
   it.each(names)("replays %s to the recorded digests", (name) => {
-    const expected = read<Expected>(join(here, "expected.json"));
-    expect(runLog(read<GameSpec>(join(here, "specs", `${name}.json`)), read<InputLog>(join(here, "logs", `${name}.json`))).map((s) => ({ step: s.step, digest: stateDigest(s) }))).toEqual(expected[name]);
+    expect(digests(name)).toEqual(read<Expected>(join(here, "expected.json"))[name]);
   });
 
   it("reaches interesting states: spawned objects, score changes, and an ended round somewhere", () => {
@@ -48,11 +59,15 @@ describe("shared engine fixtures", () => {
     expect(all.some((c) => /status=(won|lost)/.test(c.digest))).toBe(true);
   });
 
+  it("refuses every bad case with the recorded sentence", () => {
+    expect(badSpecs()).toEqual(read(join(here, "bad-specs.json")));
+  });
+
   it("keeps the Unity copy equal to these files", () => {
     expect(existsSync(unity)).toBe(true);
     for (const part of ["specs", "logs"]) {
       for (const f of readdirSync(join(here, part))) expect(readFileSync(join(unity, part, f), "utf8")).toBe(readFileSync(join(here, part, f), "utf8"));
     }
-    expect(readFileSync(join(unity, "expected.json"), "utf8")).toBe(readFileSync(join(here, "expected.json"), "utf8"));
+    for (const f of ["expected.json", "bad-specs.json"]) expect(readFileSync(join(unity, f), "utf8")).toBe(readFileSync(join(here, f), "utf8"));
   });
 });

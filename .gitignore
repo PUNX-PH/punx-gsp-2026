@@ -36,3 +36,4 @@ blender-invoker-key*.json
 *-invoker-key*.json
 __pycache__/
 *.pyc
+unity/tools/out/

@@ -395,6 +395,7 @@ export class Engine {
   private phaseEnds(): void {
     if (this.status !== "running") return;
     const ends = this.spec.ends;
+    if (!this.objs.some((o) => this.def(o).role === "hero")) return this.end("lost");
     if (Object.hasOwn(this.counters, "lives") && this.counters.lives <= 0) this.end("lost");
     else if (ends.scoreToWin > 0 && Object.hasOwn(this.counters, "score") && this.counters.score >= ends.scoreToWin) this.end("won");
     else if (ends.timeLimitMs > 0 && this.step >= toSteps(ends.timeLimitMs)) this.end(ends.winOnTime ? "won" : "lost");

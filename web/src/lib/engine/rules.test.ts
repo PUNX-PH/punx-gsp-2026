@@ -127,6 +127,15 @@ describe("conditions and actions", () => {
   });
 });
 
+describe("the hero", () => {
+  it("losing the hero (destroy self) loses the round", () => {
+    const sim = createSim(make([on({ type: "start" }, { type: "destroy", target: "self" })]));
+    sim.step(NONE);
+    expect(sim.state().status).toBe("lost");
+    expect(sim.state().entities).toHaveLength(0);
+  });
+});
+
 describe("limits", () => {
   it("more than 200 actions in one step ends the round as lost", () => {
     const many = Array.from({ length: 10 }, () => ({ type: "add", counter: "score", n: 1 }) as Action);
