@@ -163,3 +163,42 @@ describe("the packager client", () => {
     expect(String((error as Error).message)).not.toContain("SECRET");
   });
 });
+
+describe("the export service with a script game", () => {
+  const scriptSettings = (models: string[]) =>
+    JSON.stringify({
+      schemaVersion: 1, template: "runner", palette: padPalette(runner.look.palette),
+      roles: { hero: "hero.glb", obstacle: "obstacle.glb", collectible: "collectible.glb" },
+      tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 }, script: { file: "game.lua", models },
+    });
+  const text = (s: string) => new TextEncoder().encode(s);
+  const LUA = "function update(dt) end";
+
+  it("packs settings.json, game.lua and the models, as the run holds them, and counts one download", async () => {
+    const glb = makeGlb({ asset: { version: "2.0" } });
+    const { runs, id } = await storedRun(scriptSettings(["hero"]), { "game.lua": text(LUA), "entity-hero.glb": glb });
+    const { packager, calls } = fakePackager();
+    const { s, limits } = service(runs, packager);
+    expect(await s.exportGame(alice, id, "android")).toBe(packed);
+    expect(calls[0].platform).toBe("android");
+    expect(calls[0].files.map((f) => f.name)).toEqual(["settings.json", "game.lua", "entity-hero.glb"]);
+    expect(calls[0].files[1].size).toBe(LUA.length);
+    expect(count(limits)).toBe(1);
+  });
+
+  it("packs a script game with no models as settings.json and game.lua only", async () => {
+    const { runs, id } = await storedRun(scriptSettings([]), { "game.lua": text(LUA) });
+    const { packager, calls } = fakePackager();
+    await service(runs, packager).s.exportGame(alice, id, "windows");
+    expect(calls[0].files.map((f) => f.name)).toEqual(["settings.json", "game.lua"]);
+  });
+
+  it("says the game is gone when its script file is gone, and counts nothing", async () => {
+    const { runs, id } = await storedRun(scriptSettings([]), {});
+    const { packager, calls } = fakePackager();
+    const { s, limits } = service(runs, packager);
+    expect((await failure(s.exportGame(alice, id, "windows"))).status).toBe(404);
+    expect(calls).toHaveLength(0);
+    expect(count(limits)).toBe(0);
+  });
+});

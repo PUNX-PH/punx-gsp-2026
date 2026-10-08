@@ -1,6 +1,6 @@
 // The packager: the private Cloud Run service that turns a finished game into something a person can install. The owner builds a Windows player and an
 // Android player once with Unity (the same player the website runs, built for those platforms) and puts them in PLAYERS_DIR; this adds one game's
-// files (settings.json and the entity models) to a copy of the player and hands it back. No Unity Editor runs here and nothing is compiled.
+// files (settings.json, game.lua for a script game, and the entity models) to a copy of the player and hands it back. No Unity Editor runs here and nothing is compiled.
 //
 //   POST /package?platform=windows|android   body: {"files": [{"name": "settings.json", "data": "<base64>"}, ...]}
 //   GET  /health
@@ -19,9 +19,11 @@ import { listZip, rebuildZip } from "./zip.mjs";
 
 const MAX_BODY_BYTES = 32 * 1024 * 1024;
 const MAX_FILES_BYTES = 24 * 1024 * 1024;
-const MAX_FILES = 21; // settings.json and up to twenty models
+const MAX_FILES = 22; // settings.json, a script and up to twenty models
 const MAX_SETTINGS_BYTES = 128 * 1024;
-const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}\.(json|glb)$/;
+const FILE_NAME = /^(?:[A-Za-z0-9][A-Za-z0-9_-]{0,63}\.(?:json|glb)|game\.lua)$/;
+const SCRIPT_FILE = "game.lua";
+const MAX_SCRIPT_BYTES = 64 * 1024;
 const SIGN_LIMIT_MS = 60_000;
 const PLATFORMS = ["windows", "android"];
 // What a signature is made of; the rest of META-INF (service files, version files) is the player's and stays.
@@ -75,6 +77,16 @@ function reply(res, status, body) {
   res.end(text);
 }
 
+/** A game's script as the packager can check it: not empty, within its size, UTF-8 and with no NUL. (The website parses it and the player runs it in its own sandbox.) */
+function isScriptText(data) {
+  if (data.length === 0 || data.length > MAX_SCRIPT_BYTES || data.includes(0)) return false;
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(data).trim() !== "";
+  } catch {
+    return false;
+  }
+}
+
 /** The game's files from the request body, checked; 400 for a body that is not the right shape, 422 for files that are not acceptable. */
 function gameFiles(body) {
   let parsed;
@@ -98,16 +110,21 @@ function gameFiles(body) {
     total += data.length;
     if (total > MAX_FILES_BYTES) throw new Refusal(413, "too-big");
     if (f.name.endsWith(".glb") && data.subarray(0, 4).toString("latin1") !== "glTF") throw new Refusal(422, "bad-files");
+    if (f.name === SCRIPT_FILE && !isScriptText(data)) throw new Refusal(422, "bad-files");
     return { name: f.name, data };
   });
   const settings = files.find((f) => f.name === "settings.json");
   if (!settings || settings.data.length > MAX_SETTINGS_BYTES) throw new Refusal(422, "bad-files");
+  let value;
   try {
-    const value = JSON.parse(settings.data.toString("utf8"));
+    value = JSON.parse(settings.data.toString("utf8"));
     if (!isObject(value)) throw new Error("not an object");
   } catch {
     throw new Refusal(422, "bad-files");
   }
+  // A script game is settings that name a script plus game.lua, and nothing else is: neither one without the other, and not together with a game of rules.
+  const hasScript = files.some((f) => f.name === SCRIPT_FILE);
+  if (hasScript !== Object.hasOwn(value, "script") || (hasScript && Object.hasOwn(value, "game"))) throw new Refusal(422, "bad-files");
   return files;
 }
 

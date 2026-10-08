@@ -133,3 +133,39 @@ test("is not set up until a player is installed for the platform", async () => {
   assert.equal(res.status, 503);
   assert.deepEqual(await res.json(), { code: "not-set-up" });
 });
+
+// ---- a script game: settings.json that names a script, game.lua, and any models
+
+const LUA = "function update(dt) end";
+const scriptSettings = { name: "settings.json", data: b64('{"schemaVersion":1,"script":{"file":"game.lua","models":[]}}') };
+const lua = (text = LUA) => ({ name: "game.lua", data: b64(text) });
+
+test("windows and android: a script game's game.lua and models go in next to its settings", async () => {
+  const win = await post("windows", [scriptSettings, lua(), { name: "entity-hero.glb", data: GLB }]);
+  assert.equal(win.status, 200);
+  const zip = Buffer.from(await win.arrayBuffer());
+  assert.deepEqual(listZip(zip).entries.map((e) => e.name), ["Runner.exe", "Runner_Data/app.info", "Runner_Data/StreamingAssets/game/settings.json", "Runner_Data/StreamingAssets/game/game.lua", "Runner_Data/StreamingAssets/game/entity-hero.glb"]);
+  assert.equal(readStored(zip, "Runner_Data/StreamingAssets/game/game.lua").toString(), LUA);
+  const droid = await post("android", [scriptSettings, lua()]);
+  assert.equal(droid.status, 200);
+  const apk = Buffer.from(await droid.arrayBuffer());
+  assert.ok(listZip(apk).entries.some((e) => e.name === "assets/game/game.lua"));
+});
+
+test("refuses a game.lua that is too big, not UTF-8, empty or has a NUL, and one that does not go with its settings", async () => {
+  assert.equal((await post("windows", [scriptSettings, lua("-- " + "x".repeat(70_000))])).status, 422);
+  assert.equal((await post("windows", [scriptSettings, { name: "game.lua", data: Buffer.from([0xff, 0xfe, 0x66]).toString("base64") }])).status, 422);
+  assert.equal((await post("windows", [scriptSettings, lua("   ")])).status, 422);
+  assert.equal((await post("windows", [scriptSettings, lua("a\0b")])).status, 422);
+  // settings that name a script need game.lua, and a game.lua needs settings that name it
+  assert.equal((await post("windows", [scriptSettings])).status, 422);
+  assert.equal((await post("windows", [{ name: "settings.json", data: b64('{"schemaVersion":1}') }, lua()])).status, 422);
+  assert.equal((await post("windows", [{ name: "settings.json", data: b64('{"script":{"file":"game.lua","models":[]},"game":{}}') }, lua()])).status, 422);
+});
+
+test("refuses other Lua names and paths: only game.lua", async () => {
+  for (const name of ["other.lua", "../game.lua", "game.LUA", "a/game.lua", "game.lua.json", "main.lua"]) {
+    assert.equal((await post("windows", [scriptSettings, { name, data: b64(LUA) }])).status, 422, name);
+  }
+  assert.equal((await post("windows", [scriptSettings, lua(), lua()])).status, 422);
+});

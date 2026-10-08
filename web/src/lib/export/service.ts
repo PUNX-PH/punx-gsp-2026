@@ -1,4 +1,4 @@
-// The export service: what may be exported, how often, and what the person is told. Only an engine game (settings with a `game`) can be: the runner
+// The export service: what may be exported, how often, and what the person is told. Only a made game (settings with a `game` or a `script`) can be: the runner
 // has no spec and no packaged player. The game's files are read from its stored run, so what is packed is exactly what Preview plays. One count of
 // the person's daily exports is taken before the call and given back when no file came out. Packager and stores are ports, so every rule here is tested
 // with fakes.
@@ -33,7 +33,7 @@ export function makeExportService(deps: ExportDeps): ExportService {
       };
       const settingsBytes = await read("settings.json");
       const checked = validateSettings(new TextDecoder().decode(settingsBytes));
-      if (!checked.ok || !checked.settings.game) {
+      if (!checked.ok || !(checked.settings.game || checked.settings.script)) {
         throw new ExportError(409, "Only a game made with Describe Game can be built for a computer or a phone. Turn on Make a game, then press Play.");
       }
       const files = [{ name: "settings.json", bytes: settingsBytes }];
