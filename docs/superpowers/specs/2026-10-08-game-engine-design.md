@@ -81,6 +81,13 @@ Entities draw with the glTF models the graph supplied or built-in primitives mad
    a game of up to 12 entities can cost up to 12 Blender jobs, so the plan must cap generated assets per game (proposed: 6, the rest primitives).
 7. Rebuild and publish the template, measure, live checks (needs Unity Hub sign-in, a phone, the funded key).
 
+8. **Export to PC or Android** (after 7): a Preview-side "Build for" choice (Windows, Android). The owner builds a **Windows player** and an
+   **Android player** once with Unity from the same engine template (the player reads the game's spec and assets at runtime, as the WebGL one does);
+   no per-game Editor build and no Editor on a server. PC: the site zips the Windows player with that game's data folder. Android: the site puts the
+   data into the pre-built APK's assets and signs it with the studio's key (`apksigner`, run in a private worker like Blender's, key never in the
+   repo), so the file installs directly. Uploading to a store is the studio's. Needs: Unity's Windows and Android build support installed on the
+   owner's machine, the studio's keystore, and the owner's reading of the Unity licence terms for distributing the player with user content.
+
 ## Risks and open points
 
 - **Unity cannot run today** (Hub sign-in). Milestone 3's engine is proven only by the shared fixtures on the stand-in; shaders and PlayMode stay
