@@ -119,6 +119,48 @@ namespace Runner.Tests
             Assert.AreEqual(1, Run(world, 1).Count);
         }
 
+        [TestCase(1.0, 0.0, 1)]
+        [TestCase(1.001, 0.0, 0)]
+        [TestCase(0.0, 1.0, 1)]
+        [TestCase(0.0, 1.001, 0)]
+        [TestCase(0.0, -1.0, 1)]
+        [TestCase(-1.001, 0.0, 0)]
+        public void TouchingEdgesCountOnBothAxesAndAGapDoesNot(double dx, double dy, int expected)
+        {
+            var world = new ScriptWorld();
+            Solid(world, 0, 0);
+            Solid(world, dx, dy);
+            Assert.AreEqual(expected, Run(world, 1).Count);
+        }
+
+        [TestCase(5.0, 0.0)]
+        [TestCase(-5.0, 0.0)]
+        [TestCase(0.0, 5.0)]
+        [TestCase(0.0, -5.0)]
+        public void AnObjectExitsThroughEveryEdgeExactlyOnce(double vx, double vy)
+        {
+            var world = new ScriptWorld();
+            world.SetBounds(10, 10);
+            var o = world.Spawn("box");
+            o.Vx = vx;
+            o.Vy = vy;
+            var exits = 0;
+            var exitFrame = 0;
+            for (var frame = 1; frame <= 240; frame++)
+            {
+                var events = new List<WorldEvent>();
+                world.Step(Frame, events);
+                if (events.Any(e => e.Kind == WorldEventKind.Exit))
+                {
+                    exits++;
+                    exitFrame = frame;
+                }
+            }
+            Assert.AreEqual(1, exits);
+            // the box (1 wide) is fully out when its center is 5.5 from the middle: 1.1 s at 5 units a second
+            Assert.That(exitFrame, Is.InRange(65, 68));
+        }
+
         [Test]
         public void ObjectsThatAreNotBothSolidDoNotCollide()
         {
