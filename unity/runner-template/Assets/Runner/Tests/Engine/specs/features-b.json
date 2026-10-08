@@ -1,0 +1,35 @@
+{
+  "engine": 1, "seed": 23,
+  "world": { "camera": "behind", "gravity": 10000, "width": 7000, "height": 12000, "scroll": 500 },
+  "counters": { "score": 0, "lives": 3, "time": 0, "misses": 0 },
+  "entities": {
+    "hero": { "role": "hero", "model": "capsule", "color": 0, "w": 900, "h": 900, "collider": "box", "x": 0, "y": 1500,
+      "behaviors": [
+        { "type": "lane", "count": 4, "switchMs": 200 },
+        { "type": "control", "on": "tap", "does": "switchLane", "power": 0 },
+        { "type": "control", "on": "tap", "does": "jump", "power": 5000 }
+      ] },
+    "coin": { "role": "pickup", "model": "sphere", "color": 2, "w": 500, "h": 500, "collider": "circle", "x": 0, "y": 12000,
+      "behaviors": [{ "type": "fall", "speed": 3000 }, { "type": "oscillate", "axis": "x", "amplitude": 400, "periodMs": 1000 }] },
+    "rock": { "role": "hazard", "model": "box", "color": 1, "w": 800, "h": 800, "collider": "box", "x": 0, "y": 12000,
+      "behaviors": [{ "type": "fall", "speed": 2500 }] },
+    "mist": { "role": "platform", "model": "box", "color": 3, "w": 600, "h": 600, "collider": "box", "x": 0, "y": 12000,
+      "behaviors": [{ "type": "fall", "speed": 1500 }, { "type": "lifetime", "ms": 3000 }] },
+    "coins": { "role": "pickup", "model": "box", "color": 2, "w": 0, "h": 0, "collider": "box", "x": 0, "y": 12000,
+      "behaviors": [{ "type": "spawn", "entity": "coin", "pattern": "lanes", "intervalMs": 900, "speed": 0, "ramp": false }] },
+    "rocks": { "role": "hazard", "model": "box", "color": 1, "w": 0, "h": 0, "collider": "box", "x": 0, "y": 12000,
+      "behaviors": [{ "type": "spawn", "entity": "rock", "pattern": "random", "intervalMs": 1500, "speed": 0, "ramp": true }] },
+    "clouds": { "role": "platform", "model": "box", "color": 3, "w": 0, "h": 0, "collider": "box", "x": 0, "y": 12000,
+      "behaviors": [{ "type": "spawn", "entity": "mist", "pattern": "stream", "intervalMs": 700, "speed": 0, "ramp": false }] }
+  },
+  "rules": [
+    { "on": { "type": "collide", "a": "hero", "b": "coin" }, "do": [{ "type": "add", "counter": "score", "n": 2 }, { "type": "destroy", "target": "b" }] },
+    { "on": { "type": "collide", "a": "hero", "b": "rock" }, "do": [{ "type": "add", "counter": "lives", "n": -1 }, { "type": "destroy", "target": "b" }] },
+    { "on": { "type": "exitBounds", "entity": "coin" }, "do": [{ "type": "add", "counter": "misses", "n": 1 }] },
+    { "on": { "type": "counterReaches", "counter": "misses", "value": 5 }, "do": [{ "type": "lose" }] },
+    { "on": { "type": "tick", "everyMs": 5000 }, "when": [{ "counter": "time", "op": ">=", "value": 20 }, { "counter": "score", "op": ">=", "value": 10 }], "do": [{ "type": "win" }] }
+  ],
+  "ends": { "timeLimitMs": 30000, "winOnTime": false, "scoreToWin": 60 },
+  "difficulty": { "rampMs": 20000, "speedPercent": 80, "spawnPercent": 50 },
+  "look": { "palette": ["#264653", "#e63946", "#1d3557", "#a8dadc", "#f1faee"] }
+}

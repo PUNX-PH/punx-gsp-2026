@@ -1,0 +1,25 @@
+{
+  "engine": 1,
+  "seed": 3,
+  "world": { "camera": "top", "gravity": 0, "width": 6000, "height": 10000, "scroll": 0 },
+  "counters": { "score": 0, "lives": 3 },
+  "entities": {
+    "basket": { "role": "hero", "model": "box", "color": 0, "w": 1400, "h": 700, "collider": "box", "x": 2300, "y": 500,
+      "behaviors": [{ "type": "lane", "count": 3, "switchMs": 150 }, { "type": "control", "on": "tap", "does": "switchLane", "power": 0 }] },
+    "apple": { "role": "pickup", "model": "sphere", "color": 1, "w": 600, "h": 600, "collider": "circle", "x": 0, "y": 10000,
+      "behaviors": [{ "type": "fall", "speed": 4500 }] },
+    "bomb": { "role": "hazard", "model": "sphere", "color": 2, "w": 600, "h": 600, "collider": "circle", "x": 0, "y": 10000,
+      "behaviors": [{ "type": "fall", "speed": 4500 }] },
+    "apples": { "role": "pickup", "model": "box", "color": 1, "w": 0, "h": 0, "collider": "box", "x": 0, "y": 10000,
+      "behaviors": [{ "type": "spawn", "entity": "apple", "pattern": "lanes", "intervalMs": 1100, "speed": 0, "ramp": true }] },
+    "bombs": { "role": "hazard", "model": "box", "color": 2, "w": 0, "h": 0, "collider": "box", "x": 0, "y": 10000,
+      "behaviors": [{ "type": "spawn", "entity": "bomb", "pattern": "lanes", "intervalMs": 2200, "speed": 0, "ramp": true }] }
+  },
+  "rules": [
+    { "on": { "type": "collide", "a": "basket", "b": "apple" }, "do": [{ "type": "add", "counter": "score", "n": 1 }, { "type": "destroy", "target": "b" }] },
+    { "on": { "type": "collide", "a": "basket", "b": "bomb" }, "do": [{ "type": "add", "counter": "lives", "n": -1 }, { "type": "destroy", "target": "b" }] }
+  ],
+  "ends": { "timeLimitMs": 60000, "winOnTime": false, "scoreToWin": 12 },
+  "difficulty": { "rampMs": 40000, "speedPercent": 60, "spawnPercent": 50 },
+  "look": { "palette": ["#264653", "#e63946", "#1d3557", "#a8dadc", "#f1faee"] }
+}

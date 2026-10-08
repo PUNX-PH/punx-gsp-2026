@@ -1,0 +1,43 @@
+{
+  "engine": 1, "seed": 11,
+  "world": { "camera": "side", "gravity": 15000, "width": 12000, "height": 8000, "scroll": 300 },
+  "counters": { "score": 0, "lives": 5, "time": 0, "combo": 0 },
+  "entities": {
+    "hero": { "role": "hero", "model": "sphere", "color": 0, "w": 700, "h": 700, "collider": "circle", "x": 2000, "y": 3000,
+      "behaviors": [
+        { "type": "control", "on": "tap", "does": "flap", "power": 7000 },
+        { "type": "control", "on": "hold", "does": "thrust", "power": 20000 },
+        { "type": "control", "on": "tap", "does": "fire", "power": 9000 }
+      ] },
+    "shot": { "role": "projectile", "model": "box", "color": 2, "w": 300, "h": 300, "collider": "box", "x": 0, "y": 0,
+      "behaviors": [{ "type": "lifetime", "ms": 700 }, { "type": "move", "dir": "right", "speed": 8000 }] },
+    "drone": { "role": "hazard", "model": "sphere", "color": 1, "w": 600, "h": 600, "collider": "circle", "x": 12000, "y": 4000,
+      "behaviors": [{ "type": "move", "dir": "left", "speed": 3000 }, { "type": "oscillate", "axis": "y", "amplitude": 1200, "periodMs": 1500 }] },
+    "chaser": { "role": "hazard", "model": "box", "color": 3, "w": 500, "h": 500, "collider": "box", "x": 11000, "y": 6000,
+      "behaviors": [{ "type": "follow", "target": "hero", "speed": 1200 }, { "type": "lifetime", "ms": 4000 }] },
+    "gem": { "role": "pickup", "model": "sphere", "color": 2, "w": 400, "h": 400, "collider": "circle", "x": 0, "y": 8000,
+      "behaviors": [{ "type": "fall", "speed": 2000 }] },
+    "ball": { "role": "hazard", "model": "box", "color": 4, "w": 600, "h": 600, "collider": "box", "x": 12000, "y": 6000,
+      "behaviors": [{ "type": "move", "dir": "left", "speed": 2500 }, { "type": "fall", "speed": 3000 }] },
+    "floor": { "role": "platform", "model": "box", "color": 4, "w": 12000, "h": 300, "collider": "box", "x": 0, "y": -300, "behaviors": [] },
+    "dronegen": { "role": "hazard", "model": "box", "color": 1, "w": 0, "h": 0, "collider": "box", "x": 12000, "y": 0,
+      "behaviors": [{ "type": "spawn", "entity": "drone", "pattern": "wave", "intervalMs": 2000, "speed": 0, "ramp": true }] },
+    "gemrain": { "role": "pickup", "model": "box", "color": 2, "w": 0, "h": 0, "collider": "box", "x": 0, "y": 8000,
+      "behaviors": [{ "type": "spawn", "entity": "gem", "pattern": "rain", "intervalMs": 1300, "speed": 2500, "ramp": false }] },
+    "ballgen": { "role": "hazard", "model": "box", "color": 4, "w": 0, "h": 0, "collider": "box", "x": 12000, "y": 0,
+      "behaviors": [{ "type": "spawn", "entity": "ball", "pattern": "random", "intervalMs": 2500, "speed": 0, "ramp": false }] }
+  },
+  "rules": [
+    { "on": { "type": "collide", "a": "hero", "b": "gem" }, "do": [{ "type": "add", "counter": "score", "n": 1 }, { "type": "add", "counter": "combo", "n": 1 }, { "type": "destroy", "target": "b" }] },
+    { "on": { "type": "collide", "a": "hero", "b": "drone" }, "do": [{ "type": "add", "counter": "lives", "n": -1 }, { "type": "destroy", "target": "b" }] },
+    { "on": { "type": "collide", "a": "shot", "b": "drone" }, "do": [{ "type": "add", "counter": "score", "n": 3 }, { "type": "destroy", "target": "a" }, { "type": "destroy", "target": "b" }] },
+    { "on": { "type": "collide", "a": "ball", "b": "floor" }, "do": [{ "type": "bounce", "target": "a" }] },
+    { "on": { "type": "tick", "everyMs": 2000 }, "do": [{ "type": "spawn", "entity": "chaser" }] },
+    { "on": { "type": "counterReaches", "counter": "combo", "value": 3 }, "do": [{ "type": "set", "counter": "combo", "n": 0 }, { "type": "speedUp", "percent": 20 }, { "type": "add", "counter": "lives", "n": 1 }] },
+    { "on": { "type": "collide", "a": "hero", "b": "chaser" }, "when": [{ "counter": "lives", "op": ">", "value": 2 }], "do": [{ "type": "add", "counter": "lives", "n": -1 }, { "type": "destroy", "target": "b" }] },
+    { "on": { "type": "collide", "a": "hero", "b": "ball" }, "do": [{ "type": "add", "counter": "lives", "n": -1 }, { "type": "destroy", "target": "b" }] }
+  ],
+  "ends": { "timeLimitMs": 25000, "winOnTime": true, "scoreToWin": 40 },
+  "difficulty": { "rampMs": 10000, "speedPercent": 50, "spawnPercent": 40 },
+  "look": { "palette": ["#ffb703", "#023047", "#fb8500", "#8ecae6", "#219ebc"] }
+}
