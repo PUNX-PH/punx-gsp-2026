@@ -102,6 +102,28 @@ describe("askForJson: when the call fails", () => {
     expect(String((failure as Error).message)).not.toContain("make a thing");
   });
 
+  it("keeps no detail for any status but 400", async () => {
+    const { client } = stubClient(() => {
+      throw Object.assign(new Error("overloaded"), { status: 529 });
+    });
+    expect(((await askForJson(client, REQUEST).then(() => null, (e: unknown) => e)) as AiUnavailableError).detail).toBeUndefined();
+  });
+
+  it("keeps what a 400 says about the request, shortened, with keys and long secret-looking strings removed", async () => {
+    const message = `output_config.format.schema: too many union types. key sk-ant-api03-abcdefghijkl Bearer abc.def ${"x".repeat(60)} ${"y ".repeat(300)}`;
+    const { client } = stubClient(() => {
+      throw Object.assign(new Error(message), { status: 400 });
+    });
+    const failure = (await askForJson(client, REQUEST).then(() => null, (e: unknown) => e)) as AiUnavailableError;
+    expect(failure.status).toBe(400);
+    expect(failure.detail).toContain("too many union types");
+    expect(failure.detail).not.toContain("sk-ant");
+    expect(failure.detail).not.toContain("abc.def");
+    expect(failure.detail).not.toMatch(/x{40}/);
+    expect(failure.detail!.length).toBeLessThanOrEqual(300);
+    expect(String(failure.message)).toBe("The model is not available"); // the error's own message is still never the service's
+  });
+
   it("has no status when the error carried none", async () => {
     const { client } = stubClient(() => {
       throw new Error("socket hang up");

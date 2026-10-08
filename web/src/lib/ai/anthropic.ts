@@ -51,7 +51,7 @@ export async function askForJson(
   } catch (error) {
     // Only the HTTP status survives (a plain number, safe to log); nothing the error says does.
     const status = (error as { status?: unknown } | null)?.status;
-    throw new AiUnavailableError(typeof status === "number" ? status : undefined);
+    throw new AiUnavailableError(typeof status === "number" ? status : undefined, status === 400 ? rejectionDetail(error) : undefined);
   }
 
   if (message.stop_reason === "refusal") throw new AiRefusedError();
@@ -64,6 +64,23 @@ export async function askForJson(
     raw = undefined; // not JSON (or cut off): the caller will say it could not use the answer
   }
   return { raw, usage: { inputTokens: message.usage?.input_tokens ?? 0, outputTokens: message.usage?.output_tokens ?? 0 } };
+}
+
+const MAX_DETAIL = 300;
+
+/**
+ * Why a 400 was refused, for the log: what the service said about the request (a schema it will not take, a parameter it does not know), cut to
+ * 300 characters, with anything shaped like a key, a bearer token or a long secret-looking string replaced. Only used for a 400; every other
+ * failure logs its status alone.
+ */
+export function rejectionDetail(error: unknown): string | undefined {
+  const message = (error as { error?: { error?: { message?: unknown } } } | null)?.error?.error?.message ?? (error as { message?: unknown } | null)?.message;
+  if (typeof message !== "string") return undefined;
+  return message
+    .replace(/sk-[A-Za-z0-9_-]{8,}/g, "[key]")
+    .replace(/Bearer\s+\S+/gi, "Bearer [token]")
+    .replace(/[A-Za-z0-9+/_-]{40,}/g, "[long]")
+    .slice(0, MAX_DETAIL);
 }
 
 /** A picture (already a small JPEG) as a block of the user's turn. */

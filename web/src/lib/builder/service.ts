@@ -111,7 +111,7 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
         log({ step, call, outcome: "picture" });
         throw error;
       }
-      if (error instanceof AiUnavailableError) log({ step, call, outcome: "unavailable", ...(error.status === undefined ? {} : { status: error.status }) });
+      if (error instanceof AiUnavailableError) log({ step, call, outcome: "unavailable", ...(error.status === undefined ? {} : { status: error.status }), ...(error.detail === undefined ? {} : { detail: error.detail }) });
       else log({ step, call, outcome: "unexpected", kind: error instanceof Error ? error.name : typeof error });
       throw problem(NO_ANSWER);
     }

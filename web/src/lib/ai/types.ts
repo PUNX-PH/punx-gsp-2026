@@ -58,7 +58,14 @@ export class AiRefusedError extends Error {
  * the HTTP status when there was one: a plain number that is safe to log, and what tells a rejected key from an overloaded service.
  */
 export class AiUnavailableError extends Error {
-  constructor(readonly status?: number) {
+  /**
+   * `detail` is only ever set for a 400 (the service said the request itself is wrong, so its words describe the request's shape, such as a schema
+   * it will not take): see `rejectionDetail` in anthropic.ts, which shortens it and removes anything that looks like a key.
+   */
+  constructor(
+    readonly status?: number,
+    readonly detail?: string,
+  ) {
     super("The model is not available");
     this.name = "AiUnavailableError";
   }
