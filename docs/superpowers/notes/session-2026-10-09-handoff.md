@@ -13,9 +13,9 @@ Users prompt a game idea; the platform generates that game (no limits on the gam
 - Live facts (2026-10-08): the Anthropic key works; Describe Game with Make a game now works (after the grammar fix: the game is JSON text in one string field); Preview still shows the OLD player ("hero.glb is not a valid GLB file") because the new player is not published; the packager is deployed and private (`https://packager-202701573550.us-east1.run.app`, `PACKAGER_URL` and `PACKAGER_KEY` set in Vercel) but holds **no players** yet, so Build for says "not set up".
 - Unity: Hub 3.22.2 signed in as rey@punx.ai, **Unity Personal licence active**, Editor 6000.3.25f1 with WebGL, Android (SDK, NDK, OpenJDK) and Windows modules. Batch runs work. **EditMode 167 passed, PlayMode 19 passed** (first ever run of the slice 6 and 7 Unity code).
 
-## In flight when the session ended
+## Done at the very end
 
-- **A WebGL build was running in the background** (`powershell tools\build-webgl.ps1`, it takes many minutes; output to `Builds\runner-desktop` and `Builds\runner-mobile`, log `Builds\build.log`, size report `Builds\size-report.json`). **Do not start another Unity process until it has finished** (two Unity processes on one project clash). Check: is a `Unity.exe` still running? If the build finished, read `Builds\size-report.json` (budget 15,000,000 bytes per target) and the tail of `Builds\build.log`. If it failed or was cut off, run `tools\build-webgl.ps1` again.
+- **The WebGL build finished successfully (2026-10-09):** `Buildsunner-desktop` and `Buildsunner-mobile`, **8,607,010 and 8,607,380 bytes** (budget 15,000,000 each), log `Buildsuild.log` says "Build Finished, Result: Success". It is **not yet published** (no `web/public/templates` change, nothing pushed for it). One Unity process was still alive afterwards (probably the compiler server); check `Get-Process Unity` before starting another Unity run. The build rewrote `Assets/Scenes/Main.unity` and `ProjectSettings/GraphicsSettings.asset` (uncommitted; look at the diff, commit them only if the changes are the intended shader inclusions).
 
 ## Next steps, in order
 
