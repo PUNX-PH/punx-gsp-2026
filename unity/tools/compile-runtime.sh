@@ -15,6 +15,10 @@ for dll in "$UNITY_DATA"/Managed/UnityEngine/UnityEngine*.dll; do REFS+=("-r:$dl
 for name in glTFast Unity.InputSystem Unity.Mathematics Unity.Collections Unity.Burst; do
   [ -f "$PROJECT/Library/ScriptAssemblies/$name.dll" ] && REFS+=("-r:$PROJECT/Library/ScriptAssemblies/$name.dll")
 done
+find "$PROJECT/Assets/Runner/ThirdParty/MoonSharp" -name '*.cs' | while read -r f; do cygpath -m "$f"; done > "$OUT/moonsharp.rsp" # 245 files: a response file, not an argument list
+"$DOTNET" "$CSC" -nologo -langversion:9 -nullable:disable -nostdlib -warn:0 -target:library -out:"$OUT/MoonSharp.check.dll" "-r:$UNITY_DATA/NetStandard/ref/2.1.0/netstandard.dll" "@$OUT/moonsharp.rsp"
+echo "ok    MoonSharp compiles"
+REFS+=("-r:$OUT/MoonSharp.check.dll")
 SRC=$(find "$PROJECT/Assets/Runner/Runtime" -name '*.cs')
 # shellcheck disable=SC2086
 "$DOTNET" "$CSC" -nologo -langversion:9 -nullable:disable -nostdlib -target:library -out:"$OUT/Runner.Runtime.check.dll" "${REFS[@]}" $SRC

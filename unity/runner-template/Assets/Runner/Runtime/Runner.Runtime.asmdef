@@ -3,7 +3,8 @@
     "rootNamespace": "Runner",
     "references": [
         "Unity.InputSystem",
-        "glTFast"
+        "glTFast",
+        "MoonSharp"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
