@@ -19,6 +19,9 @@ namespace Runner.Engine
                 case "sphere": mesh = Sphere(12, 8, 1f); break;
                 case "capsule": mesh = Sphere(12, 8, 1f); break; // drawn as a sphere stretched by the entity's size: the engine has no rounded body of its own
                 case "cylinder": mesh = Cylinder(16); break;
+                case "cone": mesh = Cone(16); break;
+                case "quad": mesh = Face(Vector3.back, Vector3.up, Vector3.left); break; // one flat rectangle in x and y, facing the viewer on -z
+                case "plane": mesh = Face(Vector3.up, Vector3.forward, Vector3.left); break; // one flat rectangle on the ground (x and z), facing up
                 default: mesh = Box(); break;
             }
             mesh.name = "Engine " + name;
@@ -37,16 +40,66 @@ namespace Runner.Engine
                 (Vector3.up, Vector3.forward, Vector3.left), (Vector3.down, Vector3.forward, Vector3.right),
                 (Vector3.right, Vector3.up, Vector3.back), (Vector3.left, Vector3.up, Vector3.forward),
             };
-            foreach (var (normal, up, right) in faces)
+            foreach (var (normal, up, right) in faces) AddFace(v, n, t, normal, up, right);
+            return Build(v, n, t);
+        }
+
+        /// <summary>One unit square on its own, centered on the origin and facing along <paramref name="normal"/>.</summary>
+        static Mesh Face(Vector3 normal, Vector3 up, Vector3 right)
+        {
+            var v = new List<Vector3>();
+            var n = new List<Vector3>();
+            var t = new List<int>();
+            AddFace(v, n, t, normal, up, right, 0f);
+            return Build(v, n, t);
+        }
+
+        static void AddFace(List<Vector3> v, List<Vector3> n, List<int> t, Vector3 normal, Vector3 up, Vector3 right, float offset = 0.5f)
+        {
+            var start = v.Count;
+            var c = normal * offset;
+            v.Add(c - right * 0.5f - up * 0.5f);
+            v.Add(c + right * 0.5f - up * 0.5f);
+            v.Add(c + right * 0.5f + up * 0.5f);
+            v.Add(c - right * 0.5f + up * 0.5f);
+            for (var i = 0; i < 4; i++) n.Add(normal);
+            t.AddRange(new[] { start, start + 2, start + 1, start, start + 3, start + 2 });
+        }
+
+        /// <summary>A cone one unit across and one unit tall, apex up, centered on the origin.</summary>
+        static Mesh Cone(int around)
+        {
+            var v = new List<Vector3>();
+            var n = new List<Vector3>();
+            var t = new List<int>();
+            for (var a = 0; a <= around; a++)
             {
-                var start = v.Count;
-                var c = normal * 0.5f;
-                v.Add(c - right * 0.5f - up * 0.5f);
-                v.Add(c + right * 0.5f - up * 0.5f);
-                v.Add(c + right * 0.5f + up * 0.5f);
-                v.Add(c - right * 0.5f + up * 0.5f);
-                for (var i = 0; i < 4; i++) n.Add(normal);
-                t.AddRange(new[] { start, start + 2, start + 1, start, start + 3, start + 2 });
+                var theta = 2f * Mathf.PI * a / around;
+                var d = new Vector3(Mathf.Cos(theta), 0f, Mathf.Sin(theta));
+                var slope = (d + Vector3.up * 0.5f).normalized;
+                v.Add(d * 0.5f + Vector3.down * 0.5f);
+                v.Add(Vector3.up * 0.5f);
+                n.Add(slope);
+                n.Add(slope);
+            }
+            for (var a = 0; a < around; a++)
+            {
+                var i = a * 2;
+                t.AddRange(new[] { i, i + 1, i + 2 });
+            }
+            var center = v.Count;
+            v.Add(Vector3.down * 0.5f);
+            n.Add(Vector3.down);
+            for (var a = 0; a <= around; a++)
+            {
+                var theta = 2f * Mathf.PI * a / around;
+                v.Add(new Vector3(Mathf.Cos(theta) * 0.5f, -0.5f, Mathf.Sin(theta) * 0.5f));
+                n.Add(Vector3.down);
+            }
+            for (var a = 0; a < around; a++)
+            {
+                var i = center + 1 + a;
+                t.AddRange(new[] { center, i, i + 1 });
             }
             return Build(v, n, t);
         }

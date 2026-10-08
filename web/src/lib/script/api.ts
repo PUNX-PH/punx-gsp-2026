@@ -64,7 +64,7 @@ export const SCRIPT_API: readonly ApiEntry[] = [
   { name: "world.clear", signature: "world.clear()", doc: "Remove every object." },
   { name: "world.gravity", signature: "world.gravity(g)", doc: "Set the downward pull (units per second squared, 20 by default) for objects with gravity = true." },
   { name: "world.bounds", signature: "world.bounds(w, h)", doc: "Set the field's width and height in units (9 by 16 by default)." },
-  { name: "world.camera", signature: "world.camera{ mode, follow, x, y, z, zoom }", doc: "Choose the view: side, top, chase, fixed (3D) or side2d, top2d (2D, drawn with sprites)." },
+  { name: "world.camera", signature: "world.camera{ mode, follow, x, y, z, zoom }", doc: "Choose the view and call it again with only the fields to change. side and fixed (3D) see the field head on: x right, y up, z depth away from you. top and chase (3D) see the field as the ground: x right, y running away from you, z height; chase follows the object given as follow from behind and above. side2d and top2d are flat and orthographic (x right, y up). zoom above 1 moves in. follow = false stops following." },
   { name: "obj.destroy", signature: "obj:destroy()", doc: "Remove the object." },
   { name: "obj.set_color", signature: "obj:set_color(c)", doc: "Change its color." },
   { name: "obj.play", signature: "obj:play(animation)", doc: "Play one of its animations." },
