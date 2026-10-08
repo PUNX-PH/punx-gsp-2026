@@ -33,7 +33,9 @@ game (a checked, playtested spec in a closed vocabulary) plus Claude-made models
 implementations kept equal by shared fixtures: `unity/tools/engine-check.sh`); a private packager adds a game to a Windows or Android player, and the Preview
 panel has Build for buttons. Unity has not run any of it (no Hub sign-in). The packager is deployed (2026-10-08, private Cloud Run, `PACKAGER_URL` and `PACKAGER_KEY` set in Vercel) but holds no players yet (`slice7-handoff.md`).
 
-**Next, designed but not built (specs only, awaiting approval):** slice 8 (`specs/2026-10-08-lua-games-design.md`: Claude writes the game as a Lua script run by a sandboxed interpreter inside the player, 2D or 3D, no limits on the game) and slice 9 (`specs/2026-10-08-art-pipeline-design.md`: budgeted detail per target instead of low-poly, a richer Blender kit, textures, PC and mobile variants, sprites for 2D). The product goal is in the memory note `project-product-goal`: a user prompts an idea and the platform generates the game and its models, for PC or Android.
+**Slice 8 (Lua games) is built on the branch `slice-8-lua-games` (2026-10-09, not yet pushed or merged):** Describe Game's Make a game is Script, Rules or Off; Claude writes the game as a Lua script, checked on the server (luaparse, parse only) and run only inside the player's sandboxed MoonSharp interpreter (instruction budget, removed names, caps), 2D or 3D, with ten example games. The player, the packager (`game.lua`) and the export carry it. The live prompt check was skipped, the whole-branch review was not done, and nothing is run live yet (`slice8-handoff.md`). A new look for the sign-in, Games and Runs pages came with it.
+
+**Next, designed but not built:** slice 9 (`specs/2026-10-08-art-pipeline-design.md`: budgeted detail per target instead of low-poly, a richer Blender kit, textures, PC and mobile variants, sprites for 2D; the plan is written, `plans/2026-10-09-slice9-art-pipeline.md`). The product goal is in the memory note `project-product-goal`: a user prompts an idea and the platform generates the game and its models, for PC or Android.
 
 ## Skills (in `.claude/skills/`; origins in `.claude/skills-sources/SOURCES.md`)
 
@@ -66,7 +68,7 @@ checks and `slice6-results.md`. Slice 7 waits for the same Unity sign-in (engine
 players (built with `tools/build-players.ps1`, uploaded to the packager's bucket with a `players.json`), then its live checks and `slice7-results.md`. `main` holds slices 2
 to 7; the slice branches were deleted after the merge. Ask before any push: pushing `main` starts a production build. Also open: the password
 pre-registration decision (the Email/Password provider is still enabled next to Google), the checks listed as not run in the results notes,
-and slice 1's player-hardening gate before any use beyond punx.ai. Read `docs/superpowers/notes/slice7-handoff.md`, then `slice6-handoff.md`, then
+and slice 1's player-hardening gate before any use beyond punx.ai. Read `docs/superpowers/notes/slice8-handoff.md`, then `slice7-handoff.md`, then `slice6-handoff.md`, then
 `slice5-handoff.md` and `slice4-handoff.md` first, then `slice2-results.md` (it also has what went wrong deploying to
 Vercel and how it was fixed), `slice3a-results.md`, `slice3b-results.md` and the handoffs (`slice2-handoff.md`, `slice3a-handoff.md`,
 `slice3b-handoff.md`, `2026-10-02-slice1-handoff.md`) before doing anything else.
