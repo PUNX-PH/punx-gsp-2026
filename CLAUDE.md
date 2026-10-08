@@ -52,10 +52,11 @@ come from an uploaded file, and keep Blender and Unity workers sandboxed with no
 
 Slice 4's code is done and live but **parked until the studio has API funds** (2026-10-05); what is left is the studio's setup (a funded Claude Console workspace and key with a monthly spend limit, the data-terms
 decision, `ANTHROPIC_API_KEY` as a Sensitive Production variable in Vercel, then a redeploy), then the live checks and
-`slice4-results.md`. Slice 5's worker is deployed (its first revision predates `POST /build`, so it must be redeployed from the final slice 6
-code); what is left is the studio's invoker key and Vercel variables, a budget alert, then the live checks and `slice5-results.md`. Slice 6's
-code is done; what is left is the studio's Unity Hub sign-in (so I can run its Unity tests, rebuild and publish the template and measure), the
-worker redeploy, the funded key, a phone, then the live checks and `slice6-results.md`, and a push and merge when the user asks. Ask before any
+`slice4-results.md`. Slice 5's worker was redeployed from the slice 6 branch on 2026-10-08 (smoke test passed, `/build` and the High tier included); the Vercel
+variables and the Anthropic key are set and the Firebase project is back on Blaze (uploads need it); what is left is a budget alert, then the live checks
+and `slice5-results.md` (and slice 4's, `slice4-results.md`). Slice 6's code is done and its whole-branch review found nothing Critical or Important;
+what is left is the studio's Unity Hub sign-in (so I can run its Unity tests, rebuild and publish the template and measure), a phone, then the live
+checks and `slice6-results.md`, and a push and merge when the user asks. Ask before any
 push: pushing `main` starts a production build. Also open (none of it blocks slice 7, if there is one): the password
 pre-registration decision (the Email/Password provider is still enabled next to Google), the checks listed as not run in the results notes,
 and slice 1's player-hardening gate before any use beyond punx.ai. Read `docs/superpowers/notes/slice6-handoff.md`, then

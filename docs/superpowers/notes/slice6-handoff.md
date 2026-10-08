@@ -129,8 +129,10 @@ Only the live site, a Unity run and a phone can show these:
 
 1. **Unity Hub sign-in** on the development machine (so the licence is valid), then I run the EditMode and PlayMode suites, generate and commit the
    `.meta` files, rebuild the WebGL template, measure `RUNNER ready in N ms` and the frame rate, and publish the template (Tasks 35 and 44).
-2. **Redeploy the Blender worker from the final code** in Google Cloud Shell (the commands are in `slice5-setup-progress.md`, "Slice 6"; the
-   deployed revision today is `main` at `90e8c0e`: Standard only, with no High tier and no mesh check), then run `smoke.mjs` and check its `/build` line.
+2. **DONE 2026-10-08: the Blender worker was redeployed from `slice-6-built-models`** (cloned with `--branch`, so `main` was not touched) in Google Cloud
+   Shell, and `smoke.mjs` passed all six checks, including `/build` for the default character (5.8 s) and the no-token refusal. The worker now has the High
+   tier and the mesh check. Vercel already had `BLENDER_WORKER_URL` and `BLENDER_WORKER_KEY` (Production, locked) and the Anthropic key was added the same
+   day. The Firebase project had dropped to Spark (uploads failed 500 until it was upgraded to Blaze again); it is on Blaze now. Still open: a budget alert.
    Slice 5's open setup (invoker key, `BLENDER_WORKER_URL` and `BLENDER_WORKER_KEY` Sensitive in Vercel, redeploy, a budget alert) comes first if it
    is still open. Deploys can be automated (a Cloud Build trigger on `main` for `blender-worker/`); the studio has not asked for that yet.
 3. **A funded Anthropic key** (a Claude Console workspace with a monthly spend limit): `ANTHROPIC_API_KEY` as a Sensitive Production variable in
@@ -154,11 +156,8 @@ old settings file play exactly as before. Then measure Play's time (a cold first
 
 ## The final review
 
-**Not done.** The one fresh whole-branch review (plan Task 46) was started on 2026-10-06 and stopped before it reported anything, so **no
-independent review of this slice exists yet**; what backs it is the tests, the mutation checks and the gate above. Run it again before the merge to
-`main` (a fresh reviewer, read-only, over `main..slice-6-built-models` and the seven Review Focus items in Task 46), fix any Critical or Important
-finding test-first with one `fix:` commit each, and list the minors under "Deferred minors". The ledger is
-`.superpowers/sdd/2026-10-06-slice6-built-models/progress.md` (git-ignored).
+**Done 2026-10-08** (read-only reviewer over `main..slice-6-built-models`, the seven Review Focus items; nothing was run): **no Critical or Important
+findings.** Minors are under "Deferred minors". The ledger is `.superpowers/sdd/2026-10-06-slice6-built-models/progress.md` (git-ignored).
 
 ## Regenerating every real-output fixture
 
@@ -173,7 +172,16 @@ on the committed code changes nothing (that is the check).
 
 ## Deferred minors
 
-None recorded yet, because the review has not reported. Known loose ends that are not review findings:
+From the 2026-10-08 review:
+
+- `web/src/lib/builder/service.ts` `askClaude`: `ai.limits.give(...)` is not guarded like the Blender service's `giveBack`; if it throws, the person sees a raw error and keeps the count used (older than this branch).
+- `RunnerBootstrap.cs`: the governor also runs for Standard games, so a Standard game with scenery under 30 fps loses scenery at levels 1 and 2 ("Standard plays exactly as before" is not strictly true on slow devices).
+- `JsonKeys.cs`: a top-level key literally named like a nested path (`environment.world.style`) would collide; nothing user-controlled reaches it.
+- `build.py` exit 5 for a count mismatch over 10 percent is really a kit-table fault but tells the person "try different words".
+- A cold High Build Environment can cost up to 6 Blender jobs in a row (3 scenery and 3 world pieces): heavy against the 60-a-day limit and Play's time; not measured.
+- The wording above about which build refusals keep the count is out of date: `buildKind` gives the count back on all of them.
+
+Known loose ends that are not review findings:
 
 1. The Unity compile-check scripts (`compile-runtime.sh` and the rsp files, with the .NET stand-in harness) lived in the session's scratchpad and are
    not in the repository; they have to be rebuilt if Unity still cannot run.
