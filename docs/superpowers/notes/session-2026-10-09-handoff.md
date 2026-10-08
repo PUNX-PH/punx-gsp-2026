@@ -9,7 +9,7 @@ Users prompt a game idea; the platform generates that game (no limits on the gam
 ## State of the repo and the live site
 
 - `main` holds slices 2 to 7 and is deployed at https://punx-gsp.vercel.app (open it by that address; Vercel's per-deployment links fail Google sign-in).
-- **Local commits not pushed** (`main` is ahead of `origin/main`): the CLAUDE.md update (`2cd00ca`) and the Unity `.meta` files (`db1816e`). The slice 8 plan file is written but **not committed**; the slice 9 plan is **not written yet**. Ask before any push (a push to `main` starts a production build).
+- **Local commits not pushed** (`main` is ahead of `origin/main`): the CLAUDE.md update (`2cd00ca`) and the Unity `.meta` files (`db1816e`). Both plans are written and committed: `docs/superpowers/plans/2026-10-09-slice8-lua-games.md` and `2026-10-09-slice9-art-pipeline.md`. Ask before any push (a push to `main` starts a production build).
 - Live facts (2026-10-08): the Anthropic key works; Describe Game with Make a game now works (after the grammar fix: the game is JSON text in one string field); Preview still shows the OLD player ("hero.glb is not a valid GLB file") because the new player is not published; the packager is deployed and private (`https://packager-202701573550.us-east1.run.app`, `PACKAGER_URL` and `PACKAGER_KEY` set in Vercel) but holds **no players** yet, so Build for says "not set up".
 - Unity: Hub 3.22.2 signed in as rey@punx.ai, **Unity Personal licence active**, Editor 6000.3.25f1 with WebGL, Android (SDK, NDK, OpenJDK) and Windows modules. Batch runs work. **EditMode 167 passed, PlayMode 19 passed** (first ever run of the slice 6 and 7 Unity code).
 
@@ -23,7 +23,7 @@ Users prompt a game idea; the platform generates that game (no limits on the gam
 2. Ask, then publish the WebGL template (`tools\publish-template.ps1`, about 16 MB into the repo), push `main`, wait for the Vercel build; after that the Preview should play a described game (Describe Game card text still unseen by the owner).
 3. Ask, then upload `windows.zip`, `android.apk` and `players.json` to the packager's bucket `gs://punx-gsp-players` (steps in `packager/README.md`); test Build for.
 4. Slice 8 (Lua scripts): spec approved, plan written at `docs/superpowers/plans/2026-10-09-slice8-lua-games.md`; commit it, then execute inline (the plan lists the studio asks: vendoring MoonSharp, a Lua parser npm package).
-5. Slice 9 (art pipeline): spec approved at `docs/superpowers/specs/2026-10-08-art-pipeline-design.md`; **write the plan** (milestones are in the spec's Build order: measure and look gate, kit v2, materials and textures, variants and LODs with `target` in the worker body and two worker calls, sprite renderer, web side, Unity side, acceptance).
+5. Slice 9 (art pipeline): spec approved, plan at `docs/superpowers/plans/2026-10-09-slice9-art-pipeline.md` (its Task 1 is a gate: five reference models are shown to the owner before the rest is built). Execute after slice 8 or in parallel if two sessions are used (they touch different files: slice 8 is the Unity script host and the web script mode, slice 9 is the Blender worker, the builder and the run files).
 6. UI refresh: the owner shared a Google Sheet that is only a skills list (Design group: Impeccable, Frontend Design, UI/UX Pro Max); the project already has `frontend-design`. **Still needed from the owner: what the new UI should be** (a mockup, a few sentences, or "redesign your way").
 
 ## Owner's own to-dos (told to them; unconfirmed)
