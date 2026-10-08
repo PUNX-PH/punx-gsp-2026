@@ -62,8 +62,8 @@ export const SCRIPT_API: readonly ApiEntry[] = [
   { name: "world.find", signature: "world.find(tag)", doc: "A list of the live objects with this tag." },
   { name: "world.count", signature: "world.count(tag)", doc: "How many live objects have this tag." },
   { name: "world.clear", signature: "world.clear()", doc: "Remove every object." },
-  { name: "world.gravity", signature: "world.gravity(g)", doc: "Set the downward pull (units per second squared) for objects with gravity = true." },
-  { name: "world.bounds", signature: "world.bounds(w, h)", doc: "Set the field's width and height in units." },
+  { name: "world.gravity", signature: "world.gravity(g)", doc: "Set the downward pull (units per second squared, 20 by default) for objects with gravity = true." },
+  { name: "world.bounds", signature: "world.bounds(w, h)", doc: "Set the field's width and height in units (9 by 16 by default)." },
   { name: "world.camera", signature: "world.camera{ mode, follow, x, y, z, zoom }", doc: "Choose the view: side, top, chase, fixed (3D) or side2d, top2d (2D, drawn with sprites)." },
   { name: "obj.destroy", signature: "obj:destroy()", doc: "Remove the object." },
   { name: "obj.set_color", signature: "obj:set_color(c)", doc: "Change its color." },
@@ -85,6 +85,14 @@ export const SCRIPT_API: readonly ApiEntry[] = [
 /** The libraries a script may use besides the API above. math.random is not among them: use rand(). */
 export const ALLOWED_LIBRARIES = ["math (without random)", "string", "table"] as const;
 
+/** How the field and the objects behave, for the prompt (the player's ScriptWorld does exactly this). */
+export const FIELD_TEXT = [
+  "The field is centered on 0, 0: x runs from -width/2 to width/2 and y from -height/2 to height/2, y up. z is depth and is ignored by collisions and by the 2d cameras.",
+  "Objects move by their velocity every frame. Two objects with solid = true raise on_collide once when they begin to overlap (boxes by x, y, w, h; a sphere counts as a circle).",
+  "on_exit(obj) is raised once when an object that was inside the field has fully left it; the object is not removed, so call obj:destroy() if it should go.",
+  "An object with life = seconds is removed when it runs out. A spawn over the object or spawn-rate limit returns a dead object and does nothing.",
+].join("\n");
+
 /** The API as text for the prompt: one line per entry, in table order. */
 export function apiText(): string {
   const lines = [
@@ -93,6 +101,8 @@ export function apiText(): string {
     "",
     "What the player provides (global tables and functions):",
     ...SCRIPT_API.map((a) => `- ${a.signature}: ${a.doc}`),
+    "",
+    FIELD_TEXT,
     "",
     "Camera modes: " + CAMERA_MODES.join(", ") + ". Primitive kinds: " + PRIMITIVE_KINDS.join(", ") + ".",
     "Libraries: " + ALLOWED_LIBRARIES.join(", ") + ".",

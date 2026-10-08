@@ -66,6 +66,9 @@ describe("the script API table", () => {
     const cs = readFileSync(join(process.cwd(), "..", "unity", "runner-template", "Assets", "Runner", "Runtime", "Script", "Pure", "ScriptHost.cs"), "utf8");
     expect(cs).toContain(`InstructionsPerFrame = ${SCRIPT_LIMITS.instructionsPerFrame}`);
     expect(cs).toContain(`MaxStringLength = ${SCRIPT_LIMITS.stringLength}`);
+    const world = readFileSync(join(process.cwd(), "..", "unity", "runner-template", "Assets", "Runner", "Runtime", "Script", "Pure", "ScriptWorld.cs"), "utf8");
+    expect(world).toContain(`MaxObjects = ${SCRIPT_LIMITS.objects}`);
+    expect(world).toContain(`MaxSpawnsPerSecond = ${SCRIPT_LIMITS.spawnsPerSecond}`);
     for (const name of REMOVED_NAMES.filter((n) => n !== "loadsafe" || cs.includes("loadsafe"))) expect(cs, name).toContain(`"${name}"`);
   });
 });
