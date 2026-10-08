@@ -63,7 +63,7 @@ describe("Build Model", () => {
   });
 
   it("refuses a missing, an extra or a renamed setting", () => {
-    const sentence = "role, kind, description, run, jump, loop and quality are the only settings a Build Model step has.";
+    const sentence = "role, kind, description, run, jump, loop, quality and soft are the only settings a Build Model step has.";
     const withoutRun = spec.defaultParams();
     delete withoutRun.run;
     for (const bad of [{}, withoutRun, params({ extra: 1 }), { ...withoutRun, runs: "" }]) expect(spec.shapeProblem(bad)).toBe(sentence);

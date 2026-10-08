@@ -2,6 +2,7 @@
 // tested without a server. Every handler goes through the shared guard (origin for changes, a valid session, plain
 // failures), and nothing it returns says who owns a graph.
 import { json, makeGuard } from "@/lib/api/guard";
+import { MAX_PROMPT_CHARACTERS } from "@/lib/graph/registry";
 import type { AuthPort } from "@/lib/auth/ports";
 import { readBodyCapped, TooLargeError } from "@/lib/body";
 import { type Platform, PLATFORMS } from "@/lib/export/types";
@@ -71,10 +72,24 @@ export function makeGraphApi({ auth, graphs, domain }: GraphApiDeps) {
         const body = await readJson(req, MAX_CREATE_BODY_BYTES, "The request is too large.", "The request is not valid JSON.");
         if (!body.ok) return body.response;
         const input = body.value ?? {};
-        if (!isObject(input) || (input.name !== undefined && typeof input.name !== "string") || (input.starter !== undefined && typeof input.starter !== "boolean" && input.starter !== "described" && input.starter !== "built")) {
-          return json(400, { error: 'Send { name?: text, starter?: true, false, "described" or "built" } as JSON.' });
+        if (
+          !isObject(input) ||
+          (input.name !== undefined && typeof input.name !== "string") ||
+          (input.describe !== undefined && (typeof input.describe !== "string" || input.describe.trim() === "" || Array.from(input.describe).length > MAX_PROMPT_CHARACTERS)) ||
+          (input.starter !== undefined && typeof input.starter !== "boolean" && input.starter !== "described" && input.starter !== "built")
+        ) {
+          return json(400, { error: `Send { name?: text, starter?: true, false, "described" or "built", describe?: your words, up to ${MAX_PROMPT_CHARACTERS} characters } as JSON.` });
         }
-        return json(201, publicGraph(await graphs.createGraph(user, { name: input.name as string | undefined, starter: input.starter as boolean | "described" | "built" | undefined })));
+        return json(
+          201,
+          publicGraph(
+            await graphs.createGraph(user, {
+              name: input.name as string | undefined,
+              starter: input.starter as boolean | "described" | "built" | undefined,
+              describe: input.describe as string | undefined,
+            }),
+          ),
+        );
       }),
 
     getGraph: (req: Request, id: string) =>

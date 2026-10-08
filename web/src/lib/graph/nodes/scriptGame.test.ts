@@ -67,13 +67,13 @@ describe("the Make a game setting", () => {
 });
 
 describe("Describe Game in script mode", () => {
-  it("gives the script on the game port and no palette or feel, and reports what it made", async () => {
+  it("gives the script on the game port and its colors on the palette port (no feel), and reports what it made", async () => {
     const { service, calls } = scripts();
     const done = await describeGame({}, { prompt: "a bird that flies through pipes", makeGame: "script" }, ctxWith(service));
     expect(done.outputs?.game).toMatchObject({ type: "game", script: SCRIPT, palette: PALETTE, leftOut: "no sound", assets: [], entityFiles: [] });
-    expect(done.outputs?.palette).toBeUndefined();
+    expect(done.outputs?.palette).toEqual({ type: "palette", colors: PALETTE });
     expect(done.outputs?.feel).toBeUndefined();
-    expect(done.result).toMatchObject({ script: true, lines: SCRIPT.split("\n").length, leftOut: "no sound", palette: PALETTE, models: 0, plainShapes: [], reused: false });
+    expect(done.result).toMatchObject({ script: true, lines: SCRIPT.split("\n").length, leftOut: "no sound", palette: PALETTE, models: [], reused: false });
     expect(calls).toHaveLength(1);
     expect(calls[0].input).toMatchObject({ description: "a bird that flies through pipes", picture: null, models: [], attempt: 0 });
   });
@@ -93,21 +93,18 @@ describe("Describe Game in script mode", () => {
     expect(calls[0].input.picture).toEqual({ sha256: SHA, bytes });
   });
 
-  it("builds the models Claude asked for, puts their files on the wire, and lets a failed one be a plain shape", async () => {
+  it("lists the models Claude asked for and builds none itself: each is a Build Model step of its own", async () => {
     const assets = [
       { entity: "hero", role: "hero" as const, kind: "biped" as const, description: "a fox" },
       { entity: "coin", role: "collectible" as const, kind: "prop" as const, description: "a gem" },
     ];
-    const builder = {
-      buildModel: async (_job: unknown, input: { description: string }) => {
-        if (input.description === "a gem") throw new NodeError("Build Model: The Blender service did not answer. Try again.");
-        return { sha256: SHA, size: 1, kind: "biped", parts: 1, triangles: 1, clips: [], summary: "", skipped: [], reused: false };
-      },
-    };
+    let built = 0;
+    const builder = { buildModel: async () => void built++ };
     const ctx = ctxWith(scripts({ assets }).service, { builder, graphId: "g", derived: {}, deadline: Date.now() + 120_000 });
     const done = await describeGame({}, { prompt: "x", makeGame: "script" }, ctx);
-    expect(done.outputs?.game).toMatchObject({ entityFiles: [{ file: entityFile("hero"), sha256: SHA }] });
-    expect(done.result).toMatchObject({ models: 1, plainShapes: [{ entity: "coin", message: "The Blender service did not answer. Try again." }] });
+    expect(done.outputs?.game).toMatchObject({ assets, entityFiles: [] });
+    expect(done.result).toMatchObject({ models: ["hero", "coin"] });
+    expect(built).toBe(0);
   });
 
   it("says a script from the cache was reused", async () => {
@@ -224,6 +221,38 @@ describe("Preview with a script", () => {
   });
 });
 
+// What a Build Model step hands on (its wire value), here a stored GLB.
+const buildModelStep = async (): Promise<WireValue> => ({ type: "model", sha256: SHA, name: "hero.glb", size: 1, format: "glb", role: "hero" });
+
+describe("Game Template's numbered model inputs", () => {
+  const tuning = { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 };
+  const assets = [
+    { entity: "hero", role: "hero" as const, kind: "biped" as const, description: "x" },
+    { entity: "coin", role: "collectible" as const, kind: "prop" as const, description: "x" },
+  ];
+  const wire = (): WireValue => ({ type: "game", script: SCRIPT, palette: PALETTE, leftOut: "", assets, entityFiles: [] });
+
+  it("takes the Nth model for the Nth name Describe Game listed, and draws the rest as plain shapes", async () => {
+    const done = await gameTemplate({ game: wire(), model2: await buildModelStep() }, { tuning }, {} as ExecutorContext);
+    if (done.output?.type !== "settings") throw new Error("expected settings");
+    const checked = validateSettings(done.output.settingsText);
+    if (!checked.ok) throw new Error(checked.error);
+    expect(checked.settings.script).toEqual({ file: "game.lua", models: ["coin"] });
+    expect(done.output.entityFiles).toEqual([{ file: entityFile("coin"), sha256: SHA }]);
+  });
+
+  it("refuses a model that is not a GLB, and says to prepare it", async () => {
+    const fbx: WireValue = { type: "model", sha256: SHA, name: "x.fbx", size: 1, format: "fbx" };
+    await expect(gameTemplate({ game: wire(), model1: fbx }, { tuning }, {} as ExecutorContext)).rejects.toThrow(/model 1 is an FBX file.*Prepare Model/);
+  });
+
+  it("ignores a model wired to a number the game has no name for", async () => {
+    const done = await gameTemplate({ game: wire(), model5: await buildModelStep() }, { tuning }, {} as ExecutorContext);
+    if (done.output?.type !== "settings") throw new Error("expected settings");
+    expect(done.output.entityFiles).toEqual([]);
+  });
+});
+
 describe("Describe Game, Game Template and Preview together, as Play runs them", () => {
   it("turns words into a ready run with the script, one model and the settings", async () => {
     let n = 0;
@@ -245,7 +274,9 @@ describe("Describe Game, Game Template and Preview together, as Play runs them",
     } as unknown as ExecutorContext;
 
     const described = await describeGame({}, { prompt: "a fox that flies", makeGame: "script" }, ctx);
-    const made = await gameTemplate({ game: described.outputs!.game }, { tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } }, ctx);
+    // the Build Model step the site made for the first model hands its model to the template's model 1 input
+    const built = await buildModelStep();
+    const made = await gameTemplate({ game: described.outputs!.game, model1: built }, { tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } }, ctx);
     const done = await preview({ settings: made.output }, {}, ctx);
     const run = (await runs.listRuns(user)).find((r) => r.id === (done.result as { runId: string }).runId)!;
     expect(run.status).toBe("ready");

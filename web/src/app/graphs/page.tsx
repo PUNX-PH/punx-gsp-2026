@@ -4,6 +4,7 @@ import { AppHeader } from "@/app/AppHeader";
 import styles from "@/app/shell.module.css";
 import { currentUser } from "@/lib/auth/server";
 import { getGraphService } from "@/lib/graph/firebase";
+import { MakeItBox } from "./MakeItBox";
 import { DeleteGraphButton, NewGraphButton } from "./NewGraphButton";
 import { ThemedShell } from "./ThemedShell";
 
@@ -19,8 +20,11 @@ export default async function GraphsPage() {
         <AppHeader email={user.email} current="games" />
         <main className={styles.main}>
           <h1 className={styles.title}>Your games</h1>
-          <p className={styles.lede}>Each game is a set of steps wired together on a canvas. Open one to change it and play it, or start a new one.</p>
+          <p className={styles.lede}>Describe a game and it is made for you: the game, its models and the steps that build them, ready to play. Open any game to change a step.</p>
 
+          <MakeItBox />
+
+          <p className={styles.orStart}>Or start from a ready-made set of steps:</p>
           <NewGraphButton />
 
           {graphs.length === 0 ? (

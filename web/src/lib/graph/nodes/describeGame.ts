@@ -26,14 +26,15 @@ export const describeGame: Executor = async (inputs, params, ctx) => {
     if (!ctx.scripts) throw new NodeError("Describe Game: making a whole game is not set up on this site yet.");
     const attempt = typeof params.attempt === "number" ? params.attempt : 0;
     const made = await ctx.scripts.create({ user: ctx.user, deadline: ctx.deadline }, { description: prompt, picture, models: [], attempt });
-    // The models Claude asked for are built now (one failing only makes that model a plain shape).
-    const art = await designEntityAssets(ctx.builder, { user: ctx.user, graphId: ctx.graphId, derived: ctx.derived, deadline: ctx.deadline }, made.assets, paintingPalette(made.palette));
+    // The models Claude asked for are not built here: each is a Build Model step of its own in the graph (the site makes them from this answer), wired
+    // to the Game Template's numbered model inputs in the order of `assets`, so each can be seen, changed and rebuilt.
     const outputs: Record<string, WireValue> = {
-      game: { type: "game", script: made.script, palette: made.palette, leftOut: made.leftOut, assets: made.assets, entityFiles: art.files },
+      game: { type: "game", script: made.script, palette: made.palette, leftOut: made.leftOut, assets: made.assets, entityFiles: [] },
+      palette: { type: "palette", colors: made.palette },
     };
     return {
       outputs,
-      result: { script: true, lines: made.script.split("\n").length, leftOut: made.leftOut, palette: made.palette, models: art.files.length, plainShapes: art.fallbacks, reused: !made.asked },
+      result: { script: true, lines: made.script.split("\n").length, leftOut: made.leftOut, palette: made.palette, models: made.assets.map((a) => a.entity), reused: !made.asked },
     };
   }
 

@@ -93,6 +93,13 @@ export async function runGraph(graph: Graph, deps: RunDeps, onEvent: (event: Run
       let message = UNEXPECTED;
       if (error instanceof NodeError) message = error.message;
       else log({ node: id, type: node.type, failure: describeFailure(error) });
+      // A soft step (one the site made from a described game) that fails does not stop the game: it hands nothing on, and what follows uses a plain shape.
+      if (node.params.soft === true && error instanceof NodeError) {
+        outputs.set(id, {});
+        outcomes.set(id, { state: "done", result: { notBuilt: message.replace(/^[^:]+: /, "") } });
+        emit({ type: "node-done", node: id, result: { notBuilt: message.replace(/^[^:]+: /, "") } });
+        continue;
+      }
       outcomes.set(id, { state: "failed", error: message });
       emit({ type: "node-failed", node: id, error: message });
     }

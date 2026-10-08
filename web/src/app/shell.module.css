@@ -336,3 +336,50 @@
 @media (prefers-reduced-motion: reduce) {
   .wire { animation: none; }
 }
+
+/* ---- the way in: one description makes the whole game ---- */
+
+.makeIt {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.makeItLabel {
+  color: var(--text);
+  font-family: var(--font-display), var(--font-geist-sans), system-ui, sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.makeItText {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--canvas);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.makeItText:hover:not(:disabled) { border-color: var(--muted); }
+.makeItText:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.makeItText:disabled { opacity: 0.6; }
+
+.makeItBar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.makeItBar .hint { max-width: 40ch; }
+.makeItBar .cta { flex: none; }
+
+.orStart { color: var(--muted); font-size: 14px; }
+
+@media (max-width: 860px) {
+  .makeItBar { flex-direction: column; align-items: stretch; }
+}

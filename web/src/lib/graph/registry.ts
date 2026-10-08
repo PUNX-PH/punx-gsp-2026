@@ -128,8 +128,11 @@ const MOTION_BOXES = [
 ] as const;
 
 function buildModelParams(params: Record<string, unknown>): string | null {
-  if (!hasExactlyAndMaybeQuality(params, ["role", "kind", "description", "run", "jump", "loop"])) {
-    return "role, kind, description, run, jump, loop and quality are the only settings a Build Model step has.";
+  // `soft` is optional and true only for a step the site made from a described game: if it fails, the game goes on and the model is a plain shape.
+  const { soft, ...rest } = params;
+  if (Object.hasOwn(params, "soft") && typeof soft !== "boolean") return "soft must be on or off.";
+  if (!hasExactlyAndMaybeQuality(rest, ["role", "kind", "description", "run", "jump", "loop"])) {
+    return "role, kind, description, run, jump, loop, quality and soft are the only settings a Build Model step has.";
   }
   const { role, kind, description } = params;
   if (typeof role !== "string" || !Object.hasOwn(ROLE_FILES, role)) return "role must be hero, obstacle or collectible.";
@@ -165,6 +168,12 @@ const port = (name: string, label: string, help: string, type: WireType, require
   required,
   ...(missing ? { missing } : {}),
 });
+
+/** How many numbered model inputs a script game has: its first, second and so on model, in the order Describe Game lists them. */
+export const SCRIPT_MODEL_PORTS = 6;
+const MODEL_PORTS: PortSpec[] = Array.from({ length: SCRIPT_MODEL_PORTS }, (_, i) =>
+  port(`model${i + 1}`, `model ${i + 1}`, `The game's model number ${i + 1}, in the order Describe Game lists them. Without one, a plain shape is used.`, "model"),
+);
 
 export const NODE_SPECS: Record<string, NodeSpec> = {
   "reference-image": {
@@ -281,6 +290,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
       port("obstacle", "obstacle model", "The obstacles' model. Without one, a built-in shape is used.", "model"),
       port("collectible", "collectible model", "The collectibles' model. Without one, a built-in shape is used.", "model"),
       port("game", "game rules", "A whole game from Describe Game. Without one, the runner below is made.", "game"),
+      ...MODEL_PORTS,
     ],
     outputs: [port("settings", "game", "The finished game, ready to preview.", "settings")],
     defaultParams: () => ({ tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } }),

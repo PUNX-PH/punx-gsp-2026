@@ -4,8 +4,9 @@ import { getGraphService } from "@/lib/graph/firebase";
 import { GraphError } from "@/lib/graph/types";
 import { Editor } from "./Editor";
 
-export default async function GraphPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function GraphPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ play?: string }> }) {
   const { id } = await params;
+  const { play } = await searchParams;
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
@@ -17,5 +18,5 @@ export default async function GraphPage({ params }: { params: Promise<{ id: stri
       throw error;
     });
 
-  return <Editor id={record.id} name={record.name} initialGraph={record.graph} initialAssets={record.assets} initialRunId={record.lastRunId} />;
+  return <Editor id={record.id} name={record.name} initialGraph={record.graph} initialAssets={record.assets} initialRunId={record.lastRunId} autoPlay={play === "1"} />;
 }

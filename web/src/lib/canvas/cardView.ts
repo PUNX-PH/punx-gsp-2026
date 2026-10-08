@@ -162,6 +162,11 @@ const plural = (n: number, word: string) => `${count(n)} ${word}${n === 1 ? "" :
 // What a finished Build Model step handed over (lib/graph/nodes/buildModel.ts), or null when the result is not that. Nothing in it is
 // trusted: the kind and the clips must be ones we have, and the summary is kept as text for the card to draw as text.
 function builtModel(result: unknown): ResultView | null {
+  // A soft step (made from a described game) that could not build: the game goes on with a plain shape, and the card says why.
+  const soft = result as { notBuilt?: unknown } | null | undefined;
+  if (typeof soft === "object" && soft !== null && typeof soft.notBuilt === "string") {
+    return { kind: "text", text: `Not built: ${soft.notBuilt} The game uses a plain shape for it. Press Play again to try building it.` };
+  }
   const r = result as { kind?: unknown; parts?: unknown; triangles?: unknown; size?: unknown; clips?: unknown; summary?: unknown; skipped?: unknown; reused?: unknown; quality?: unknown; vertices?: unknown } | null | undefined;
   if (typeof r !== "object" || r === null) return null;
   const { kind, parts, triangles, size, clips, summary, skipped, reused, quality, vertices } = r;

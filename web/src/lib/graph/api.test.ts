@@ -299,7 +299,7 @@ describe("creating a graph from the Build a character starter", () => {
     const { api, service } = setup();
     const response = await api.createGraph(request("POST", "/api/graphs", { body: asJson({ starter }) }));
     expect(response.status).toBe(400);
-    expect((await readJson(response)).error).toBe('Send { name?: text, starter?: true, false, "described" or "built" } as JSON.');
+    expect((await readJson(response)).error).toBe('Send { name?: text, starter?: true, false, "described" or "built", describe?: your words, up to 500 characters } as JSON.');
     expect(await service.listGraphs({ uid: "alice", email: "alice@punx.ai" })).toEqual([]);
   });
 });

@@ -15,6 +15,7 @@ import { checkGraph } from "@/lib/graph/checks";
 import { readImage, sniffKind } from "@/lib/graph/image";
 import { checkFbx } from "@/lib/modelFiles";
 import { EXECUTORS } from "@/lib/graph/nodes";
+import { generatedGraph } from "@/lib/graph/generated";
 import { PLAY_BUDGET_MS } from "@/lib/graph/playTime";
 import { NODE_SPECS, WIRE_WORDS } from "@/lib/graph/registry";
 import { type RunResult, runGraph } from "@/lib/graph/runner";
@@ -50,7 +51,7 @@ export type PlayResult = { kind: "invalid"; problems: Problem[] } | { kind: "ran
 
 export interface GraphService {
   /** `starter: true` is the picture-and-palette starter, `"described"` the Describe a game one, `"built"` the Build a character one, anything else an empty graph. */
-  createGraph(user: User, input: { name?: string; starter?: boolean | "described" | "built" }): Promise<GraphRecord>;
+  createGraph(user: User, input: { name?: string; starter?: boolean | "described" | "built"; describe?: string }): Promise<GraphRecord>;
   listGraphs(user: User): Promise<GraphRecord[]>;
   getGraph(user: User, id: string): Promise<GraphRecord>;
   saveGraph(user: User, id: string, input: { name?: string; graph: unknown }): Promise<GraphRecord>;
@@ -155,21 +156,36 @@ export function makeGraphService(deps: GraphServiceDeps): GraphService {
       const existing = await records.listByOwner(user.uid);
       if (existing.length >= MAX_GRAPHS_PER_PERSON) throw new GraphError(409, `You have ${MAX_GRAPHS_PER_PERSON} graphs. Delete one first.`);
 
+      // One description makes the whole graph: the AI writes the game and names the models it needs, and the steps for them are made and wired here.
+      let made: Graph | null = null;
+      if (input.describe !== undefined) {
+        if (!deps.scripts) throw new GraphError(503, "Making a whole game is not set up on this site yet.");
+        try {
+          const result = await deps.scripts.create({ user, deadline: now() + PLAY_BUDGET_MS }, { description: input.describe, picture: null, models: [], attempt: 0 });
+          made = generatedGraph({ words: input.describe, assets: result.assets });
+        } catch (error) {
+          if (!(error instanceof NodeError)) throw error;
+          const plain = error.message.replace(/^[^:]+: /, "");
+          throw new GraphError(503, plain.charAt(0).toUpperCase() + plain.slice(1));
+        }
+      }
+
       const record: GraphRecord = {
         id: newId(),
         ownerUid: user.uid,
         ownerEmail: user.email,
-        name: cleanName(input.name),
+        name: cleanName(input.name ?? (input.describe !== undefined ? input.describe.slice(0, 40) : undefined)),
         createdAt: now(),
         updatedAt: now(),
         graph:
-          input.starter === "described"
+          made ??
+          (input.starter === "described"
             ? describedStarterGraph()
             : input.starter === "built"
               ? builtStarterGraph()
               : input.starter
                 ? starterGraph()
-                : { schemaVersion: 1, nodes: [], edges: [] },
+                : { schemaVersion: 1, nodes: [], edges: [] }),
         assets: {},
         lastRunId: null,
       };

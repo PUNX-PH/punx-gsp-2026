@@ -67,6 +67,7 @@ describe("a step's identity", () => {
       ["obstacle", "obstacle model", "model", false, false],
       ["collectible", "collectible model", "model", false, false],
       ["game", "game rules", "game", false, false],
+      ...[1, 2, 3, 4, 5, 6].map((n) => [`model${n}`, `model ${n}`, "model", false, false]),
     ]);
     expect(template.outputs.map((p) => [p.name, p.type, p.wired])).toEqual([["settings", "settings", true]]);
     expect(step("n2").inputs[0]).toMatchObject({ name: "image", required: true, wired: true });

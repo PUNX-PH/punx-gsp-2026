@@ -48,6 +48,8 @@ export interface EditorProps {
   initialGraph: Graph;
   initialAssets: Assets;
   initialRunId: string | null;
+  /** Play as soon as the page opens (a game just made from one description). */
+  autoPlay?: boolean;
 }
 
 const NODE_TYPES = { step: StepCard };
@@ -85,7 +87,7 @@ export function Editor(props: EditorProps) {
   );
 }
 
-function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorProps) {
+function Canvas({ id, name, initialGraph, initialAssets, initialRunId, autoPlay }: EditorProps) {
   const [state, dispatch] = useReducer(editorReducer, { graph: initialGraph, assets: initialAssets, lastRunId: initialRunId }, initialEditorState);
   const latest = useRef(state);
   useEffect(() => {
@@ -378,6 +380,15 @@ function Canvas({ id, name, initialGraph, initialAssets, initialRunId }: EditorP
     [fitView],
   );
 
+  // A game just made from one description opens already played: the steps run in front of the person, in order. The flag is taken off the address first,
+  // so reloading the page does not play again.
+  const autoPlayed = useRef(false);
+  useEffect(() => {
+    if (!autoPlay || autoPlayed.current) return;
+    autoPlayed.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    void play();
+  }, [autoPlay, play]);
   // ---- what the cards can ask for ----
 
   const actions = useMemo<EditorActions>(
