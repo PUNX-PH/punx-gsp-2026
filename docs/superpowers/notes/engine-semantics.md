@@ -34,7 +34,7 @@ hero's vertical speed each step when the hero has a `jump` or `flip` control: `v
 | `fall` | `speed` | constant downward speed (like `move` `down`) |
 | `follow` | `target`, `speed` | each step moves toward the nearest live entity of type `target` at `speed`, per axis, never overshooting |
 | `control` | `on` (`tap`,`hold`), `does`, `power` | input drives an action, see Controls |
-| `spawn` | `entity`, `pattern`, `intervalMs`, `speed`, `ramp` | a spawner (not drawn); creates objects, see Spawn patterns |
+| `spawn` | `entity`, `pattern`, `intervalMs`, `speed`, `ramp` | makes the entity a **spawner**: it is neither drawn nor collidable (its `w` and `h` may be 0) and its `x`,`y` is where `stream` spawns; see Spawn patterns. A nonzero `speed` replaces the spawned entity's `move` or `fall` speed |
 | `lifetime` | `ms` | the entity is destroyed after `ms` |
 
 ## Controls
@@ -42,6 +42,7 @@ hero's vertical speed each step when the hero has a `jump` or `flip` control: `v
 | name | meaning |
 |---|---|
 | `jump` | on input, if the entity is on the floor (y at its start y or on a platform), `vy = power` |
+| `flap` | on input, `vy = power` wherever the entity is |
 | `flip` | on input, gravity direction for this entity flips sign |
 | `fire` | on input, spawns the first `projectile` entity type at the entity with `vy = power` (cooldown 10 steps) |
 | `switchLane` | on input, moves one lane toward the end it is not at (alternates) |
@@ -75,6 +76,8 @@ A spawn is skipped (silently) when 150 objects are live or when it would exceed 
 
 Overlap: `box` against `box` by closed intervals on both axes; `circle` is the circle of diameter `min(w,h)`; mixed pairs use the circle's bounding box.
 
+Cleanup (phase 7) removes destroyed objects and any object other than the hero that is outside the field by more than its own size.
+
 ## Conditions
 
 A rule's `when` is a list of `{ counter, op, value }` joined by `and`; `op` is `<`, `<=`, `==`, `>=` or `>`. An empty or missing list is true.
@@ -85,7 +88,7 @@ A rule's `when` is a list of `{ counter, op, value }` joined by `and`; `op` is `
 |---|---|---|
 | `add` | `counter`, `n` | `counter += n`, clamped |
 | `set` | `counter`, `n` | `counter = n`, clamped |
-| `destroy` | `target` (`a`,`b`,`self`) | the object is removed at cleanup; `a` and `b` are the colliding pair of a `collide` event, `self` is the hero otherwise |
+| `destroy` | `target` (`a`,`b`,`self`) | the object is removed at cleanup; `a` and `b` are the colliding pair of a `collide` event, `self` is the exiting object of an `exitBounds` event and the hero otherwise |
 | `spawn` | `entity` | creates one object of that type at its own start position |
 | `bounce` | `target` (`a`,`b`) | the object's vertical speed is negated |
 | `win` | none | the round ends `won` |

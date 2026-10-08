@@ -30,7 +30,7 @@ export const DIRECTIONS = ["left", "right", "up", "down"] as const;
 export const AXES = ["x", "y"] as const;
 
 export const BEHAVIOR_NAMES = ["move", "lane", "oscillate", "fall", "follow", "control", "spawn", "lifetime"] as const;
-export const CONTROL_NAMES = ["jump", "flip", "fire", "switchLane", "thrust"] as const;
+export const CONTROL_NAMES = ["jump", "flap", "flip", "fire", "switchLane", "thrust"] as const;
 export const SPAWN_PATTERNS = ["random", "lanes", "wave", "rain", "stream"] as const;
 export const EVENT_NAMES = ["start", "tick", "tap", "hold", "release", "collide", "exitBounds", "counterReaches"] as const;
 export const ACTION_NAMES = ["add", "set", "destroy", "spawn", "bounce", "win", "lose", "speedUp"] as const;
