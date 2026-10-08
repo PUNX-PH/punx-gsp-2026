@@ -38,8 +38,28 @@ describe("Describe Game with Make a game on", () => {
     expect(game).toMatchObject({ type: "game", leftOut: "no 3D worlds", assets: [], entityFiles: [] });
     expect(done.outputs?.palette).toEqual({ type: "palette", colors: padPalette(spec().look.palette) });
     expect(done.outputs?.feel).toBeUndefined();
-    expect(done.result).toMatchObject({ game: true, entities: 5, rules: 2, leftOut: "no 3D worlds", reused: false });
+    expect(done.result).toMatchObject({ game: true, entities: 5, rules: 2, leftOut: "no 3D worlds", models: 0, plainShapes: [], reused: false });
     expect(calls).toHaveLength(1);
+  });
+
+  it("builds the models Claude asked for, puts their files on the game wire, and lets a failed one be a plain shape", async () => {
+    const assets = [
+      { entity: "hero", role: "hero" as const, kind: "biped" as const, description: "a fox" },
+      { entity: "coin", role: "collectible" as const, kind: "prop" as const, description: "a gem" },
+    ];
+    const built: string[] = [];
+    const builder = {
+      buildModel: async (_job: unknown, input: { description: string }) => {
+        if (input.description === "a gem") throw new NodeError("Build Model: The Blender service did not answer. Try again.");
+        built.push(input.description);
+        return { sha256: SHA, size: 1, kind: "biped", parts: 1, triangles: 1, clips: [], summary: "", skipped: [], reused: false };
+      },
+    };
+    const ctx = { ...describeCtx(games({ assets }).service), builder, graphId: "g", derived: {}, deadline: Date.now() + 120_000 } as unknown as ExecutorContext;
+    const done = await describeGame({}, { prompt: "x", makeGame: true }, ctx);
+    expect(done.outputs?.game).toMatchObject({ entityFiles: [{ file: entityFile("hero"), sha256: SHA }] });
+    expect(done.result).toMatchObject({ models: 1, plainShapes: [{ entity: "coin", message: "The Blender service did not answer. Try again." }] });
+    expect(built).toEqual(["a fox"]);
   });
 
   it("says a game from the cache was reused", async () => {
