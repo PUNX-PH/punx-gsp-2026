@@ -25,7 +25,7 @@ const asClaudeWrites = (spec: Json): Json => ({
 });
 
 const answer = (game: Json, extra: Json = {}): DesignReply => ({
-  raw: { game: asClaudeWrites(game), leftOut: "", assets: [], ...extra },
+  raw: { game: JSON.stringify(game), leftOut: "", assets: [], ...extra }, // the game is JSON text, as the prompt asks
   usage: { inputTokens: 100, outputTokens: 200 },
 });
 
@@ -154,10 +154,26 @@ describe("the game service", () => {
     expect(cache.entries.size).toBe(0);
   });
 
-  it("keeps the count when the answer is beyond repair, and says so plainly", async () => {
-    const { service, limits } = make([{ raw: "not a game", usage: { inputTokens: 1, outputTokens: 1 } }]);
+  it("asks once more when the answer cannot be read, and keeps both counts if the second cannot either", async () => {
+    const bad = { raw: "not a game", usage: { inputTokens: 1, outputTokens: 1 } };
+    const { service, limits, author } = make([bad, bad]);
     expect(await message(service.create(job, input))).toBe("Describe Game: The AI could not build this game. Try different words.");
-    expect(used(limits)).toBe(1);
+    expect(used(limits)).toBe(2);
+    expect(author.calls[1].retryReason).toMatch(/no "game"/);
+  });
+
+  it("tells Claude when its game text is not JSON, and takes the corrected game", async () => {
+    const broken = { raw: { game: '{"engine": 1,', leftOut: "", assets: [] }, usage: { inputTokens: 1, outputTokens: 1 } };
+    const { service, author } = make([broken, answer(fixture("runner"))]);
+    const r = await service.create(job, input);
+    expect(r.asked).toBe(true);
+    expect(author.calls[1].retryReason).toMatch(/not valid JSON/);
+  });
+
+  it("still takes a game sent as an object, written with named lists, and repairs it", async () => {
+    const { service } = make([{ raw: { game: asClaudeWrites(fixture("runner")), leftOut: "", assets: [] }, usage: { inputTokens: 1, outputTokens: 1 } }]);
+    const r = await service.create(job, input);
+    expect(checkSpec(r.spec).ok).toBe(true);
   });
 
   it("keeps the count on a refusal, and gives it back when the service did not answer or something unexpected happened", async () => {

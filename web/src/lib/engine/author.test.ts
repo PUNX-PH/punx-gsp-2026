@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { ClaudeClient } from "@/lib/ai/anthropic";
 import { makeClaudeGameAuthor } from "./author";
+import { checkSpec } from "./check";
+import { EXAMPLE_GAME } from "./exampleGame";
+import { playtest } from "./playtest";
 import { ACTION_FIELDS, BEHAVIOR_FIELDS, EVENT_FIELDS } from "./fields";
 import { gameAnswerSchema, gameSystemPrompt } from "./prompts";
 import { ENGINE_CAPS } from "./spec";
@@ -46,10 +49,21 @@ describe("the system prompt", () => {
   });
 });
 
+describe("the example game in the prompt", () => {
+  it("is a game the engine accepts and the playtest passes, and the prompt shows it whole", () => {
+    expect(checkSpec(EXAMPLE_GAME).ok).toBe(true);
+    expect(playtest(EXAMPLE_GAME)).toEqual({ ok: true });
+    expect(gameSystemPrompt()).toContain(JSON.stringify(EXAMPLE_GAME));
+  });
+});
+
 describe("the answer schema", () => {
   it("is the game, what was left out, and the assets, with nothing else allowed", () => {
-    const schema = gameAnswerSchema() as { required: string[]; additionalProperties: boolean; properties: Record<string, { items?: { required: string[] } }> };
+    const schema = gameAnswerSchema() as { required: string[]; additionalProperties: boolean; properties: Record<string, { type?: string; items?: { required: string[] } }> };
     expect(schema.required).toEqual(["game", "leftOut", "assets"]);
+    // The game is text: a schema spelling out every behavior, event and action is too large for the API's grammar compiler (a 400 on the live site).
+    expect(schema.properties.game.type).toBe("string");
+    expect(JSON.stringify(schema).length).toBeLessThan(1500);
     expect(schema.additionalProperties).toBe(false);
     expect(schema.properties.assets.items!.required).toEqual(["entity", "role", "kind", "description"]);
   });

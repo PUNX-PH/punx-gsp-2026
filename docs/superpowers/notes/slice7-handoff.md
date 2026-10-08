@@ -63,8 +63,11 @@ changes) are described in the ledger; three survivors are equivalent mutants.
   its entity files (`entity-NAME.glb`); Preview stores only those (`settings.entityFiles` present means a game). Old settings never touch the engine.
 - **Describe Game's `makeGame` setting is optional on save** (a graph saved before means false) and true in new steps; with it on the step outputs `game` and
   `palette` and no `feel`. The described starter now wires `game` into Game Template.
-- **Claude's answer is `{ game, leftOut, assets }`** in structured outputs; counters and entities are lists with a `name` in the schema (structured outputs forbid
-  map-valued `additionalProperties`) and repair turns them into maps. **Unproven: that the API accepts this schema** (the `anyOf` of behaviors, events and actions).
+- **Claude's answer is `{ game, leftOut, assets }` where `game` is JSON text.** The first live Play (2026-10-08) got a 400 "the compiled grammar is too large": a schema that spells out
+  every behavior, event and action is more than the API's grammar compiler takes (so the same risk may sit in the Build Model and Auto schemas, still untested live). The
+  schema is now tiny (a string, a string, a list of asset requests); the prompt gives the shape and one complete example (`exampleGame.ts`, tested to pass the checker and the
+  playtest), and repair, the checker and the playtest make it a game. A game that cannot be read, or is not playable, gets one retry that says why. Repair still accepts
+  counters and entities as named lists. A 400's explanation is now logged (`detail`, shortened, keys removed).
 - **The game is cached as text** (`CachedGame.spec` is a JSON string) because Firestore may sort a map's keys, and the entity order decides event order.
 - **Determinism:** integers only (thousandths of a unit), 60 Hz, one xorshift32 generator; `steps = floor((ms*60+500)/1000)`.
 - **The playtest** rejects a game lost within half a second with no input, a game with no way to end, a game no test player survives for 3 seconds, and a

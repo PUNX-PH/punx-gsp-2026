@@ -126,6 +126,8 @@ function readCached(value: CachedGame): StoredGame | null {
   }
 }
 
+type Read = { ok: false; reason: string } | { ok: true; game: StoredGame; verdict: ReturnType<typeof playtest> };
+
 export function makeGameService(deps: GameDeps): GameService {
   const log = deps.log ?? (() => {});
   const problem = (message: string) => new NodeError(`${LABEL}: ${message}`);
@@ -158,17 +160,28 @@ export function makeGameService(deps: GameDeps): GameService {
     }
   }
 
-  /** The reply as a checked game and its playtest verdict; null when nothing usable could be made of it. */
-  function interpret(reply: DesignReply, wired: string[]): { game: StoredGame; verdict: ReturnType<typeof playtest> } | null {
-    if (!isObject(reply.raw)) return null;
-    const repaired = repairSpec(reply.raw.game);
-    if (!repaired) return null;
+  /**
+   * The reply as a checked game and its playtest verdict, or the reason it could not be used (a sentence Claude can act on in its one retry). The game
+   * arrives as JSON text in `game` (an object is accepted too); repair, the engine's checks and the playtest are what make it a game.
+   */
+  function read(reply: DesignReply, wired: string[]): Read {
+    if (!isObject(reply.raw) || reply.raw.game === undefined) return { ok: false, reason: 'Your answer had no "game" holding the game as JSON text.' };
+    let game: unknown = reply.raw.game;
+    if (typeof game === "string") {
+      try {
+        game = JSON.parse(game);
+      } catch {
+        return { ok: false, reason: 'The text in "game" was not valid JSON. Write one JSON object, with no comments or trailing commas.' };
+      }
+    }
+    const repaired = repairSpec(game);
+    if (!repaired) return { ok: false, reason: "The game could not be used: it needs exactly one hero entity and the parts described, each with its own parameters." };
     const assets = checkedAssets(reply.raw.assets, repaired.spec);
     const bound = bindModels(repaired.spec, assets, wired);
     const checked = checkSpec(bound);
-    if (!checked.ok) return null;
+    if (!checked.ok) return { ok: false, reason: `The game did not pass the engine's checks: ${checked.error}` };
     const leftOut = typeof reply.raw.leftOut === "string" ? cleanPrompt(reply.raw.leftOut).slice(0, MAX_LEFT_OUT) : "";
-    return { game: { spec: checked.spec, leftOut, assets, notes: repaired.notes }, verdict: playtest(checked.spec) };
+    return { ok: true, game: { spec: checked.spec, leftOut, assets, notes: repaired.notes }, verdict: playtest(checked.spec) };
   }
 
   return {
@@ -188,21 +201,20 @@ export function makeGameService(deps: GameDeps): GameService {
       const author = (retryReason?: string) => (timeoutMs: number) =>
         deps.author.author({ description, picture: input.picture?.bytes ?? null, models: input.models, retryReason, timeoutMs });
 
-      let usage = { inputTokens: 0, outputTokens: 0 };
       let reply = await ask(job, author());
-      usage = reply.usage;
-      let result = interpret(reply, input.models);
-      if (!result) {
-        log({ step: "describe-game", call: "game", outcome: "bad-answer", ...reply.usage });
-        throw problem(BAD_ANSWER);
-      }
-      if (!result.verdict.ok) {
-        const reason = result.verdict.reason;
-        log({ step: "describe-game", call: "game", outcome: "playtest-failed", retry: true });
+      let usage = reply.usage;
+      let result = read(reply, input.models);
+      if (!result.ok || !result.verdict.ok) {
+        const reason = result.ok ? (result.verdict.ok ? "" : result.verdict.reason) : result.reason;
+        log({ step: "describe-game", call: "game", outcome: result.ok ? "playtest-failed" : "unreadable", retry: true });
         reply = await ask(job, author(reason));
         usage = { inputTokens: usage.inputTokens + reply.usage.inputTokens, outputTokens: usage.outputTokens + reply.usage.outputTokens };
-        result = interpret(reply, input.models);
-        if (!result || !result.verdict.ok) {
+        result = read(reply, input.models);
+        if (!result.ok) {
+          log({ step: "describe-game", call: "game", outcome: "bad-answer", ...usage });
+          throw problem(BAD_ANSWER);
+        }
+        if (!result.verdict.ok) {
           log({ step: "describe-game", call: "game", outcome: "not-playable", ...usage });
           throw problem(NOT_PLAYABLE);
         }

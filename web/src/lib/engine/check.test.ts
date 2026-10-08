@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { checkSpec, gameSpecSchema } from "./check";
+import { checkSpec } from "./check";
 
 // The tests edit a parsed fixture freely, so it is deliberately untyped.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -80,12 +80,5 @@ describe("checkSpec", () => {
     big.look.palette = ["#ffffff"];
     big.padding = "x".repeat(70000);
     expect(error(big)).toMatch(/64 KiB/);
-  });
-
-  it("has a schema whose top-level keys are exactly the spec's", () => {
-    expect(Object.keys(gameSpecSchema.properties).sort()).toEqual(
-      ["counters", "difficulty", "ends", "engine", "entities", "look", "rules", "seed", "world"],
-    );
-    expect(gameSpecSchema.additionalProperties).toBe(false);
   });
 });
