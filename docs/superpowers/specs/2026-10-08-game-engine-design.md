@@ -8,6 +8,10 @@ A creator describes a hypercasual game in words, with pictures, and gets that ga
 hypercasual games (for example a lane runner, a tap-to-flap flier, a falling-object catcher) are each described in words and play correctly in
 the published player with **no new Unity build**.
 
+**The creator describes the game; the platform generates all of it.** The game runs in Unity (the pre-built WebGL player), and **Claude handles the
+assets**: for every entity in the spec Claude also writes the asset (a Blender recipe, built by the private worker), so the creator wires no art nodes.
+Uploaded models and pictures remain optional references.
+
 ## Constraints (carried over)
 
 - Hypercasual only: one core mechanic, one-touch controls, about a minute a session, low-poly or flat art, small builds.
@@ -70,7 +74,11 @@ Entities draw with the glTF models the graph supplied or built-in primitives mad
 3. C# engine, run against the same fixtures (compiled and run on the .NET stand-in until Unity can run).
 4. Claude authoring: prompt, schema, cache, limits, the repair retry; Describe Game and Game Template changes; settings contract.
 5. The runner as a built-in spec; migration and the "old games play the same" tests.
-6. Entities bound to Build Model, Prepare Model and Make Shape outputs; the canvas starter "Describe a game".
+6. **Claude-made assets:** each entity carries an `art` request (a role, a kind and a short description). A new step in Play designs each entity's
+   recipe (the Build Model designer, reused), builds it on the worker (Standard by default, High on request), caches it, and binds the GLB to the
+   entity; an entity whose build fails falls back to a flat primitive of its color. Wired-in models, when present, override the generated ones.
+   The canvas starter "Describe a game" is Reference Image (optional), Describe Game, Game Template, Preview. Limits and give-back rules as in slice 6;
+   a game of up to 12 entities can cost up to 12 Blender jobs, so the plan must cap generated assets per game (proposed: 6, the rest primitives).
 7. Rebuild and publish the template, measure, live checks (needs Unity Hub sign-in, a phone, the funded key).
 
 ## Risks and open points
