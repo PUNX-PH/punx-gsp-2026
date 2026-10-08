@@ -1,0 +1,73 @@
+{
+ "engine": 1,
+ "seed": 5,
+ "world": {
+  "camera": "side",
+  "gravity": 0,
+  "width": 10000,
+  "height": 6000,
+  "scroll": 0
+ },
+ "counters": {
+  "score": 0,
+  "lives": 3
+ },
+ "entities": {
+  "hero": {
+   "role": "hero",
+   "model": "box",
+   "color": 0,
+   "w": 800,
+   "h": 800,
+   "collider": "box",
+   "x": 2000,
+   "y": 0,
+   "behaviors": []
+  },
+  "dust": {
+   "role": "hazard",
+   "model": "box",
+   "color": 0,
+   "w": 100,
+   "h": 100,
+   "collider": "box",
+   "x": 5000,
+   "y": 3000,
+   "behaviors": [
+    {
+     "type": "lifetime",
+     "ms": 600000
+    }
+   ]
+  }
+ },
+ "rules": [
+  {
+   "on": {
+    "type": "tick",
+    "everyMs": 100
+   },
+   "do": [
+    {
+     "type": "spawn",
+     "entity": "dust"
+    }
+   ]
+  }
+ ],
+ "ends": {
+  "timeLimitMs": 0,
+  "winOnTime": true,
+  "scoreToWin": 0
+ },
+ "difficulty": {
+  "rampMs": 0,
+  "speedPercent": 0,
+  "spawnPercent": 0
+ },
+ "look": {
+  "palette": [
+   "#ff0000"
+  ]
+ }
+}

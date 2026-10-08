@@ -8,10 +8,18 @@ import { describe, expect, it } from "vitest";
 import { BAD_CASES } from "./badCases";
 import { checkSpec } from "./check";
 import { runLog, stateDigest, type InputLog } from "./log";
+import { MICRO_CASES } from "./microCases";
 import type { GameSpec } from "./spec";
 
 const here = join(__dirname, "fixtures");
 const unity = join(process.cwd(), "..", "unity", "runner-template", "Assets", "Runner", "Tests", "Engine");
+if (process.env.UPDATE_ENGINE_FIXTURES === "1") {
+  for (const c of MICRO_CASES) {
+    writeFileSync(join(here, "specs", `${c.name}.json`), JSON.stringify(c.spec, null, 1) + "\n");
+    writeFileSync(join(here, "logs", `${c.name}.json`), JSON.stringify(c.log));
+  }
+}
+
 const names = readdirSync(join(here, "specs")).map((f) => f.replace(/\.json$/, "")).sort();
 const read = <T>(file: string): T => JSON.parse(readFileSync(file, "utf8")) as T;
 
@@ -57,6 +65,14 @@ describe("shared engine fixtures", () => {
     expect(all.some((c) => /e=.*:(spike|drone|rock|post|apple):/.test(c.digest))).toBe(true);
     expect(all.some((c) => /score=[1-9]/.test(c.digest))).toBe(true);
     expect(all.some((c) => /status=(won|lost)/.test(c.digest))).toBe(true);
+  });
+
+  it("has the micro cases as files, and every one is a checked spec", () => {
+    for (const c of MICRO_CASES) {
+      expect(read(join(here, "specs", `${c.name}.json`))).toEqual(c.spec);
+      expect(read(join(here, "logs", `${c.name}.json`))).toEqual(c.log);
+      expect(checkSpec(c.spec).ok, c.name).toBe(true);
+    }
   });
 
   it("refuses every bad case with the recorded sentence", () => {

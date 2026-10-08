@@ -14,7 +14,14 @@ namespace Runner.Tests
     {
         static string Path_(string relative) => System.IO.Path.Combine(Application.dataPath, "Runner/Tests/Engine", relative);
 
-        static readonly string[] Names = { "catcher", "features-a", "features-b", "flapper", "runner" };
+        // Every spec in Tests/Engine/specs: the three games, the two vocabulary sweeps and the micro cases.
+        static IEnumerable<string> Names()
+        {
+            var names = new List<string>();
+            foreach (var file in Directory.GetFiles(Path_("specs"), "*.json")) names.Add(System.IO.Path.GetFileNameWithoutExtension(file));
+            names.Sort(System.StringComparer.Ordinal);
+            return names;
+        }
 
         [TestCaseSource(nameof(Names))]
         public void ReplaysToTheRecordedDigests(string name)

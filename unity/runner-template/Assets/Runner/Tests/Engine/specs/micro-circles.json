@@ -1,0 +1,161 @@
+{
+ "engine": 1,
+ "seed": 5,
+ "world": {
+  "camera": "side",
+  "gravity": 0,
+  "width": 10000,
+  "height": 6000,
+  "scroll": 0
+ },
+ "counters": {
+  "score": 0,
+  "lives": 3
+ },
+ "entities": {
+  "hero": {
+   "role": "hero",
+   "model": "box",
+   "color": 0,
+   "w": 800,
+   "h": 800,
+   "collider": "circle",
+   "x": 2000,
+   "y": 0,
+   "behaviors": []
+  },
+  "touching": {
+   "role": "hazard",
+   "model": "box",
+   "color": 0,
+   "w": 600,
+   "h": 600,
+   "collider": "circle",
+   "x": 2800,
+   "y": 100,
+   "behaviors": []
+  },
+  "apart": {
+   "role": "hazard",
+   "model": "box",
+   "color": 0,
+   "w": 600,
+   "h": 600,
+   "collider": "circle",
+   "x": 2801,
+   "y": 2100,
+   "behaviors": []
+  },
+  "corner": {
+   "role": "hazard",
+   "model": "box",
+   "color": 0,
+   "w": 800,
+   "h": 800,
+   "collider": "circle",
+   "x": 2700,
+   "y": 700,
+   "behaviors": []
+  },
+  "boxNear": {
+   "role": "hazard",
+   "model": "box",
+   "color": 0,
+   "w": 500,
+   "h": 500,
+   "collider": "box",
+   "x": 2800,
+   "y": 4000,
+   "behaviors": []
+  }
+ },
+ "rules": [
+  {
+   "on": {
+    "type": "collide",
+    "a": "hero",
+    "b": "touching"
+   },
+   "do": [
+    {
+     "type": "add",
+     "counter": "score",
+     "n": 1
+    },
+    {
+     "type": "destroy",
+     "target": "b"
+    }
+   ]
+  },
+  {
+   "on": {
+    "type": "collide",
+    "a": "hero",
+    "b": "apart"
+   },
+   "do": [
+    {
+     "type": "add",
+     "counter": "score",
+     "n": 10
+    },
+    {
+     "type": "destroy",
+     "target": "b"
+    }
+   ]
+  },
+  {
+   "on": {
+    "type": "collide",
+    "a": "hero",
+    "b": "corner"
+   },
+   "do": [
+    {
+     "type": "add",
+     "counter": "score",
+     "n": 100
+    },
+    {
+     "type": "destroy",
+     "target": "b"
+    }
+   ]
+  },
+  {
+   "on": {
+    "type": "collide",
+    "a": "hero",
+    "b": "boxNear"
+   },
+   "do": [
+    {
+     "type": "add",
+     "counter": "score",
+     "n": 1000
+    },
+    {
+     "type": "destroy",
+     "target": "b"
+    }
+   ]
+  }
+ ],
+ "ends": {
+  "timeLimitMs": 5000,
+  "winOnTime": true,
+  "scoreToWin": 0
+ },
+ "difficulty": {
+  "rampMs": 0,
+  "speedPercent": 0,
+  "spawnPercent": 0
+ },
+ "look": {
+  "palette": [
+   "#ff0000"
+  ]
+ }
+}

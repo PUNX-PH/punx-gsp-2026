@@ -1,0 +1,94 @@
+{
+ "engine": 1,
+ "seed": 5,
+ "world": {
+  "camera": "side",
+  "gravity": 0,
+  "width": 10000,
+  "height": 6000,
+  "scroll": 0
+ },
+ "counters": {
+  "score": 0,
+  "lives": 3
+ },
+ "entities": {
+  "hero": {
+   "role": "hero",
+   "model": "box",
+   "color": 0,
+   "w": 800,
+   "h": 800,
+   "collider": "box",
+   "x": 2000,
+   "y": 0,
+   "behaviors": []
+  },
+  "pile": {
+   "role": "hazard",
+   "model": "box",
+   "color": 0,
+   "w": 0,
+   "h": 0,
+   "collider": "box",
+   "x": 2000,
+   "y": 0,
+   "behaviors": [
+    {
+     "type": "spawn",
+     "entity": "lump",
+     "pattern": "stream",
+     "intervalMs": 500,
+     "speed": 0,
+     "ramp": false
+    }
+   ]
+  },
+  "lump": {
+   "role": "hazard",
+   "model": "box",
+   "color": 0,
+   "w": 800,
+   "h": 800,
+   "collider": "box",
+   "x": 0,
+   "y": 0,
+   "behaviors": []
+  }
+ },
+ "rules": [
+  {
+   "on": {
+    "type": "collide",
+    "a": "hero",
+    "b": "lump"
+   },
+   "do": [
+    {
+     "type": "add",
+     "counter": "score",
+     "n": 1
+    },
+    {
+     "type": "destroy",
+     "target": "b"
+    }
+   ]
+  }
+ ],
+ "ends": {
+  "timeLimitMs": 0,
+  "winOnTime": true,
+  "scoreToWin": 1
+ },
+ "difficulty": {
+  "rampMs": 0,
+  "speedPercent": 0,
+  "spawnPercent": 0
+ },
+ "look": {
+  "palette": [
+   "#ff0000"
+  ]
+ }
+}
