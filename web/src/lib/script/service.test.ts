@@ -33,7 +33,7 @@ class ScriptedAuthor implements ScriptAuthor {
 
 const NOW = Date.parse("2026-10-09T12:00:00Z");
 const job = { user: { uid: "u1" }, deadline: NOW + 120_000 };
-const input = { description: "a bird that flies through pipes", picture: null, models: [] as string[], tryAgain: false };
+const input = { description: "a bird that flies through pipes", picture: null, models: [] as string[], attempt: 0 };
 
 function make(steps: Step[], over: { perPerson?: number; total?: number; reverseKeys?: boolean } = {}) {
   const author = new ScriptedAuthor(steps);
@@ -85,18 +85,43 @@ describe("the script service", () => {
     expect(author.calls).toHaveLength(2);
   });
 
-  it("Try again skips the cache once, stores the new script over the old one, and counts an answer", async () => {
+  it("Try again (a higher attempt number) asks Claude once more, and every Play with that number reuses the new answer", async () => {
     const { service, cache, author, limits } = make([answer(GOOD), answer(OTHER)]);
     await service.create(job, input);
-    const fresh = await service.create(job, { ...input, tryAgain: true });
+    const fresh = await service.create(job, { ...input, attempt: 1 });
     expect(fresh.asked).toBe(true);
     expect(fresh.script).toBe(OTHER);
     expect(author.calls).toHaveLength(2);
-    expect(cache.entries.size).toBe(1);
+    expect(cache.entries.size).toBe(2);
     expect(used(limits)).toBe(2);
-    const later = await service.create(job, input);
-    expect(later.asked).toBe(false);
-    expect(later.script).toBe(OTHER);
+    const again = await service.create(job, { ...input, attempt: 1 });
+    expect(again.asked).toBe(false);
+    expect(again.script).toBe(OTHER);
+    expect(author.calls).toHaveLength(2);
+    const first = await service.create(job, input);
+    expect(first.asked).toBe(false);
+    expect(first.script).toBe(GOOD);
+  });
+
+  it("gives five colors: Claude's own, with any missing or wrong one replaced by the sample palette's", async () => {
+    const full = await make([answer(GOOD, { palette: ["#112233", "#445566", "#778899", "#aabbcc", "#ddeeff"] })]).service.create(job, input);
+    expect(full.palette).toEqual(["#112233", "#445566", "#778899", "#aabbcc", "#ddeeff"]);
+    const partial = await make([answer(GOOD, { palette: ["#112233", "red", 5] })]).service.create(job, input);
+    expect(partial.palette).toHaveLength(5);
+    expect(partial.palette[0]).toBe("#112233");
+    for (const color of partial.palette) expect(color).toMatch(/^#[0-9a-fA-F]{6}$/);
+    for (const raw of [undefined, "blue", { a: 1 }]) {
+      const none = await make([answer(GOOD, { palette: raw })]).service.create(job, input);
+      expect(none.palette).toHaveLength(5);
+    }
+  });
+
+  it("keeps the palette through the cache", async () => {
+    const { service } = make([answer(GOOD, { palette: ["#112233", "#445566", "#778899", "#aabbcc", "#ddeeff"] })]);
+    await service.create(job, input);
+    const again = await service.create(job, input);
+    expect(again.asked).toBe(false);
+    expect(again.palette[4]).toBe("#ddeeff");
   });
 
   it("retries once with the reason when the script fails the check, and counts both calls", async () => {
@@ -250,10 +275,11 @@ describe("the script service", () => {
   });
 
   it("keys on the person, the picture and the wired models, not on their order", async () => {
-    const base = { model: "m", uid: "u", description: "d", pictureSha: null, models: ["b", "a"] };
+    const base = { model: "m", uid: "u", description: "d", pictureSha: null, models: ["b", "a"], attempt: 0 };
     expect(await scriptKey(base)).toBe(await scriptKey({ ...base, models: ["a", "b"] }));
     expect(await scriptKey(base)).not.toBe(await scriptKey({ ...base, uid: "v" }));
     expect(await scriptKey(base)).not.toBe(await scriptKey({ ...base, pictureSha: "abc" }));
     expect(await scriptKey(base)).not.toBe(await scriptKey({ ...base, description: "e" }));
+    expect(await scriptKey(base)).not.toBe(await scriptKey({ ...base, attempt: 1 }));
   });
 });

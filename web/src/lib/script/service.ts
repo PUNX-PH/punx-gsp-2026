@@ -12,6 +12,7 @@ import { MODEL_KINDS, type ModelKind } from "@/lib/builder/kinds";
 import type { RecipeCache } from "@/lib/builder/ports";
 import { ASSET_ROLES } from "@/lib/engine/prompts";
 import type { AssetRequest, AssetRole } from "@/lib/engine/service";
+import { paintingPalette } from "@/lib/graph/palette";
 import { MIN_START_MS, RAN_OUT_OF_TIME, timeLeft } from "@/lib/graph/playTime";
 import { MAX_PROMPT_CHARACTERS } from "@/lib/graph/registry";
 import { NodeError } from "@/lib/graph/types";
@@ -20,9 +21,11 @@ import type { ScriptAuthor } from "./author";
 import { checkScript } from "./check";
 import { scriptKey } from "./keys";
 
-/** What is stored and returned: the script, what Claude said it left out, and the models to make. */
+/** What is stored and returned: the script, the game's five colors, what Claude said it left out, and the models to make. */
 export interface StoredScript {
   script: string;
+  /** Five #rrggbb colors; any Claude left out or got wrong is the sample palette's. */
+  palette: string[];
   leftOut: string;
   assets: AssetRequest[];
 }
@@ -54,8 +57,11 @@ export interface ScriptInput {
   picture: { sha256: string; bytes: Uint8Array } | null;
   /** Names of the models wired into the step. */
   models: string[];
-  /** Ask Claude again even if there is a stored script for these words (the person pressed Try again). */
-  tryAgain: boolean;
+  /**
+   * How many times the person has pressed Try again (0 for none). It is part of the cache key: a new number asks Claude again once, and every Play with
+   * the same number reuses that answer, so nothing has to be reset and a repeated Play costs nothing.
+   */
+  attempt: number;
 }
 
 export interface ScriptService {
@@ -96,7 +102,12 @@ function checkedAssets(raw: unknown, script: string): AssetRequest[] {
 /** A stored script back as a checked one, or null when what the cache holds does not pass the check any more (it is then asked again). */
 function readCached(value: CachedScript): StoredScript | null {
   if (!isObject(value) || typeof value.script !== "string" || !checkScript(value.script).ok) return null;
-  return { script: value.script, leftOut: typeof value.leftOut === "string" ? value.leftOut : "", assets: Array.isArray(value.assets) ? value.assets : [] };
+  return {
+    script: value.script,
+    palette: paintingPalette(Array.isArray(value.palette) ? value.palette : []),
+    leftOut: typeof value.leftOut === "string" ? value.leftOut : "",
+    assets: Array.isArray(value.assets) ? value.assets : [],
+  };
 }
 
 type Read = { ok: false; reason: string } | { ok: true; stored: StoredScript };
@@ -140,7 +151,8 @@ export function makeScriptService(deps: ScriptDeps): ScriptService {
     const checked = checkScript(script);
     if (!checked.ok) return { ok: false, reason: checked.reason };
     const leftOut = typeof reply.raw.leftOut === "string" ? cleanPrompt(reply.raw.leftOut).slice(0, MAX_LEFT_OUT) : "";
-    return { ok: true, stored: { script, leftOut, assets: checkedAssets(reply.raw.assets, script) } };
+    const palette = paintingPalette(Array.isArray(reply.raw.palette) ? reply.raw.palette : []);
+    return { ok: true, stored: { script, palette, leftOut, assets: checkedAssets(reply.raw.assets, script) } };
   }
 
   return {
@@ -149,14 +161,12 @@ export function makeScriptService(deps: ScriptDeps): ScriptService {
       const description = Array.from(cleanPrompt(input.description)).slice(0, MAX_PROMPT_CHARACTERS).join("");
       if (description === "") throw problem("describe the game you want.");
 
-      const key = await scriptKey({ model: deps.modelId, uid: job.user.uid, description, pictureSha: input.picture?.sha256 ?? null, models: input.models });
-      if (!input.tryAgain) {
-        const found = await deps.cache.get(key);
-        const cached = found ? readCached(found.value) : null;
-        if (cached) {
-          log({ step: "describe-game", call: "script", outcome: "reused" });
-          return { ...cached, asked: false };
-        }
+      const key = await scriptKey({ model: deps.modelId, uid: job.user.uid, description, pictureSha: input.picture?.sha256 ?? null, models: input.models, attempt: input.attempt });
+      const found = await deps.cache.get(key);
+      const cached = found ? readCached(found.value) : null;
+      if (cached) {
+        log({ step: "describe-game", call: "script", outcome: "reused" });
+        return { ...cached, asked: false };
       }
 
       const author = (retryReason?: string) => (timeoutMs: number) =>

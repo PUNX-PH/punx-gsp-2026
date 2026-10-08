@@ -11,7 +11,7 @@ import { PROMPT_EXAMPLES, scriptAnswerSchema, scriptSystemPrompt } from "./promp
 
 type Params = Parameters<ClaudeClient["beta"]["messages"]["create"]>[0];
 
-function fakeClient(answer: unknown = { script: "", leftOut: "", assets: [] }) {
+function fakeClient(answer: unknown = { script: "", palette: [], leftOut: "", assets: [] }) {
   const calls: Params[] = [];
   const client: ClaudeClient = {
     beta: {
@@ -95,7 +95,8 @@ describe("the answer schema", () => {
 
   it("is small: a string for the script, a string, and a short list (the API refuses a big grammar)", () => {
     expect(JSON.stringify(schema).length).toBeLessThan(1500);
-    expect(schema.required).toEqual(["script", "leftOut", "assets"]);
+    expect(schema.required).toEqual(["script", "palette", "leftOut", "assets"]);
+    expect(schema.properties.palette.type).toBe("array");
     expect(schema.properties.script.type).toBe("string");
     expect(schema.properties.leftOut.type).toBe("string");
     expect(schema.properties.assets.type).toBe("array");

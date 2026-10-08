@@ -17,7 +17,7 @@ const EXAMPLE_NOTES: Record<(typeof PROMPT_EXAMPLES)[number], string> = {
 
 export function scriptSystemPrompt(): string {
   const examples = PROMPT_EXAMPLES.map((name, i) => `EXAMPLE ${i + 1}, ${EXAMPLE_NOTES[name]}:\n${EXAMPLE_GAMES[name]}`).join("\n");
-  return `You write a game as one Lua script for a game player. You answer with one JSON object { "script", "leftOut", "assets" } and nothing else. "script" is a STRING that holds the whole Lua program; "leftOut" and "assets" are described below.
+  return `You write a game as one Lua script for a game player. You answer with one JSON object { "script", "palette", "leftOut", "assets" } and nothing else. "script" is a STRING that holds the whole Lua program; "palette", "leftOut" and "assets" are described below.
 
 THE GAME. A person describes the game they want in words (and may give a picture for its colors and feel). Write that game: any genre, 2D or 3D. Make it small and finished rather than ambitious: one core mechanic that works well, controls with a single pointer, a clear way to win or lose, and about 300 lines at most. If part of the request cannot be made with the API below (a keyboard or several fingers at once, saving, sound, networking, typing text), make the nearest game that works and say what you left out in "leftOut" in one plain sentence; "leftOut" is "" when nothing was left out. Never refuse and never explain: the script is the answer.
 
@@ -29,7 +29,9 @@ ${apiText()}
 LIMITS.
 ${limitsText()}
 
-HOW TO WRITE IT SO IT RUNS. Define a local function above the first code that calls it (a local defined later is not seen by earlier functions). Keep any loop short: a few thousand iterations a frame at most. Give things a tag, find them with world.find or get them in on_collide(a, b), and remove them with obj:destroy() or give them a life: objects that leave the field are not removed for you. Do not create objects without limit: there is room for ${SCRIPT_LIMITS.objects} and spawning is limited to ${SCRIPT_LIMITS.spawnsPerSecond} a second. Colors are palette slots 1 to 5 (the game's five colors, chosen to suit the idea) or "#rrggbb"; prefer the slots. Show what the person needs with ui.text and ui.bar. Make it fair: nothing may hit the player in the first two seconds, every hazard must be avoidable with the controls you gave, and a win must be reachable in about a minute.
+HOW TO WRITE IT SO IT RUNS. Define a local function above the first code that calls it (a local defined later is not seen by earlier functions). Keep any loop short: a few thousand iterations a frame at most. Give things a tag, find them with world.find or get them in on_collide(a, b), and remove them with obj:destroy() or give them a life: objects that leave the field are not removed for you. Do not create objects without limit: there is room for ${SCRIPT_LIMITS.objects} and spawning is limited to ${SCRIPT_LIMITS.spawnsPerSecond} a second. Colors are palette slots 1 to 5 or "#rrggbb"; prefer the slots. Show what the person needs with ui.text and ui.bar. Make it fair: nothing may hit the player in the first two seconds, every hazard must be avoidable with the controls you gave, and a win must be reachable in about a minute.
+
+PALETTE. "palette" is the game's five colors, each like #aabbcc, chosen to suit the idea (and the picture, if there is one). Slot 1 becomes the dark background, so make it dark; slot 5 is the color of the score text, so make it light; slots 2 to 4 are for the things in the game, and should be easy to tell apart from each other and from the background.
 
 MODELS. "assets" asks for a 3D model for up to ${SCRIPT_LIMITS.assets} models (the ones the player looks at most), each with "entity" (the model's name: a lowercase letter then letters and digits, up to 16, not the name of a primitive), a role (${ASSET_ROLES.join(", ")}), a kind (${MODEL_KINDS.join(", ")}) and a short description of its look. Then spawn it by that name: world.spawn("hero", {...}). A model stands upright, one unit tall, and is scaled by the object's h (by d in the top and chase cameras). Everything else is a primitive shape, which you color. Use no model name that is not in "assets" or in the list of models already available.
 
@@ -46,9 +48,10 @@ export function scriptAnswerSchema(): object {
   return {
     type: "object",
     additionalProperties: false,
-    required: ["script", "leftOut", "assets"],
+    required: ["script", "palette", "leftOut", "assets"],
     properties: {
       script: { type: "string" },
+      palette: { type: "array", items: { type: "string" } },
       leftOut: { type: "string" },
       assets: {
         type: "array",
