@@ -90,6 +90,7 @@ export const FIELD_TEXT = [
   "The field is centered on 0, 0: x runs from -width/2 to width/2 and y from -height/2 to height/2, y up. z is depth and is ignored by collisions and by the 2d cameras.",
   "Objects move by their velocity every frame. Two objects with solid = true raise on_collide once when they begin to overlap (boxes by x, y, w, h; a sphere counts as a circle).",
   "on_exit(obj) is raised once when an object that was inside the field has fully left it; the object is not removed, so call obj:destroy() if it should go.",
+  "In the 2d cameras objects are drawn by depth, not in the order they were made: an object with a smaller z is in front. Give things that overlap different z values (a background at z = 1, the action at 0, effects at -1) and keep d small, such as 0.05, so they do not cut through each other.",
   "An object with life = seconds is removed when it runs out. A spawn over the object or spawn-rate limit returns a dead object and does nothing.",
 ].join("\n");
 
