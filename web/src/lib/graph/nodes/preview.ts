@@ -14,14 +14,15 @@ export const preview: Executor = async (inputs, _params, ctx) => {
   if (game?.type !== "settings") throw new Error("Preview was run without its game"); // Play checks this first
 
   const models: [string, Uint8Array][] = [];
-  for (const role of ROLES) {
+  // An engine game's run holds only its entities' files; the runner's role files are not part of it.
+  for (const role of game.entityFiles ? [] : ROLES) {
     const source = game.models[role];
     const bytes = source.kind === "asset" ? await ctx.readAsset(source.sha256) : builtinModel(source.role);
     if (!bytes) throw new NodeError("Preview: a model file is missing. Choose it again.");
     models.push([ROLE_FILES[role], bytes]);
   }
   // The scenery of a game with an environment, then the files of its world, after the roles' files, read before anything is stored.
-  for (const piece of [...(game.scenery ?? []), ...(game.world ?? [])]) {
+  for (const piece of [...(game.entityFiles ?? []), ...(game.scenery ?? []), ...(game.world ?? [])]) {
     const bytes = await ctx.readAsset(piece.sha256);
     if (!bytes) throw new NodeError("Preview: a model file is missing. Choose it again.");
     models.push([piece.file, bytes]);

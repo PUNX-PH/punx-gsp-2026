@@ -66,6 +66,7 @@ describe("a step's identity", () => {
       ["hero", "hero model", "model", false, false],
       ["obstacle", "obstacle model", "model", false, false],
       ["collectible", "collectible model", "model", false, false],
+      ["game", "game rules", "game", false, false],
     ]);
     expect(template.outputs.map((p) => [p.name, p.type, p.wired])).toEqual([["settings", "settings", true]]);
     expect(step("n2").inputs[0]).toMatchObject({ name: "image", required: true, wired: true });
@@ -238,10 +239,10 @@ describe("a Describe Game step", () => {
     expect(step("n2", { graph: described(), run: runWith(failed) })).toMatchObject({ status: "failed", statusText: "Describe Game: The AI service did not answer. Try again." });
   });
 
-  it("lists a picture input that is optional, and a palette and a feel output", () => {
+  it("lists a picture input that is optional, and a palette, a feel and a game output", () => {
     const card = step("n2", { graph: described() });
     expect(card.inputs.map((p) => [p.name, p.type, p.required, p.wired])).toEqual([["image", "image", false, true]]);
-    expect(card.outputs.map((p) => [p.name, p.type, p.wired])).toEqual([["palette", "palette", true], ["feel", "feel", true]]);
+    expect(card.outputs.map((p) => [p.name, p.type, p.wired])).toEqual([["palette", "palette", true], ["feel", "feel", true], ["game", "game", false]]);
   });
 });
 

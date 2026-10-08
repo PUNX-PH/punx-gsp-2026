@@ -5,6 +5,7 @@
 import { getDescribeGameService } from "@/lib/ai/server";
 import { getBlenderService } from "@/lib/blender/server";
 import { getBuilderService } from "@/lib/builder/server";
+import { getGameService } from "@/lib/engine/server";
 import { type GraphService, makeGraphService } from "@/lib/graph/service";
 import { CloudGraphFiles, FirestoreGraphRecords } from "@/lib/graph/store/firebase";
 import { getRunService } from "@/lib/runs/firebase";
@@ -19,5 +20,6 @@ export function getGraphService(): GraphService {
     ai: getDescribeGameService(),
     blender,
     builder: getBuilderService(blender),
+    games: getGameService(),
   });
 }

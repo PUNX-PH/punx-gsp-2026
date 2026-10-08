@@ -1,6 +1,9 @@
 // The Describe Game node: the person's words, and a picture if one is wired in, become a palette and a feel. All the rules
 // (the cache, the limits, the model, checking the answer) are in the AI service it is given; this only passes things along.
-import { type Executor, NodeError } from "@/lib/graph/types";
+import { type Executor, NodeError, type WireValue } from "@/lib/graph/types";
+
+/** A game's one to five colors as the five a palette wire carries: the last one repeated. */
+export const padPalette = (colors: string[]): string[] => Array.from({ length: 5 }, (_, i) => colors[Math.min(i, colors.length - 1)]);
 
 export const describeGame: Executor = async (inputs, params, ctx) => {
   const prompt = params.prompt as string; // its shape was checked when the graph was saved; an empty one stops Play first
@@ -10,6 +13,22 @@ export const describeGame: Executor = async (inputs, params, ctx) => {
     const bytes = await ctx.readAsset(inputs.image.sha256);
     if (!bytes) throw new NodeError("Describe Game: the picture is missing. Choose it again.");
     picture = { sha256: inputs.image.sha256, bytes };
+  }
+
+  // With Make a game on (new steps; a graph saved before it has no such setting), Claude writes a whole game for the engine instead of a
+  // palette and a feel. The palette it chose is still offered, so a Game Template without the game wire keeps its colors.
+  if (params.makeGame === true) {
+    if (!ctx.games) throw new NodeError("Describe Game: making a whole game is not set up on this site yet.");
+    const made = await ctx.games.create({ user: ctx.user, deadline: ctx.deadline }, { description: prompt, picture, models: [] });
+    const palette = padPalette(made.spec.look.palette);
+    const outputs: Record<string, WireValue> = {
+      game: { type: "game", spec: made.spec, leftOut: made.leftOut, assets: made.assets, entityFiles: [] },
+      palette: { type: "palette", colors: palette },
+    };
+    return {
+      outputs,
+      result: { game: true, entities: Object.keys(made.spec.entities).length, rules: made.spec.rules.length, leftOut: made.leftOut, palette, reused: !made.asked },
+    };
   }
 
   const { answer, reused } = await ctx.ai.describe(ctx.user, { prompt, picture, deadline: ctx.deadline });

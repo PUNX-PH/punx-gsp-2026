@@ -6,6 +6,7 @@ import type { DescribeGameService } from "@/lib/ai/types";
 import type { BlenderService } from "@/lib/blender/types";
 import { makeBuilderService } from "@/lib/builder/service";
 import type { BuilderService } from "@/lib/builder/types";
+import type { GameService } from "@/lib/engine/service";
 import type { User } from "@/lib/auth/ports";
 import { checkGlb } from "@/lib/glb";
 import { checkGraph } from "@/lib/graph/checks";
@@ -71,6 +72,8 @@ export interface GraphServiceDeps {
   blender?: BlenderService;
   /** Build Model. Without one, a builder over the Blender service above (or over none, which fails the step plainly). */
   builder?: BuilderService;
+  /** Describe Game with Make a game on. Without one that step says it is not set up. */
+  games?: GameService;
 }
 
 // What Describe Game gets when no AI service is wired (a deployment without the key): the step fails in plain words, nothing else does.
@@ -299,6 +302,7 @@ export function makeGraphService(deps: GraphServiceDeps): GraphService {
         runs,
         lastRun: { get: () => lastRun, set: (runId) => void (lastRun = runId) },
         ai: deps.ai ?? noAi,
+        games: deps.games,
       };
       // An unexpected failure is logged with the graph, the node and the kind of failure, never a message or file contents.
       const log = (info: object) => console.error("graph node failed", { graphId: id, ...info });

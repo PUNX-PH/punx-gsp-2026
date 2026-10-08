@@ -1,5 +1,7 @@
 // The shared vocabulary of the graph engine: what a graph is, what travels along its wires, and what a node's code is
 // given. The runner's own result types live in runner.ts; the node catalog (labels, ports) is in registry.ts.
+import type { AssetRequest, GameService } from "@/lib/engine/service";
+import type { GameSpec } from "@/lib/engine/spec";
 import type { DescribeGameService } from "@/lib/ai/types";
 import type { User } from "@/lib/auth/ports";
 import type { BlenderService, ModelFormat } from "@/lib/blender/types";
@@ -12,7 +14,7 @@ import type { Density } from "@/lib/settings";
  * What a wire carries. A `feel` is the three tuning numbers (how fast, how high, how far apart); an `environment` is the world around the
  * track (the sky, the field and the edge stripes as palette picks, and the scenery).
  */
-export type WireType = "image" | "model" | "palette" | "feel" | "environment" | "settings";
+export type WireType = "image" | "model" | "palette" | "feel" | "environment" | "settings" | "game";
 
 /** The three models a runner game uses, and the file each is stored under in a run. */
 export type Role = "hero" | "obstacle" | "collectible";
@@ -113,6 +115,8 @@ export type WireValue =
   | { type: "model"; sha256: string; name: string; size: number; format: ModelFormat; role?: Role; clips?: ClipName[]; quality?: Quality }
   | { type: "palette"; colors: string[] }
   | { type: "feel"; tuning: Tuning }
+  // A whole game from Describe Game: the checked spec, what Claude left out, the assets asked for, and the entity files made so far (entity-NAME.glb).
+  | { type: "game"; spec: GameSpec; leftOut: string; assets: AssetRequest[]; entityFiles: { file: string; sha256: string }[] }
   // `sky`, `field` and `stripe` are palette indices 0 to 4; each piece of scenery is a GLB stored in the graph's folder.
   // A High environment also says so and carries the three files of its world (`style` is the look of the land, the road and the far hills).
   | {
@@ -134,6 +138,8 @@ export type WireValue =
       models: Record<Role, ModelSource>;
       scenery?: { file: string; sha256: string }[];
       world?: { file: string; sha256: string }[];
+      // Present (even empty) only for an engine game: the entity files, which are then the only files of the run.
+      entityFiles?: { file: string; sha256: string }[];
     };
 
 // ---- what a node's code is given ----
@@ -170,6 +176,8 @@ export interface ExecutorContext {
   builder: BuilderService;
   /** Describe Game turns a person's words and picture into a palette and a feel through this (cache, limits and the model). */
   ai: DescribeGameService;
+  /** Describe Game with Make a game on writes a whole game through this; without one the step says it is not set up. */
+  games?: GameService;
 }
 
 export type Executor = (

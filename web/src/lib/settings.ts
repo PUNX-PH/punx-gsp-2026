@@ -3,6 +3,10 @@
 // fixtures/settings/ are accepted and rejected the same way by both. This validator may be stricter than Unity on a
 // wrongly typed value, never looser. The 16 KB size limit is the caller's job.
 
+import { checkSpec } from "@/lib/engine/check";
+import { entityFilesNeeded } from "@/lib/engine/files";
+import type { GameSpec } from "@/lib/engine/spec";
+
 export const DENSITIES = ["few", "some", "lots"] as const;
 export type Density = (typeof DENSITIES)[number];
 
@@ -40,6 +44,8 @@ export interface GameSettings {
   environment?: Environment;
   /** Optional: absent means flat. */
   look?: Look;
+  /** Optional: a game for the engine, checked by checkSpec. With it, the runner fields above are fixed filler and the run's files are the entities'. */
+  game?: GameSpec;
 }
 
 export type SettingsResult = { ok: true; settings: GameSettings; text: string } | { ok: false; error: string };
@@ -84,6 +90,7 @@ export function rolesNeeded(s: GameSettings): string[] {
 
 /** Every file a run must have besides settings.json: the role files, then the scenery files, then the world's three, each name once. */
 export function filesNeeded(s: GameSettings): string[] {
+  if (s.game) return entityFilesNeeded(s.game);
   return [...new Set([...rolesNeeded(s), ...(s.environment?.scenery ?? []), ...(s.environment?.world ? WORLD_FILES : [])])];
 }
 
@@ -122,6 +129,11 @@ function validate(s: Record<string, unknown>): string | null {
 
   const lookError = Object.hasOwn(s, "look") ? checkLook(s.look) : null;
   if (lookError) return lookError;
+
+  if (Object.hasOwn(s, "game")) {
+    const game = checkSpec(s.game);
+    if (!game.ok) return `settings.game: ${game.error}`;
+  }
 
   return Object.hasOwn(s, "environment") ? checkEnvironment(s.environment) : null;
 }

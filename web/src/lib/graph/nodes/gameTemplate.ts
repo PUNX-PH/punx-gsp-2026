@@ -1,14 +1,36 @@
 // The Game Template node: turns the palette, the models and the tuning into a runner game's settings. It stores
 // nothing (the Preview does); it only builds the settings and checks them exactly as the Unity template will.
 import { SAMPLE_PALETTE } from "@/lib/graph/palette";
-import { type Executor, type ModelSource, NodeError, ROLE_FILES, type Role, SCENERY_FILES, type Tuning } from "@/lib/graph/types";
+import { entityFile, entityFilesNeeded, usesFile } from "@/lib/engine/files";
+import { padPalette } from "@/lib/graph/nodes/describeGame";
+import { type Executor, type ModelSource, NodeError, ROLE_FILES, type Role, SCENERY_FILES, type Tuning, type WireValue } from "@/lib/graph/types";
 import { validateSettings, WORLD_FILES } from "@/lib/settings";
 
 const ROLES = Object.keys(ROLE_FILES) as Role[];
 
 const article = (role: Role) => (role === "obstacle" ? "an" : "a");
 
+/** A whole game from Describe Game: the settings are the spec plus filler for the runner fields, and the run holds only the entities' files. */
+function gameSettings(game: Extract<WireValue, { type: "game" }>) {
+  const have = new Set(game.entityFiles.map((f) => f.file));
+  // An entity that names a model but has no file (its build failed or was not made) is drawn as a box.
+  const entities = Object.fromEntries(
+    Object.entries(game.spec.entities).map(([name, e]) => [name, usesFile(e.model) && !e.behaviors.some((b) => b.type === "spawn") && !have.has(entityFile(name)) ? { ...e, model: "box" } : e]),
+  );
+  const spec = { ...game.spec, entities };
+  const tuning: Tuning = { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 };
+  const checked = validateSettings(JSON.stringify({ schemaVersion: 1, template: "runner", palette: padPalette(spec.look.palette), roles: ROLE_FILES, tuning, game: spec }));
+  if (!checked.ok) throw new NodeError(`Game Template: ${checked.error}`);
+  const needed = new Set(entityFilesNeeded(spec));
+  const models = Object.fromEntries(ROLES.map((role): [Role, ModelSource] => [role, { kind: "builtin", role }])) as Record<Role, ModelSource>;
+  return {
+    output: { type: "settings" as const, settingsText: checked.text, tuning, models, entityFiles: game.entityFiles.filter((f) => needed.has(f.file)) },
+    result: { game: true, entities: Object.keys(spec.entities).length },
+  };
+}
+
 export const gameTemplate: Executor = async (inputs, params) => {
+  if (inputs.game?.type === "game") return gameSettings(inputs.game);
   // A connected feel replaces the sliders for this run (the saved setting is left alone, so unplugging it brings them back).
   // Either way the numbers are checked below like any others; the settings' own shape was checked when the graph was saved.
   const { speed, jumpHeight, obstacleSpacing } = inputs.feel?.type === "feel" ? inputs.feel.tuning : (params.tuning as Tuning);

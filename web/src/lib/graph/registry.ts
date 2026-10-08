@@ -31,7 +31,7 @@ export interface NodeSpec {
 }
 
 /** How each wire type is named to a person. */
-export const WIRE_WORDS: Record<WireType, string> = { image: "picture", model: "3D model", palette: "palette", feel: "feel", environment: "environment", settings: "game" };
+export const WIRE_WORDS: Record<WireType, string> = { image: "picture", model: "3D model", palette: "palette", feel: "feel", environment: "environment", settings: "game", game: "game" };
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 
@@ -60,7 +60,11 @@ function fileParam(params: Record<string, unknown>): string | null {
 export const MAX_PROMPT_CHARACTERS = 500;
 
 function promptParam(params: Record<string, unknown>): string | null {
-  if (!hasExactly(params, ["prompt"])) return "prompt is the only setting a Describe Game step has.";
+  // `makeGame` is optional: a graph saved before Describe Game could write a whole game has only the prompt, and means false.
+  const rest = { ...params };
+  delete rest.makeGame;
+  if (!hasExactly(rest, ["prompt"])) return "prompt and makeGame are the only settings a Describe Game step has.";
+  if (Object.hasOwn(params, "makeGame") && typeof params.makeGame !== "boolean") return "make a game must be on or off.";
   const { prompt } = params;
   if (typeof prompt !== "string") return "prompt must be text.";
   return Array.from(prompt).length > MAX_PROMPT_CHARACTERS ? `the description is longer than ${MAX_PROMPT_CHARACTERS} characters.` : null;
@@ -234,14 +238,15 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
   "describe-game": {
     type: "describe-game",
     label: "Describe Game",
-    help: "Turns your words, and a picture if you give one, into the game's colors and feel.",
+    help: "Turns your words, and a picture if you give one, into a game: what moves, what the player does and how it ends. With Make a game off, only the colors and feel.",
     final: false,
     inputs: [port("image", "picture", "A picture to take the look from. Optional.", "image")],
     outputs: [
       port("palette", "palette", "Five colors for the game.", "palette"),
-      port("feel", "feel", "How fast, how high and how far apart.", "feel"),
+      port("feel", "feel", "How fast, how high and how far apart. Not made with Make a game on.", "feel"),
+      port("game", "game rules", "The whole game, when Make a game is on.", "game"),
     ],
-    defaultParams: () => ({ prompt: "" }),
+    defaultParams: () => ({ prompt: "", makeGame: true }),
     shapeProblem: promptParam,
     incompleteProblem: (params) => (typeof params.prompt === "string" && params.prompt.trim() === "" ? "describe your game first." : null),
   },
@@ -257,6 +262,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
       port("hero", "hero model", "The player's model. Without one, a built-in shape is used.", "model"),
       port("obstacle", "obstacle model", "The obstacles' model. Without one, a built-in shape is used.", "model"),
       port("collectible", "collectible model", "The collectibles' model. Without one, a built-in shape is used.", "model"),
+      port("game", "game rules", "A whole game from Describe Game. Without one, the runner below is made.", "game"),
     ],
     outputs: [port("settings", "game", "The finished game, ready to preview.", "settings")],
     defaultParams: () => ({ tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } }),
