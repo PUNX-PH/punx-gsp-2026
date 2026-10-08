@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using GLTFast.Materials;
+using Runner.Engine;
 using Runner.Loading;
 using Runner.Quality;
 using Runner.Settings;
@@ -33,8 +34,10 @@ namespace Runner.View
         public string Error { get; private set; }
         public RunnerSim Sim { get; private set; }
         public RunnerView View => view;
+        public EngineGame Game => game;
 
         Hud hud;
+        EngineGame game; // set when the settings carry a game spec: the engine plays instead of the runner
         RunnerView view;
         EnvironmentView environment; // null when the settings have no environment
         WorldView worldView; // null unless the settings have a High world
@@ -76,6 +79,16 @@ namespace Runner.View
             catch (LoadException e)
             {
                 throw new LoadException("settings (" + settingsUrl + "): " + e.Message);
+            }
+
+            // A settings file with a "game" key is a game spec for the engine; without one it is the runner, exactly as before.
+            var read = EngineGame.Read(json);
+            if (read.Present)
+            {
+                if (read.Spec == null) throw new LoadException(read.Error);
+                await BootGame(read.Spec, settingsUrl);
+                Debug.Log("RUNNER ready in " + stopwatch.ElapsedMilliseconds + " ms");
+                return;
             }
 
             var parsed = SettingsParser.Parse(json);
@@ -155,6 +168,59 @@ namespace Runner.View
             hud.Loading = false;
             State = BootState.Ready;
             Debug.Log("RUNNER ready in " + stopwatch.ElapsedMilliseconds + " ms");
+        }
+
+        /// <summary>Builds an engine game: each entity that names a model gets entity-NAME.glb next to the settings (a missing or broken file is a primitive instead).</summary>
+        async Task BootGame(EngineSpec spec, string settingsUrl)
+        {
+            var root = new GameObject("World").transform;
+            root.SetParent(transform, false);
+            try
+            {
+                var flatShader = Shader.Find("Runner/Flat");
+                if (flatShader == null) throw new LoadException("the Runner/Flat shader is missing from this build");
+                var flat = new Material(flatShader);
+                IMaterialGenerator generator = new FlatMaterialGenerator(flat);
+                var models = new Dictionary<string, GameObject>();
+                foreach (var e in spec.Entities)
+                {
+                    if (e.IsSpawner || System.Array.IndexOf(EngineVocab.Primitives, e.Model) >= 0) continue;
+                    var file = "entity-" + e.Name + ".glb";
+                    try
+                    {
+                        var content = await AssetLoader.LoadModel(UrlTools.SiblingUrl(settingsUrl, file), root, generator);
+                        models[e.Name] = FitTo(content, e.H / 1000f, e.W / 1000f);
+                    }
+                    catch (Exception ex) when (ex is LoadException || ex is ArgumentException)
+                    {
+                        Debug.LogWarning("Runner: " + file + " could not be used (" + ex.Message + "), drawing a " + e.Model + " instead");
+                    }
+                }
+                game = new EngineGame(root, spec, models, flat);
+                hud.PanelColor = game.Slot(2);
+                hud.PanelTextColor = game.Slot(0);
+                hud.ScoreColor = game.Slot(Mathf.Min(4, spec.Palette.Count - 1));
+            }
+            catch
+            {
+                Destroy(root.gameObject);
+                throw;
+            }
+            hud.Loading = false;
+            State = BootState.Ready;
+        }
+
+        static GameObject FitTo(GameObject content, float height, float maxWidth)
+        {
+            var renderers = content.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0) throw new LoadException("has no visible geometry");
+            var bounds = renderers[0].bounds;
+            for (var i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+            var (scale, offset) = ModelFit.Compute(bounds, height, maxWidth);
+            content.transform.localScale = Vector3.one * scale;
+            content.transform.localPosition = offset;
+            content.SetActive(false);
+            return content;
         }
 
         string ResolveSettingsUrl(string pageUrl)
@@ -264,6 +330,15 @@ namespace Runner.View
             if (State != BootState.Ready) return;
 
             var pressed = Pressed();
+            if (game != null)
+            {
+                game.Tick(Time.deltaTime, pressed, Held());
+                hud.Score = game.Score;
+                hud.Subtitle = game.Subtitle;
+                hud.GameOver = game.Over;
+                hud.EndText = game.EndText;
+                return;
+            }
             if (Sim.GameOver)
             {
                 if (pressed) Sim.Restart();
@@ -287,6 +362,11 @@ namespace Runner.View
             hud.QualityLevel = appliedLevel;
             hud.Score = Sim.Score;
             hud.GameOver = Sim.GameOver;
+        }
+
+        static bool Held()
+        {
+            return (Pointer.current != null && Pointer.current.press.isPressed) || (Keyboard.current != null && Keyboard.current.spaceKey.isPressed);
         }
 
         // One press covers mouse, touch and pen, so a tap on a phone is exactly one jump.

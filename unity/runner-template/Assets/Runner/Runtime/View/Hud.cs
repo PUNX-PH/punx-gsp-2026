@@ -11,6 +11,8 @@ namespace Runner.View
         public bool GameOver;
         public bool ShowFps;
         public int QualityLevel; // shown beside the fps with debug=1
+        public string Subtitle; // a line under the score (an engine game shows its lives here); none when null
+        public string EndText = "Game over\nTap to restart"; // what the end panel says
         public Color PanelColor = new Color(0.2f, 0.2f, 0.3f);
         public Color PanelTextColor = Color.white;
         public Color ScoreColor = Color.white;
@@ -54,11 +56,13 @@ namespace Runner.View
             }
             Label(new Rect(0f, screen.height * 0.03f, screen.width, screen.height * 0.12f), scoreText, ScoreColor);
 
+            if (!string.IsNullOrEmpty(Subtitle)) Label(new Rect(0f, screen.height * 0.13f, screen.width, screen.height * 0.08f), Subtitle, ScoreColor);
+
             if (GameOver)
             {
                 var panel = new Rect(screen.width * 0.15f, screen.height * 0.35f, screen.width * 0.7f, screen.height * 0.3f);
                 Fill(panel, PanelColor);
-                Label(panel, "Game over\nTap to restart", PanelTextColor);
+                Label(panel, EndText, PanelTextColor);
             }
             if (ShowFps) Label(new Rect(0f, screen.height * 0.9f, screen.width * 0.3f, screen.height * 0.1f), fps.ToString("0") + " fps, quality " + QualityLevel, ScoreColor);
         }

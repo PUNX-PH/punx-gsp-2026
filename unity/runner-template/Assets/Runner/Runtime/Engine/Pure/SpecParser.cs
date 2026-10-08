@@ -210,9 +210,16 @@ namespace Runner.Engine
         {
             spec = null;
             if (!MiniJson.TryParse(text, out var root, out var parseError)) { error = "game: not valid JSON (" + parseError + ")"; return false; }
+            return TryParseValue(root, Encoding.UTF8.GetByteCount(text), out spec, out error);
+        }
+
+        /// <summary>Checks a spec that is already parsed (the "game" value inside a settings file); <paramref name="bytes"/> is the size of the text it came from.</summary>
+        public static bool TryParseValue(object root, int bytes, out EngineSpec spec, out string error)
+        {
+            spec = null;
             try
             {
-                spec = CheckAll(root, Encoding.UTF8.GetByteCount(text));
+                spec = CheckAll(root, bytes);
                 error = null;
                 return true;
             }
