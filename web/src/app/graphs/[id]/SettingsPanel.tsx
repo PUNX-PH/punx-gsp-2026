@@ -2,6 +2,7 @@
 
 // The settings of the selected step, in plain words: a file picker for the steps that take a file, three sliders for the
 // Game Template (with a live line when the combination cannot be played), and a short explanation for the others.
+import Link from "next/link";
 import { useId, useState } from "react";
 import type { Platform } from "@/lib/export/types";
 import { cx } from "@/app/graphs/[id]/cx";
@@ -298,6 +299,18 @@ function BuildModelPanel({ node, onSettings }: { node: GraphNode; onSettings: Se
   );
 }
 
+// The studio window: this step opened large, with a render of what it builds. It works on the saved graph, so the link is for a graph that has been saved.
+function StudioLink({ graphId, nodeId, what }: { graphId: string; nodeId: string; what: "model" | "world" }) {
+  return (
+    <p>
+      <Link href={`/graphs/${encodeURIComponent(graphId)}/studio/${encodeURIComponent(nodeId)}`} className={styles.secondary}>
+        Open in studio
+      </Link>
+      <span className={styles.hint}> Describe the {what} in detail and see it rendered.</span>
+    </p>
+  );
+}
+
 const DENSITY_NAMES: Record<Density, string> = { few: "Few", some: "Some", lots: "Lots" };
 
 // Build Environment: the person's theme for the world, and how much scenery there is. An empty theme builds a meadow and sends nothing.
@@ -466,6 +479,7 @@ export function SettingsPanel({ node, data, uploading, error, onChooseFile, onTu
           <ColorChoice nodeId={node.id} color={node.params.color} swatches={data.swatches} withOriginal={false} onSettings={onSettings} />
         </>
       )}
+      {(node.type === "build-model" || node.type === "build-environment") && <StudioLink graphId={graphId} nodeId={node.id} what={node.type === "build-model" ? "model" : "world"} />}
       {node.type === "build-model" && <BuildModelPanel node={node} onSettings={onSettings} />}
       {node.type === "build-environment" && <BuildEnvironmentPanel node={node} data={data} onSettings={onSettings} />}
       {node.type === "describe-game" && (

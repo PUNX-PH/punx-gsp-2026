@@ -1,0 +1,141 @@
+/* The studio window. It sits inside ThemedShell (the editor's tokens) and the shell page styles; the render stage is the one memorable thing here, so
+   everything around it stays quiet. */
+
+.studio {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.top { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.top .title { margin-top: 6px; }
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(18rem, 26rem) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.long { resize: vertical; line-height: 1.5; font-size: 15px; }
+
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.more { border-top: 1px solid var(--line); padding-top: 12px; color: var(--text); font-size: 14px; }
+.more summary { cursor: pointer; color: var(--muted); }
+.more summary:hover { color: var(--text); }
+.more[open] { display: flex; flex-direction: column; gap: 12px; }
+
+.label { color: var(--text); font-size: 14px; font-weight: 600; }
+
+.choices { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+
+.choice,
+.tab {
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.choice:hover,
+.tab:hover { border-color: var(--muted); }
+
+.choice[aria-pressed="true"],
+.tab[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+.choice:focus-visible,
+.tab:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+/* ---- the render ---- */
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.viewer {
+  position: relative;
+  min-height: 460px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 85%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 55%),
+    linear-gradient(180deg, var(--surface) 0%, var(--canvas) 100%);
+}
+
+.model {
+  display: block;
+  width: 100%;
+  height: 460px;
+  --poster-color: transparent;
+  background: transparent;
+}
+
+.loading { padding: 24px; color: var(--muted); }
+
+.clips,
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clips { position: absolute; left: 12px; bottom: 12px; }
+
+.waiting {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  min-height: 460px;
+  padding: 32px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.waiting strong { color: var(--text); font-size: 18px; }
+
+.facts { display: flex; flex-direction: column; gap: 8px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+
+.chips span {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .viewer, .model, .waiting { min-height: 340px; height: 340px; }
+  .studio { padding: 24px 16px 48px; }
+}

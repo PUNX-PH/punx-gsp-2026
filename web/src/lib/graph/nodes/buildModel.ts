@@ -38,6 +38,7 @@ export const buildModel: Executor = async (inputs, params, ctx) => {
     result: {
       role,
       kind: built.kind,
+      sha256: built.sha256, // the studio window shows this file
       parts: built.parts,
       triangles: built.triangles,
       size: built.size,

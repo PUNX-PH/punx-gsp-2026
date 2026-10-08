@@ -60,6 +60,10 @@ export interface GraphService {
   readAsset(user: User, id: string, sha256: string): Promise<{ bytes: Uint8Array; contentType: string }>;
   /** Checks the SAVED graph, runs it, and keeps the graph's one run. */
   play(user: User, id: string): Promise<PlayResult>;
+  /** Runs one Build Model or Build Environment step (and what it needs) for the studio window, without touching the Preview or the graph's run. */
+  playStep(user: User, id: string, nodeId: string): Promise<{ kind: "ran"; result: RunResult }>;
+  /** A file kept in this graph's folder (an upload or something a step made), by its hash. */
+  readStored(user: User, id: string, sha256: string): Promise<{ bytes: Uint8Array; contentType: string }>;
   /** Packs the graph's last game (made with Describe Game) for a computer or a phone. */
   exportGame(user: User, id: string, platform: Platform): Promise<PackedGame>;
 }
@@ -149,6 +153,43 @@ export function makeGraphService(deps: GraphServiceDeps): GraphService {
     const updated = await records.update(record.id, { removeAssets: shas, updatedAt: now() });
     for (const sha of shas) await files.delete(record.id, sha);
     return updated;
+  }
+
+  /**
+   * What a step is given when it runs. Files steps make (Blender's results) live in the graph's folder beside its uploads. A step can read one only after
+   * this run has stored it or found it there again, so a hash is never a way to reach another graph's files. `holder` carries the graph's last run, which
+   * the Preview replaces.
+   */
+  function contextFor(user: User, id: string, record: GraphRecord, holder: { lastRun: string | null }): ExecutorContext {
+    const made = new Set<string>();
+    const blender = deps.blender ?? noBlender;
+    return {
+      user,
+      graphId: id,
+      assets: record.assets,
+      readAsset: async (sha256) => (Object.hasOwn(record.assets, sha256) || made.has(sha256) ? files.get(id, sha256) : null),
+      derived: {
+        async put(bytes) {
+          const sha256 = await sha256Hex(bytes);
+          await files.put(id, sha256, bytes, "model/gltf-binary");
+          made.add(sha256);
+          return sha256;
+        },
+        async recall(sha256) {
+          if (!SHA256_HEX.test(sha256) || !(await files.get(id, sha256))) return false;
+          made.add(sha256);
+          return true;
+        },
+      },
+      deadline: now() + PLAY_BUDGET_MS,
+      blender,
+      builder: deps.builder ?? makeBuilderService({ blender, now }),
+      runs,
+      lastRun: { get: () => holder.lastRun, set: (runId) => void (holder.lastRun = runId) },
+      ai: deps.ai ?? noAi,
+      games: deps.games,
+      scripts: deps.scripts,
+    };
   }
 
   return {
@@ -308,47 +349,38 @@ export function makeGraphService(deps: GraphServiceDeps): GraphService {
       const problems = checkGraph(parsed.graph, record.assets);
       if (problems.length > 0) return { kind: "invalid", problems };
 
-      // The Preview replaces the graph's earlier run; the holder tells us afterwards whether the run changed.
-      let lastRun = record.lastRunId;
-      // Files steps make (Blender's results) live in the graph's folder beside its uploads. A step can read one only after this Play
-      // has stored it or found it there again, so a hash is never a way to reach another graph's files.
-      const made = new Set<string>();
-      const blender = deps.blender ?? noBlender;
-      const ctx: ExecutorContext = {
-        user,
-        graphId: id,
-        assets: record.assets,
-        readAsset: async (sha256) => (Object.hasOwn(record.assets, sha256) || made.has(sha256) ? files.get(id, sha256) : null),
-        derived: {
-          async put(bytes) {
-            const sha256 = await sha256Hex(bytes);
-            await files.put(id, sha256, bytes, "model/gltf-binary");
-            made.add(sha256);
-            return sha256;
-          },
-          async recall(sha256) {
-            if (!SHA256_HEX.test(sha256) || !(await files.get(id, sha256))) return false;
-            made.add(sha256);
-            return true;
-          },
-        },
-        deadline: now() + PLAY_BUDGET_MS,
-        blender,
-        builder: deps.builder ?? makeBuilderService({ blender, now }),
-        runs,
-        lastRun: { get: () => lastRun, set: (runId) => void (lastRun = runId) },
-        ai: deps.ai ?? noAi,
-        games: deps.games,
-        scripts: deps.scripts,
-      };
+      const holder = { lastRun: record.lastRunId };
+      const ctx = contextFor(user, id, record, holder);
       // An unexpected failure is logged with the graph, the node and the kind of failure, never a message or file contents.
       const log = (info: object) => console.error("graph node failed", { graphId: id, ...info });
       const result = await runGraph(parsed.graph, { executors: deps.executors ?? EXECUTORS, ctx, log });
-      if (lastRun !== record.lastRunId) await records.setLastRunId(id, lastRun);
+      if (holder.lastRun !== record.lastRunId) await records.setLastRunId(id, holder.lastRun);
 
       const finalNode = parsed.graph.nodes.find((n) => NODE_SPECS[n.type].final)!;
       const runId = (result.nodes[finalNode.id].result as { runId?: string } | undefined)?.runId;
       return { kind: "ran", result, runId };
+    },
+
+    async playStep(user, id, nodeId) {
+      const record = await ownedGraph(user, id);
+      const parsed = parseGraph(record.graph);
+      if (!parsed.ok) throw new Error("a stored graph no longer parses");
+      const node = parsed.graph.nodes.find((n) => n.id === nodeId);
+      if (!node || (node.type !== "build-model" && node.type !== "build-environment")) throw new GraphError(400, "Only a Build Model or Build Environment step can be opened in the studio.");
+      const problem = NODE_SPECS[node.type].incompleteProblem(node.params);
+      if (problem) throw new GraphError(400, `${NODE_SPECS[node.type].label}: ${problem}`);
+      const ctx = contextFor(user, id, record, { lastRun: record.lastRunId });
+      const log = (info: object) => console.error("graph node failed", { graphId: id, ...info });
+      const result = await runGraph(parsed.graph, { executors: deps.executors ?? EXECUTORS, ctx, log, target: nodeId });
+      return { kind: "ran" as const, result };
+    },
+
+    async readStored(user, id, sha256) {
+      await ownedGraph(user, id);
+      if (!SHA256_HEX.test(sha256)) throw notFound();
+      const bytes = await files.get(id, sha256);
+      if (!bytes) throw notFound();
+      return { bytes, contentType: "model/gltf-binary" };
     },
   };
 }

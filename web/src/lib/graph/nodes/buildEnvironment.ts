@@ -34,6 +34,8 @@ export const buildEnvironment: Executor = async (inputs, params, ctx) => {
       stripe: palette[built.stripe],
       density: built.density,
       scenery: built.scenery.map((piece) => piece.kind),
+      // the files of the pieces, for the studio window to show
+      pieces: [...built.scenery.map((piece) => ({ name: piece.kind, sha256: piece.sha256 })), ...(world ? [{ name: "terrain", sha256: world.terrain.sha256 }, { name: "road", sha256: world.road.sha256 }, { name: "backdrop", sha256: world.backdrop.sha256 }] : [])],
       reused: built.reused,
       ...(world ? { quality: "high" as const, world: world.style, triangles: total("triangles"), vertices: total("vertices"), size: total("size") } : {}),
     },

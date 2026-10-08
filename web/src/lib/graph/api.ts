@@ -125,6 +125,23 @@ export function makeGraphApi({ auth, graphs, domain }: GraphApiDeps) {
         return json(201, { sha256, name: shown, size, kind, width, height });
       }),
 
+    playStep: (req: Request, id: string) =>
+      guarded(req, "playStep", { changes: true, id }, async (user) => {
+        const node = new URL(req.url).searchParams.get("node") ?? "";
+        const played = await graphs.playStep(user, id, node);
+        const { state, order, nodes } = played.result;
+        return json(200, { state, order, nodes });
+      }),
+
+    getStored: (req: Request, id: string, sha256: string) =>
+      guarded(req, "getStored", { changes: false, id }, async (user) => {
+        const { bytes, contentType } = await graphs.readStored(user, id, sha256);
+        return new Response(bytes as BodyInit, {
+          status: 200,
+          headers: { "Content-Type": contentType, "X-Content-Type-Options": "nosniff", "Cache-Control": "private, max-age=3600" },
+        });
+      }),
+
     getAsset: (req: Request, id: string, sha256: string) =>
       guarded(req, "getAsset", { changes: false, id }, async (user) => {
         const { bytes, contentType } = await graphs.readAsset(user, id, sha256);

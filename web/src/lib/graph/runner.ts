@@ -34,6 +34,8 @@ export interface RunDeps {
   executors: Record<string, Executor>;
   ctx: ExecutorContext;
   specs?: Record<string, NodeSpec>;
+  /** Run only this node and what it needs, instead of everything that leads to the Preview (the studio window runs one step). */
+  target?: string;
   /** Where unexpected failures are logged (the node and the kind of failure, never a message). */
   log?: (info: object) => void;
 }
@@ -45,7 +47,7 @@ export async function runGraph(graph: Graph, deps: RunDeps, onEvent: (event: Run
   const log = deps.log ?? ((info: object) => console.error("graph node failed", info));
 
   const nodes = new Map(graph.nodes.map((n) => [n.id, n]));
-  const finals = graph.nodes.filter((n) => specs[n.type].final).map((n) => n.id);
+  const finals = deps.target !== undefined ? [deps.target] : graph.nodes.filter((n) => specs[n.type].final).map((n) => n.id);
   const planned = orderNodes(graph, ancestors(graph, finals));
   if (!planned.ok) throw new Error("runGraph was given a graph with a loop; check the graph first");
 
