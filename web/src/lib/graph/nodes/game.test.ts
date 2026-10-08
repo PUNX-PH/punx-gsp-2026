@@ -91,9 +91,9 @@ describe("Describe Game with Make a game on", () => {
     const check = NODE_SPECS["describe-game"].shapeProblem;
     expect(check({ prompt: "" })).toBeNull();
     expect(check({ prompt: "", makeGame: true })).toBeNull();
-    expect(check({ prompt: "", makeGame: "yes" })).toMatch(/on or off/);
+    expect(check({ prompt: "", makeGame: "yes" })).toMatch(/script, rules or off/);
     expect(check({ prompt: "", other: 1 })).toMatch(/only settings/);
-    expect(NODE_SPECS["describe-game"].defaultParams()).toEqual({ prompt: "", makeGame: true });
+    expect(NODE_SPECS["describe-game"].defaultParams()).toEqual({ prompt: "", makeGame: "script" });
   });
 });
 

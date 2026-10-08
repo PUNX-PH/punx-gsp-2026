@@ -2,6 +2,7 @@
 // given. The runner's own result types live in runner.ts; the node catalog (labels, ports) is in registry.ts.
 import type { AssetRequest, GameService } from "@/lib/engine/service";
 import type { GameSpec } from "@/lib/engine/spec";
+import type { ScriptService } from "@/lib/script/service";
 import type { DescribeGameService } from "@/lib/ai/types";
 import type { User } from "@/lib/auth/ports";
 import type { BlenderService, ModelFormat } from "@/lib/blender/types";
@@ -117,6 +118,9 @@ export type WireValue =
   | { type: "feel"; tuning: Tuning }
   // A whole game from Describe Game: the checked spec, what Claude left out, the assets asked for, and the entity files made so far (entity-NAME.glb).
   | { type: "game"; spec: GameSpec; leftOut: string; assets: AssetRequest[]; entityFiles: { file: string; sha256: string }[] }
+  // A Lua script game from Describe Game, on the same game wire: the checked script, its five colors, what Claude left out, the models asked for and
+  // the entity files made so far. It has `script` where a game of rules has `spec`.
+  | { type: "game"; script: string; palette: string[]; leftOut: string; assets: AssetRequest[]; entityFiles: { file: string; sha256: string }[] }
   // `sky`, `field` and `stripe` are palette indices 0 to 4; each piece of scenery is a GLB stored in the graph's folder.
   // A High environment also says so and carries the three files of its world (`style` is the look of the land, the road and the far hills).
   | {
@@ -138,8 +142,10 @@ export type WireValue =
       models: Record<Role, ModelSource>;
       scenery?: { file: string; sha256: string }[];
       world?: { file: string; sha256: string }[];
-      // Present (even empty) only for an engine game: the entity files, which are then the only files of the run.
+      // Present (even empty) only for an engine game or a script game: the entity files, which are then the only files of the run besides the script.
       entityFiles?: { file: string; sha256: string }[];
+      // Present only for a script game: the Lua text, stored in the run as game.lua.
+      script?: string;
     };
 
 // ---- what a node's code is given ----
@@ -178,6 +184,8 @@ export interface ExecutorContext {
   ai: DescribeGameService;
   /** Describe Game with Make a game on writes a whole game through this; without one the step says it is not set up. */
   games?: GameService;
+  /** Describe Game with Make a game on Script writes a Lua game through this; without one the step says it is not set up. */
+  scripts?: ScriptService;
 }
 
 export type Executor = (

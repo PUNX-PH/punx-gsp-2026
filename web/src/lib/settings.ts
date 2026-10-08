@@ -4,8 +4,9 @@
 // wrongly typed value, never looser. The 16 KB size limit is the caller's job.
 
 import { checkSpec } from "@/lib/engine/check";
-import { entityFilesNeeded } from "@/lib/engine/files";
+import { entityFile, entityFilesNeeded } from "@/lib/engine/files";
 import type { GameSpec } from "@/lib/engine/spec";
+import { PRIMITIVE_KINDS, SCRIPT_FILE, SCRIPT_LIMITS } from "@/lib/script/api";
 
 export const DENSITIES = ["few", "some", "lots"] as const;
 export type Density = (typeof DENSITIES)[number];
@@ -46,6 +47,11 @@ export interface GameSettings {
   look?: Look;
   /** Optional: a game for the engine, checked by checkSpec. With it, the runner fields above are fixed filler and the run's files are the entities'. */
   game?: GameSpec;
+  /**
+   * Optional: a Lua script game, played by the Unity player's own interpreter. The run holds `file` and one entity-NAME.glb for each of `models`; the
+   * runner fields above are fixed filler, as for a game of rules. A game has a `script` or a `game`, never both.
+   */
+  script?: { file: string; models: string[] };
 }
 
 export type SettingsResult = { ok: true; settings: GameSettings; text: string } | { ok: false; error: string };
@@ -91,6 +97,7 @@ export function rolesNeeded(s: GameSettings): string[] {
 /** Every file a run must have besides settings.json: the role files, then the scenery files, then the world's three, each name once. */
 export function filesNeeded(s: GameSettings): string[] {
   if (s.game) return entityFilesNeeded(s.game);
+  if (s.script) return [s.script.file, ...s.script.models.map(entityFile)];
   return [...new Set([...rolesNeeded(s), ...(s.environment?.scenery ?? []), ...(s.environment?.world ? WORLD_FILES : [])])];
 }
 
@@ -135,7 +142,34 @@ function validate(s: Record<string, unknown>): string | null {
     if (!game.ok) return `settings.game: ${game.error}`;
   }
 
+  if (Object.hasOwn(s, "script")) {
+    if (Object.hasOwn(s, "game")) return "settings: a game has a script or rules, not both";
+    const scriptError = checkScriptSetting(s.script);
+    if (scriptError) return scriptError;
+  }
+
   return Object.hasOwn(s, "environment") ? checkEnvironment(s.environment) : null;
+}
+
+const MODEL_NAME = /^[a-z][a-zA-Z0-9]{0,15}$/;
+
+function checkScriptSetting(value: unknown): string | null {
+  if (!isObject(value)) return "settings.script: must be an object like { file, models }";
+  if (value.file !== SCRIPT_FILE) return `settings.script.file: ${shown(value.file)} must be "${SCRIPT_FILE}"`;
+  const models = value.models;
+  if (!Array.isArray(models)) return "settings.script.models: must be a list of model names";
+  if (models.length > SCRIPT_LIMITS.assets) return `settings.script.models: at most ${SCRIPT_LIMITS.assets} models`;
+  const seen = new Set<string>();
+  for (const name of models) {
+    if (typeof name !== "string" || !MODEL_NAME.test(name) || (PRIMITIVE_KINDS as readonly string[]).includes(name)) {
+      return `settings.script.models: ${shown(name)} is not a model name (a lowercase letter then letters and digits, 16 at most, not a primitive's name)`;
+    }
+    if (seen.has(name)) return `settings.script.models: ${shown(name)} is listed twice`;
+    seen.add(name);
+  }
+  const extra = Object.keys(value).filter((k) => k !== "file" && k !== "models");
+  if (extra.length > 0) return `settings.script: unknown key ${shown(extra[0])}`;
+  return null;
 }
 
 function checkLook(value: unknown): string | null {

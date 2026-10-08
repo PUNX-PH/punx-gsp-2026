@@ -7,6 +7,7 @@ import type { BlenderService } from "@/lib/blender/types";
 import { makeBuilderService } from "@/lib/builder/service";
 import type { BuilderService } from "@/lib/builder/types";
 import type { GameService } from "@/lib/engine/service";
+import type { ScriptService } from "@/lib/script/service";
 import { ExportError, type ExportService, type PackedGame, type Platform, PLATFORM_NAMES } from "@/lib/export/types";
 import type { User } from "@/lib/auth/ports";
 import { checkGlb } from "@/lib/glb";
@@ -77,6 +78,8 @@ export interface GraphServiceDeps {
   builder?: BuilderService;
   /** Describe Game with Make a game on. Without one that step says it is not set up. */
   games?: GameService;
+  /** Describe Game with Make a game on Script. Without one that step says it is not set up. */
+  scripts?: ScriptService;
   /** The download of a finished game. Without one, asking for it says it is not set up. */
   exporter?: ExportService;
 }
@@ -320,6 +323,7 @@ export function makeGraphService(deps: GraphServiceDeps): GraphService {
         lastRun: { get: () => lastRun, set: (runId) => void (lastRun = runId) },
         ai: deps.ai ?? noAi,
         games: deps.games,
+        scripts: deps.scripts,
       };
       // An unexpected failure is logged with the graph, the node and the kind of failure, never a message or file contents.
       const log = (info: object) => console.error("graph node failed", { graphId: id, ...info });

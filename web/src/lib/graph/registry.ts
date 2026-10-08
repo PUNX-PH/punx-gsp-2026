@@ -59,12 +59,30 @@ function fileParam(params: Record<string, unknown>): string | null {
 
 export const MAX_PROMPT_CHARACTERS = 500;
 
+/** What Describe Game makes: a Lua script, a game of rules for the engine, or only the colors and the feel. */
+export type MakeGameMode = "script" | "rules" | "off";
+const MAKE_GAME_MODES: readonly string[] = ["script", "rules", "off"];
+const MAX_ATTEMPTS = 1_000;
+
+/** A saved `makeGame` as a mode: the words as they are, a saved true (from before scripts) is rules, and false or nothing is off. */
+export function makeGameMode(value: unknown): MakeGameMode {
+  if (value === true) return "rules";
+  return typeof value === "string" && MAKE_GAME_MODES.includes(value) ? (value as MakeGameMode) : "off";
+}
+
 function promptParam(params: Record<string, unknown>): string | null {
-  // `makeGame` is optional: a graph saved before Describe Game could write a whole game has only the prompt, and means false.
+  // `makeGame` and `attempt` are optional: a graph saved before Describe Game could write a whole game has only the prompt. `makeGame` is a switch
+  // (true for rules, false for off) in graphs saved before scripts, and one of the three words after; `attempt` counts presses of Try again.
   const rest = { ...params };
   delete rest.makeGame;
-  if (!hasExactly(rest, ["prompt"])) return "prompt and makeGame are the only settings a Describe Game step has.";
-  if (Object.hasOwn(params, "makeGame") && typeof params.makeGame !== "boolean") return "make a game must be on or off.";
+  delete rest.attempt;
+  if (!hasExactly(rest, ["prompt"])) return "prompt, makeGame and attempt are the only settings a Describe Game step has.";
+  if (Object.hasOwn(params, "makeGame") && typeof params.makeGame !== "boolean" && !(typeof params.makeGame === "string" && MAKE_GAME_MODES.includes(params.makeGame))) {
+    return "make a game must be script, rules or off.";
+  }
+  if (Object.hasOwn(params, "attempt") && !(Number.isInteger(params.attempt) && (params.attempt as number) >= 0 && (params.attempt as number) <= MAX_ATTEMPTS)) {
+    return `attempt must be a whole number from 0 to ${MAX_ATTEMPTS}.`;
+  }
   const { prompt } = params;
   if (typeof prompt !== "string") return "prompt must be text.";
   return Array.from(prompt).length > MAX_PROMPT_CHARACTERS ? `the description is longer than ${MAX_PROMPT_CHARACTERS} characters.` : null;
@@ -246,7 +264,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
       port("feel", "feel", "How fast, how high and how far apart. Not made with Make a game on.", "feel"),
       port("game", "game rules", "The whole game, when Make a game is on.", "game"),
     ],
-    defaultParams: () => ({ prompt: "", makeGame: true }),
+    defaultParams: () => ({ prompt: "", makeGame: "script" }),
     shapeProblem: promptParam,
     incompleteProblem: (params) => (typeof params.prompt === "string" && params.prompt.trim() === "" ? "describe your game first." : null),
   },

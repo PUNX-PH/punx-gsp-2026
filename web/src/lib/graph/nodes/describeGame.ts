@@ -1,7 +1,9 @@
-// The Describe Game node: the person's words, and a picture if one is wired in, become a palette and a feel. All the rules
-// (the cache, the limits, the model, checking the answer) are in the AI service it is given; this only passes things along.
+// The Describe Game node: the person's words, and a picture if one is wired in, become a game. Three modes (the Make a game setting): Script (Claude writes a
+// Lua game for the player's interpreter), Rules (Claude writes a game of rules for the engine) and Off (only a palette and the three tuning numbers). All the
+// rules (the cache, the limits, the model, checking the answer) are in the services it is given; this only passes things along.
 import { designEntityAssets } from "@/lib/engine/assets";
 import { paintingPalette } from "@/lib/graph/palette";
+import { makeGameMode } from "@/lib/graph/registry";
 import { type Executor, NodeError, type WireValue } from "@/lib/graph/types";
 
 /** A game's one to five colors as the five a palette wire carries: the last one repeated. */
@@ -9,6 +11,7 @@ export const padPalette = (colors: string[]): string[] => Array.from({ length: 5
 
 export const describeGame: Executor = async (inputs, params, ctx) => {
   const prompt = params.prompt as string; // its shape was checked when the graph was saved; an empty one stops Play first
+  const mode = makeGameMode(params.makeGame);
 
   let picture: { sha256: string; bytes: Uint8Array } | null = null;
   if (inputs.image?.type === "image") {
@@ -17,9 +20,26 @@ export const describeGame: Executor = async (inputs, params, ctx) => {
     picture = { sha256: inputs.image.sha256, bytes };
   }
 
-  // With Make a game on (new steps; a graph saved before it has no such setting), Claude writes a whole game for the engine instead of a
-  // palette and a feel. The palette it chose is still offered, so a Game Template without the game wire keeps its colors.
-  if (params.makeGame === true) {
+  // Script (the default for new steps): Claude writes a Lua game, its five colors and the models it wants. There is no palette or feel port value: the
+  // colors travel with the game, and Game Template puts them in the settings.
+  if (mode === "script") {
+    if (!ctx.scripts) throw new NodeError("Describe Game: making a whole game is not set up on this site yet.");
+    const attempt = typeof params.attempt === "number" ? params.attempt : 0;
+    const made = await ctx.scripts.create({ user: ctx.user, deadline: ctx.deadline }, { description: prompt, picture, models: [], attempt });
+    // The models Claude asked for are built now (one failing only makes that model a plain shape).
+    const art = await designEntityAssets(ctx.builder, { user: ctx.user, graphId: ctx.graphId, derived: ctx.derived, deadline: ctx.deadline }, made.assets, paintingPalette(made.palette));
+    const outputs: Record<string, WireValue> = {
+      game: { type: "game", script: made.script, palette: made.palette, leftOut: made.leftOut, assets: made.assets, entityFiles: art.files },
+    };
+    return {
+      outputs,
+      result: { script: true, lines: made.script.split("\n").length, leftOut: made.leftOut, palette: made.palette, models: art.files.length, plainShapes: art.fallbacks, reused: !made.asked },
+    };
+  }
+
+  // Rules (and a saved true): Claude writes a whole game for the engine instead of a palette and a feel. The palette it chose is still offered, so a
+  // Game Template without the game wire keeps its colors.
+  if (mode === "rules") {
     if (!ctx.games) throw new NodeError("Describe Game: making a whole game is not set up on this site yet.");
     const made = await ctx.games.create({ user: ctx.user, deadline: ctx.deadline }, { description: prompt, picture, models: [] });
     const palette = padPalette(made.spec.look.palette);

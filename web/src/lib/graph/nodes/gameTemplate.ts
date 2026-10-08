@@ -2,7 +2,10 @@
 // nothing (the Preview does); it only builds the settings and checks them exactly as the Unity template will.
 import { SAMPLE_PALETTE } from "@/lib/graph/palette";
 import { entityFile, entityFilesNeeded, usesFile } from "@/lib/engine/files";
+import type { GameSpec } from "@/lib/engine/spec";
 import { padPalette } from "@/lib/graph/nodes/describeGame";
+import { SCRIPT_FILE } from "@/lib/script/api";
+import { checkScript } from "@/lib/script/check";
 import { type Executor, type ModelSource, NodeError, ROLE_FILES, type Role, SCENERY_FILES, type Tuning, type WireValue } from "@/lib/graph/types";
 import { validateSettings, WORLD_FILES } from "@/lib/settings";
 
@@ -11,7 +14,7 @@ const ROLES = Object.keys(ROLE_FILES) as Role[];
 const article = (role: Role) => (role === "obstacle" ? "an" : "a");
 
 /** A whole game from Describe Game: the settings are the spec plus filler for the runner fields, and the run holds only the entities' files. */
-function gameSettings(game: Extract<WireValue, { type: "game" }>) {
+function gameSettings(game: Extract<WireValue, { type: "game"; spec: GameSpec }>) {
   const have = new Set(game.entityFiles.map((f) => f.file));
   // An entity that names a model but has no file (its build failed or was not made) is drawn as a box.
   const entities = Object.fromEntries(
@@ -29,8 +32,28 @@ function gameSettings(game: Extract<WireValue, { type: "game" }>) {
   };
 }
 
+/**
+ * A Lua game from Describe Game: the settings name game.lua and the models that were built (the others are drawn as boxes by the player), with the
+ * game's five colors and the runner's fields as filler; the script itself travels on the settings wire and Preview stores it as game.lua.
+ */
+function scriptSettings(game: Extract<WireValue, { type: "game"; script: string }>) {
+  const checkedScript = checkScript(game.script);
+  if (!checkedScript.ok) throw new NodeError(`Game Template: ${checkedScript.reason}`);
+  const have = new Set(game.entityFiles.map((f) => f.file));
+  const names = game.assets.map((a) => a.entity).filter((name) => have.has(entityFile(name)));
+  const tuning: Tuning = { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 };
+  const checked = validateSettings(JSON.stringify({ schemaVersion: 1, template: "runner", palette: game.palette, roles: ROLE_FILES, tuning, script: { file: SCRIPT_FILE, models: names } }));
+  if (!checked.ok) throw new NodeError(`Game Template: ${checked.error}`);
+  const needed = new Set(names.map(entityFile));
+  const models = Object.fromEntries(ROLES.map((role): [Role, ModelSource] => [role, { kind: "builtin", role }])) as Record<Role, ModelSource>;
+  return {
+    output: { type: "settings" as const, settingsText: checked.text, tuning, models, entityFiles: game.entityFiles.filter((f) => needed.has(f.file)), script: game.script },
+    result: { script: true, models: names.length },
+  };
+}
+
 export const gameTemplate: Executor = async (inputs, params) => {
-  if (inputs.game?.type === "game") return gameSettings(inputs.game);
+  if (inputs.game?.type === "game") return "script" in inputs.game ? scriptSettings(inputs.game) : gameSettings(inputs.game);
   // A connected feel replaces the sliders for this run (the saved setting is left alone, so unplugging it brings them back).
   // Either way the numbers are checked below like any others; the settings' own shape was checked when the graph was saved.
   const { speed, jumpHeight, obstacleSpacing } = inputs.feel?.type === "feel" ? inputs.feel.tuning : (params.tuning as Tuning);

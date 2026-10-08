@@ -4,6 +4,8 @@
 // exist, or has no such file all look the same ("Not found").
 import type { User } from "@/lib/auth/ports";
 import { checkGlb } from "@/lib/glb";
+import { SCRIPT_FILE } from "@/lib/script/api";
+import { checkScript } from "@/lib/script/check";
 import { filesNeeded, validateSettings } from "@/lib/settings";
 import { FileExistsError, type FileStore, type Run, RunError, type RunRecords, type RunService } from "@/lib/runs/types";
 
@@ -78,7 +80,7 @@ export function makeRunService(deps: RunServiceDeps): RunService {
       if (!run.needed.includes(name)) throw new RunError(400, `${name} is not one of this run's files`);
       if (Object.hasOwn(run.files, name)) throw new RunError(409, `${name} was already uploaded`);
 
-      const checked = checkGlb(name, bytes);
+      const checked = name === SCRIPT_FILE ? checkScriptFile(bytes) : checkGlb(name, bytes);
       if (!checked.ok) throw new RunError(400, checked.error);
 
       const meta = { size: bytes.length, sha256: await sha256Hex(bytes) };
@@ -113,9 +115,22 @@ export function makeRunService(deps: RunServiceDeps): RunService {
   };
 }
 
+/** A game's script is stored as text only when it is UTF-8 and passes the same check Describe Game's script does (size, syntax, the names the player removed). */
+function checkScriptFile(bytes: Uint8Array): { ok: true } | { ok: false; error: string } {
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return { ok: false, error: `${SCRIPT_FILE}: not valid UTF-8 text` };
+  }
+  const checked = checkScript(text);
+  return checked.ok ? { ok: true } : { ok: false, error: `${SCRIPT_FILE}: ${checked.reason}` };
+}
+
 function contentTypeFor(name: string): string {
   const extension = name.slice(name.lastIndexOf(".")).toLowerCase();
   if (extension === ".json") return "application/json";
+  if (extension === ".lua") return "text/plain; charset=utf-8";
   if (extension === ".glb") return "model/gltf-binary";
   return "application/octet-stream";
 }
