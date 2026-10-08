@@ -10,6 +10,9 @@ import {
   signOut,
 } from "firebase/auth";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { Mark } from "@/app/AppHeader";
+import styles from "@/app/shell.module.css";
+import { ThemedShell } from "@/app/graphs/ThemedShell";
 import { isAllowedEmail } from "@/lib/access";
 import { clientAuth } from "@/lib/firebaseClient";
 import { googleSignInMessage, resolveLinkEmail } from "@/lib/signInState";
@@ -118,26 +121,79 @@ export default function SignInPage() {
   }
 
   return (
-    <main className="page">
-      <h1>Sign in</h1>
-      {status === "finishing" && <p>Signing you in…</p>}
-      {status === "sent" && <p>Check your inbox: we sent a sign-in link to {email.trim()}. Open it on this device.</p>}
-      {(status === "idle" || status === "sending" || status === "google") && (
-        <>
-          <button type="button" onClick={signInWithGoogle} disabled={status !== "idle"}>
-            {status === "google" ? "Opening Google…" : "Continue with Google"}
-          </button>
-          <p>or</p>
-          <form onSubmit={sendLink} className="page">
-            <label htmlFor="email">Your {DOMAIN} email address</label>
-            <input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-            <button type="submit" disabled={status !== "idle"}>
-              {status === "sending" ? "Sending…" : "Email me a sign-in link"}
-            </button>
-          </form>
-        </>
-      )}
-      {error && <p className="error" role="alert">{error}</p>}
-    </main>
+    <ThemedShell>
+      <main className={styles.signin}>
+        <section className={styles.signinCopy}>
+          <span className={styles.brand}>
+            <Mark />
+            Game Studio
+          </span>
+          <h1 className={styles.heading}>Describe a game. Press Play.</h1>
+          <p className={styles.lede}>Write what the game is, add a picture for its look, and Game Studio builds it as steps on a canvas you can change, then lets you play it.</p>
+
+          {status === "finishing" && <p className={styles.notice}>Signing you in…</p>}
+          {status === "sent" && <p className={styles.notice}>Check your inbox: we sent a sign-in link to {email.trim()}. Open it on this device.</p>}
+          {(status === "idle" || status === "sending" || status === "google") && (
+            <div className={styles.signinForm}>
+              <button type="button" className={styles.google} onClick={signInWithGoogle} disabled={status !== "idle"}>
+                {status === "google" ? "Opening Google…" : "Continue with Google"}
+              </button>
+              <p className={styles.or}>or</p>
+              <form onSubmit={sendLink} className={styles.emailForm}>
+                <div className={styles.field}>
+                  <label htmlFor="email">Your {DOMAIN} email address</label>
+                  <input id="email" className={styles.input} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+                <button type="submit" className={styles.button} disabled={status !== "idle"}>
+                  {status === "sending" ? "Sending…" : "Email me a sign-in link"}
+                </button>
+              </form>
+            </div>
+          )}
+          {error && (
+            <p className={styles.error} role="alert">
+              {error}
+            </p>
+          )}
+        </section>
+        <Diagram />
+      </main>
+    </ThemedShell>
+  );
+}
+
+/**
+ * The steps of a game as the editor draws them: a picture and the words go into Describe Game, which feeds the Game Template, which feeds the Preview.
+ * The wires draw themselves once. It is decoration for a page the person has seen, so it is hidden from screen readers.
+ */
+function Diagram() {
+  return (
+    <aside className={styles.diagram} aria-hidden="true">
+      <svg className={styles.wires} viewBox="0 0 100 70" preserveAspectRatio="none">
+        <path className={styles.wire} data-wire="image" pathLength="100" d="M16 16 L16 26" />
+        <path className={styles.wire} data-wire="palette" pathLength="100" d="M44 40 C50 40 50 13 56 13" />
+        <path className={styles.wire} data-wire="settings" pathLength="100" d="M77 21 L77 44" />
+      </svg>
+      <div className={styles.node} style={{ left: "2%", top: "2.8%", width: "28%", height: "20%", ["--dot" as string]: "var(--wire-image)" }}>
+        <span className={styles.nodeName}>Picture</span>
+        <span className={styles.swatches}>
+          {["#1b1f3b", "#ff6f59", "#ffd166", "#06d6a0", "#ffffff"].map((c) => (
+            <span key={c} style={{ background: c }} />
+          ))}
+        </span>
+      </div>
+      <div className={styles.node} style={{ left: "2%", top: "37%", width: "42%", height: "40%", ["--dot" as string]: "var(--wire-palette)" }}>
+        <span className={styles.nodeName}>Describe Game</span>
+        <span className={styles.typed}>A fox that jumps over logs and collects berries</span>
+      </div>
+      <div className={styles.node} style={{ left: "56%", top: "5.7%", width: "42%", height: "24%", ["--dot" as string]: "var(--wire-settings)" }}>
+        <span className={styles.nodeName}>Game Template</span>
+        <span className={styles.nodeBody}>Script game, 5 colors</span>
+      </div>
+      <div className={styles.node} style={{ left: "56%", top: "63%", width: "42%", height: "34%", ["--dot" as string]: "var(--accent)" }}>
+        <span className={styles.nodeName}>Preview</span>
+        <span className={styles.playMock}>Play</span>
+      </div>
+    </aside>
   );
 }

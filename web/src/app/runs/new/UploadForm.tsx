@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import styles from "@/app/shell.module.css";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { checkGlb } from "@/lib/glb";
@@ -89,40 +90,55 @@ export function UploadForm() {
   }
 
   return (
-    <main className="page">
-      <h1>Add a run</h1>
-      <form onSubmit={submit} className="page">
-        <label htmlFor="settings">Settings file (settings.json)</label>
-        <input id="settings" type="file" accept=".json,application/json" onChange={(e) => setSettingsFile(e.target.files?.[0] ?? null)} />
+    <main className={styles.main}>
+      <h1 className={styles.title}>Add a run</h1>
+      <p className={styles.lede}>Choose a game&apos;s settings file and the models it names. They are stored together so the game can be played.</p>
+      <form onSubmit={submit} className={styles.form}>
+        <div className={styles.field}>
+          <label htmlFor="settings">Settings file</label>
+          <input id="settings" className={styles.input} type="file" accept=".json,application/json" onChange={(e) => setSettingsFile(e.target.files?.[0] ?? null)} />
+          <span className={styles.hint}>settings.json</span>
+        </div>
 
-        <label htmlFor="models">Models (the .glb files your settings name)</label>
-        <input id="models" type="file" accept=".glb,model/gltf-binary" multiple onChange={(e) => setModels(Array.from(e.target.files ?? []))} />
+        <div className={styles.field}>
+          <label htmlFor="models">Models</label>
+          <input id="models" className={styles.input} type="file" accept=".glb,model/gltf-binary" multiple onChange={(e) => setModels(Array.from(e.target.files ?? []))} />
+          <span className={styles.hint}>The .glb files your settings name.</span>
+        </div>
 
-        <button type="submit" disabled={busy}>
-          {busy ? "Uploading…" : "Upload"}
-        </button>
+        <div className={styles.actions}>
+          <button type="submit" className={styles.cta} disabled={busy}>
+            {busy ? "Uploading…" : "Upload"}
+          </button>
+          <Link href="/runs" className={styles.link}>
+            Back to your runs
+          </Link>
+        </div>
       </form>
 
-      {error && <p className="error" role="alert">{error}</p>}
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
 
       {results.length > 0 && (
-        <ul>
+        <ul className={styles.results}>
           {results.map((r) => (
             <li key={r.name}>
-              {r.name}: {r.state === "uploading" ? "uploading…" : r.state === "uploaded" ? "uploaded" : <span className="error">{r.message}</span>}
+              {r.name}: {r.state === "uploading" ? "uploading…" : r.state === "uploaded" ? "uploaded" : <span className={styles.error}>{r.message}</span>}
             </li>
           ))}
         </ul>
       )}
 
       {runId && (
-        <p>
-          <Link href={`/runs/${encodeURIComponent(runId)}/preview`}>Open the Preview</Link>
-        </p>
+        <div className={styles.actions}>
+          <Link href={`/runs/${encodeURIComponent(runId)}/preview`} className={styles.cta}>
+            Play it
+          </Link>
+        </div>
       )}
-      <p>
-        <Link href="/">Back to your runs</Link>
-      </p>
     </main>
   );
 }

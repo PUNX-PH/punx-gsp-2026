@@ -1,0 +1,338 @@
+/* The pages around the editor: sign-in, the list of games, the runs. They sit inside ThemedShell, which gives them the editor's color tokens
+   (--canvas, --surface, --line, --text, --muted, --accent, the wire colors) and the person's theme, so everything here is one of those tokens. */
+
+.shell {
+  min-height: 100vh;
+  background-color: var(--canvas);
+  background-image: radial-gradient(var(--dots) 1px, transparent 1px);
+  background-size: 22px 22px;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- the header ---- */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: 56px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-family: var(--font-display), var(--font-geist-sans), system-ui, sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.mark { width: 30px; height: 20px; flex: none; }
+
+.nav { display: flex; gap: 4px; }
+
+.nav a {
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.nav a:hover { color: var(--text); background: var(--surface-raised); }
+.nav a[aria-current="page"] { color: var(--text); background: var(--surface-raised); box-shadow: inset 0 -2px 0 var(--accent); }
+
+.spacer { flex: 1; }
+
+.who { color: var(--muted); font-size: 13px; }
+
+.brand:focus-visible,
+.nav a:focus-visible,
+.link:focus-visible,
+.ghost:focus-visible,
+.cta:focus-visible,
+.button:focus-visible,
+.name:focus-visible,
+.input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* ---- buttons and links ---- */
+
+.ghost,
+.button {
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.ghost:hover:not(:disabled),
+.button:hover:not(:disabled) { border-color: var(--muted); }
+.button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.cta {
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cta:hover:not(:disabled) { filter: brightness(1.08); }
+.cta:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.link { color: var(--text); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--muted); }
+.link:hover { text-decoration-color: var(--accent); }
+
+.error { color: var(--bad); font-size: 14px; }
+
+/* ---- a page of content ---- */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 48px 24px 72px;
+}
+
+.title {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-display), var(--font-geist-sans), system-ui, sans-serif;
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+
+.lede { max-width: 54ch; color: var(--muted); font-size: 15px; line-height: 1.55; }
+
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+.rows { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+
+.row { display: flex; align-items: center; gap: 16px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.row:hover { background: var(--surface-raised); }
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.meta { color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+.pill {
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pill[data-state="ready"] { border-color: var(--ok); color: var(--ok); }
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 32px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.empty strong { color: var(--text); font-size: 16px; }
+
+/* ---- the form pages ---- */
+
+.form { display: flex; flex-direction: column; gap: 16px; max-width: 28rem; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { color: var(--text); font-size: 14px; font-weight: 600; }
+.hint { color: var(--muted); font-size: 13px; line-height: 1.45; }
+
+.input {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.input:hover { border-color: var(--muted); }
+
+.results { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 14px; }
+
+/* ---- sign-in ---- */
+
+.signin {
+  display: grid;
+  grid-template-columns: minmax(0, 26rem) minmax(0, 32rem);
+  justify-content: center;
+  align-items: center;
+  gap: clamp(32px, 7vw, 96px);
+  min-height: 100vh;
+  padding: 48px 24px;
+}
+
+.signinCopy { display: flex; flex-direction: column; gap: 20px; }
+
+.signinCopy .brand { margin-bottom: 20px; }
+
+.heading {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-display), var(--font-geist-sans), system-ui, sans-serif;
+  font-size: clamp(36px, 5.5vw, 56px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.signinForm { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+
+.google {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.google:hover:not(:disabled) { filter: brightness(1.08); }
+.google:disabled { opacity: 0.5; cursor: not-allowed; }
+.google:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+.or { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; }
+.or::before,
+.or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+.emailForm { display: flex; flex-direction: column; gap: 10px; }
+
+.notice {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* the diagram: the real steps of a game, wired the way the editor wires them */
+
+.diagram {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 100 / 70;
+}
+
+.wires { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+
+.wire {
+  fill: none;
+  stroke-width: 0.8;
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 0;
+  animation: draw 1.1s ease-out both;
+}
+
+.wire[data-wire="image"] { stroke: var(--wire-image); animation-delay: 0.2s; }
+.wire[data-wire="palette"] { stroke: var(--wire-palette); animation-delay: 0.9s; }
+.wire[data-wire="settings"] { stroke: var(--wire-settings); animation-delay: 1.6s; }
+
+@keyframes draw {
+  from { stroke-dashoffset: 100; opacity: 0.2; }
+  to { stroke-dashoffset: 0; opacity: 1; }
+}
+
+.node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--card-shadow);
+  color: var(--text);
+  font-size: clamp(10px, 1.5vw, 13px);
+  line-height: 1.3;
+}
+
+.nodeName { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.nodeName::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dot, var(--muted)); }
+.nodeBody { color: var(--muted); }
+
+.swatches { display: flex; gap: 4px; }
+.swatches span { width: 14px; height: 14px; border-radius: 4px; }
+
+.typed {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--canvas);
+  color: var(--text);
+}
+
+.playMock {
+  align-self: flex-start;
+  padding: 4px 14px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+
+@media (max-width: 860px) {
+  .signin { grid-template-columns: minmax(0, 28rem); min-height: 0; }
+  .diagram { max-width: 28rem; }
+  .header { padding: 0 16px; gap: 12px; }
+  .who { display: none; }
+  .main { padding: 32px 16px 56px; }
+  .row { flex-wrap: wrap; gap: 8px 12px; }
+  .meta { order: 3; flex-basis: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wire { animation: none; }
+}

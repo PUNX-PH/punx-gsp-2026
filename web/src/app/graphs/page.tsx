@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import styles from "@/app/graphs/[id]/editor.module.css";
+import { AppHeader } from "@/app/AppHeader";
+import styles from "@/app/shell.module.css";
 import { currentUser } from "@/lib/auth/server";
 import { getGraphService } from "@/lib/graph/firebase";
 import { DeleteGraphButton, NewGraphButton } from "./NewGraphButton";
@@ -14,34 +15,34 @@ export default async function GraphsPage() {
 
   return (
     <ThemedShell>
-      <main className={styles.listPage}>
-        <h1 className={styles.listTitle}>Your graphs</h1>
-        <p className={styles.hint}>A graph is a game: the steps that make it, wired together. Open one to build and play it.</p>
+      <div className={styles.shell}>
+        <AppHeader email={user.email} current="games" />
+        <main className={styles.main}>
+          <h1 className={styles.title}>Your games</h1>
+          <p className={styles.lede}>Each game is a set of steps wired together on a canvas. Open one to change it and play it, or start a new one.</p>
 
-        <NewGraphButton />
+          <NewGraphButton />
 
-        {graphs.length === 0 ? (
-          <p className={styles.hint}>You have no graphs yet. Describe a game, build a character, or start from the starter graph.</p>
-        ) : (
-          <ul className={styles.listRows}>
-            {graphs.map((graph) => (
-              <li key={graph.id} className={styles.listRow}>
-                <Link href={`/graphs/${encodeURIComponent(graph.id)}`} className={styles.listName}>
-                  {graph.name}
-                </Link>
-                <span className={styles.listMeta}>{new Date(graph.updatedAt).toISOString().slice(0, 16).replace("T", " ")} UTC</span>
-                <DeleteGraphButton id={graph.id} />
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <p>
-          <Link href="/" className={styles.listBack}>
-            Back to your runs
-          </Link>
-        </p>
-      </main>
+          {graphs.length === 0 ? (
+            <div className={styles.empty}>
+              <strong>No games yet</strong>
+              <span>Describe the game you want and the steps are made for you, or start from the starter and change it.</span>
+            </div>
+          ) : (
+            <ul className={styles.rows}>
+              {graphs.map((graph) => (
+                <li key={graph.id} className={styles.row}>
+                  <Link href={`/graphs/${encodeURIComponent(graph.id)}`} className={styles.name}>
+                    {graph.name}
+                  </Link>
+                  <span className={styles.meta}>Edited {new Date(graph.updatedAt).toISOString().slice(0, 16).replace("T", " ")} UTC</span>
+                  <DeleteGraphButton id={graph.id} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </main>
+      </div>
     </ThemedShell>
   );
 }

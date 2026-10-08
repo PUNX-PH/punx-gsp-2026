@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import styles from "@/app/shell.module.css";
 
 export function SignOutButton() {
   const router = useRouter();
@@ -21,8 +22,10 @@ export function SignOutButton() {
 
   return (
     <>
-      <button onClick={signOut}>Sign out</button>
-      {error && <span className="error"> {error}</span>}
+      <button type="button" className={styles.ghost} onClick={signOut}>
+        Sign out
+      </button>
+      {error && <span className={styles.error}> {error}</span>}
     </>
   );
 }

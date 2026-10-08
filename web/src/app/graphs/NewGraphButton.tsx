@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import styles from "@/app/graphs/[id]/editor.module.css";
+import styles from "@/app/shell.module.css";
 
 async function message(response: Response, fallback: string): Promise<string> {
   const body = (await response.json().catch(() => ({}))) as { error?: string };
@@ -31,18 +31,18 @@ export function NewGraphButton() {
   }
 
   return (
-    <p>
-      <button type="button" className={styles.play} onClick={() => create("described")} disabled={busy}>
-        New: describe a game
-      </button>{" "}
-      <button type="button" className={styles.secondary} onClick={() => create("built")} disabled={busy}>
-        New: build a character
-      </button>{" "}
-      <button type="button" className={styles.secondary} onClick={() => create(true)} disabled={busy}>
-        New from starter
+    <div className={styles.actions}>
+      <button type="button" className={styles.cta} onClick={() => create("described")} disabled={busy}>
+        Describe a game
       </button>
-      {error && <span className={styles.errorText}> {error}</span>}
-    </p>
+      <button type="button" className={styles.button} onClick={() => create("built")} disabled={busy}>
+        Build a character
+      </button>
+      <button type="button" className={styles.button} onClick={() => create(true)} disabled={busy}>
+        Start from the starter
+      </button>
+      {error && <span className={styles.error}> {error}</span>}
+    </div>
   );
 }
 
@@ -51,7 +51,7 @@ export function DeleteGraphButton({ id }: { id: string }) {
   const [error, setError] = useState("");
 
   async function remove() {
-    if (!window.confirm("Delete this graph, its files and its game?")) return;
+    if (!window.confirm("Delete this game, its files and its run?")) return;
     try {
       const response = await fetch(`/api/graphs/${encodeURIComponent(id)}`, { method: "DELETE" });
       if (response.status === 401) return router.replace("/sign-in");
@@ -64,10 +64,10 @@ export function DeleteGraphButton({ id }: { id: string }) {
 
   return (
     <>
-      <button type="button" className={styles.secondary} onClick={remove}>
+      <button type="button" className={styles.ghost} onClick={remove}>
         Delete
       </button>
-      {error && <span className={styles.errorText}> {error}</span>}
+      {error && <span className={styles.error}> {error}</span>}
     </>
   );
 }
