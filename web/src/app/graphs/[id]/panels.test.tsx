@@ -176,12 +176,26 @@ describe("SettingsPanel for Describe Game and a locked Game Template", () => {
   });
   const rangeInputs = (html: string) => html.split("<input").filter((part) => part.includes('type="range"'));
 
-  it("has a Make a game choice, on for a step saved with it on and off for one saved without it", () => {
-    const on = panel("n2", { graph: { ...described(""), nodes: described("").nodes.map((n) => (n.id === "n2" ? { ...n, params: { prompt: "", makeGame: true } } : n)) } });
-    expect(on).toContain("Make a game");
-    expect(on).toMatch(/aria-pressed="true"[^>]*>On: a whole game/);
-    const off = panel("n2", { graph: described("") });
-    expect(off).toMatch(/aria-pressed="true"[^>]*>Off: colors and feel/);
+  const withParams = (params: Record<string, unknown>): Graph => ({ ...described(""), nodes: described("").nodes.map((n) => (n.id === "n2" ? { ...n, params: { prompt: "", ...params } } : n)) });
+
+  it("has a Make a game choice of Script, Rules and Off: Script for a step saved with it, Rules for an older step saved with it on, Off for one saved without it", () => {
+    const script = panel("n2", { graph: withParams({ makeGame: "script" }) });
+    expect(script).toContain("Make a game");
+    expect(script).toMatch(/aria-pressed="true"[^>]*>Script: any game/);
+    expect(script).toContain("Rules: simple, tested games");
+    expect(script).toContain("Off: colors and feel");
+    expect(panel("n2", { graph: withParams({ makeGame: "rules" }) })).toMatch(/aria-pressed="true"[^>]*>Rules: simple, tested games/);
+    expect(panel("n2", { graph: withParams({ makeGame: true }) })).toMatch(/aria-pressed="true"[^>]*>Rules: simple, tested games/);
+    expect(panel("n2", { graph: described("") })).toMatch(/aria-pressed="true"[^>]*>Off: colors and feel/);
+    expect(panel("n2", { graph: withParams({ makeGame: false }) })).toMatch(/aria-pressed="true"[^>]*>Off: colors and feel/);
+  });
+
+  it("offers Try again only for a script game, and says it runs in the player and never on the servers", () => {
+    const script = panel("n2", { graph: withParams({ makeGame: "script" }) });
+    expect(script).toContain("Try again");
+    expect(script).toContain("next time you press Play");
+    expect(script).toMatch(/runs inside the player, never on our servers/);
+    for (const makeGame of ["rules", "off", true, false]) expect(panel("n2", { graph: withParams({ makeGame }) })).not.toContain("Try again");
   });
 
   it("has a box for the prompt (at most 500 characters), holding what was typed, with the characters left", () => {

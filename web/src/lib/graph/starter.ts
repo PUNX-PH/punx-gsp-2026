@@ -8,7 +8,7 @@ export function describedStarterGraph(): Graph {
     schemaVersion: 1,
     nodes: [
       { id: "n1", type: "reference-image", params: { asset: null }, position: { x: 0, y: 0 } },
-      { id: "n2", type: "describe-game", params: { prompt: "", makeGame: true }, position: { x: 260, y: 0 } },
+      { id: "n2", type: "describe-game", params: { prompt: "", makeGame: "script" }, position: { x: 260, y: 0 } },
       { id: "n3", type: "game-template", params: { tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } }, position: { x: 520, y: 0 } },
       { id: "n4", type: "preview", params: {}, position: { x: 780, y: 0 } },
     ],

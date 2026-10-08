@@ -31,7 +31,7 @@ describe("describedStarterGraph", () => {
     expect(describedStarterGraph().nodes.map((n) => n.position)).toEqual([0, 260, 520, 780].map((x) => ({ x, y: 0 })));
     const a = describedStarterGraph();
     a.nodes[1].params = { prompt: "changed" };
-    expect(describedStarterGraph().nodes[1].params).toEqual({ prompt: "", makeGame: true });
+    expect(describedStarterGraph().nodes[1].params).toEqual({ prompt: "", makeGame: "script" });
   });
 
   it("is not the same graph as the original starter, which keeps working with no AI", () => {

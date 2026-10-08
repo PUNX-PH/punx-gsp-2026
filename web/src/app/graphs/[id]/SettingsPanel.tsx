@@ -12,7 +12,7 @@ import { SHAPES, SHAPE_NAMES, TRIANGLES } from "@/lib/blender/types";
 import { KIND_NAMES, MODEL_KINDS, QUALITIES, type Quality } from "@/lib/builder/kinds";
 import { TUNING_FIELDS, tuningProblem } from "@/lib/canvas/tuning";
 import { SAMPLE_PALETTE } from "@/lib/graph/palette";
-import { MAX_DESCRIPTION_CHARACTERS, MAX_MOTION_CHARACTERS, MAX_PROMPT_CHARACTERS, MAX_THEME_CHARACTERS } from "@/lib/graph/registry";
+import { makeGameMode, MAX_DESCRIPTION_CHARACTERS, MAX_MOTION_CHARACTERS, MAX_PROMPT_CHARACTERS, MAX_THEME_CHARACTERS } from "@/lib/graph/registry";
 import { type Assets, type GraphNode, ROLE_FILES, type Role, type Tuning } from "@/lib/graph/types";
 import { DENSITIES, type Density } from "@/lib/settings";
 
@@ -224,6 +224,21 @@ function ChoiceGroup(props: { label: string; choices: { value: string; name: str
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+// Make a game: Script. Try again counts presses in the step's settings: the next Play asks the AI for a different game from the same words, and any Play
+// after that reuses it. The note says what a script is, because it is code the AI wrote.
+function TryAgain({ node, onSettings }: { node: GraphNode; onSettings: SettingsPanelProps["onSettings"] }) {
+  const attempt = typeof node.params.attempt === "number" ? node.params.attempt : 0;
+  return (
+    <div className={styles.field}>
+      <button type="button" className={styles.choice} onClick={() => onSettings(node.id, { attempt: attempt + 1 })}>
+        Try again
+      </button>
+      <p className={styles.hint}>Asks the AI for a different game from the same words the next time you press Play.</p>
+      <p className={styles.hint}>The AI writes your game as a small program that runs inside the player, never on our servers.</p>
     </div>
   );
 }
@@ -457,10 +472,11 @@ export function SettingsPanel({ node, data, uploading, error, onChooseFile, onTu
         <>
           <ChoiceGroup
             label="Make a game"
-            choices={[{ value: "on", name: "On: a whole game" }, { value: "off", name: "Off: colors and feel" }]}
-            current={node.params.makeGame === true ? "on" : "off"}
-            onPick={(value) => onSettings(node.id, { makeGame: value === "on" })}
+            choices={[{ value: "script", name: "Script: any game" }, { value: "rules", name: "Rules: simple, tested games" }, { value: "off", name: "Off: colors and feel" }]}
+            current={makeGameMode(node.params.makeGame)}
+            onPick={(value) => onSettings(node.id, { makeGame: value })}
           />
+          {makeGameMode(node.params.makeGame) === "script" && <TryAgain node={node} onSettings={onSettings} />}
           <PromptBox nodeId={node.id} prompt={typeof node.params.prompt === "string" ? node.params.prompt : ""} onPrompt={onPrompt} />
         </>
       )}

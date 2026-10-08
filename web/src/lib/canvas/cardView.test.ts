@@ -251,6 +251,19 @@ describe("a Describe Game step", () => {
     expect(plain).toEqual({ kind: "text", text: "A game with 5 things and 2 rules." });
   });
 
+
+  it("describes a script game by its length, what was left out, the plain shapes, and whether it was reused", () => {
+    const result = { script: true, lines: 64, leftOut: "no sound", palette: [], models: 0, plainShapes: [], reused: false };
+    const text = (r: object) => step("n2", { graph: described(), run: runWith({ state: "done", result: r }) }).result;
+    expect(text(result)).toEqual({ kind: "text", text: "A script game, 64 lines. Left out: no sound" });
+    expect(text({ ...result, leftOut: "", reused: true })).toEqual({ kind: "text", text: "A script game, 64 lines. Reused your earlier result." });
+    expect(text({ ...result, leftOut: "", plainShapes: [{ entity: "hero", message: "x" }] })).toEqual({
+      kind: "text",
+      text: "A script game, 64 lines. Drawn as plain shapes for now: hero. Press Play again to try building them.",
+    });
+    expect(text({ ...result, lines: 1, leftOut: "" })).toEqual({ kind: "text", text: "A script game, 1 line." });
+  });
+
   it("lists a picture input that is optional, and a palette, a feel and a game output", () => {
     const card = step("n2", { graph: described() });
     expect(card.inputs.map((p) => [p.name, p.type, p.required, p.wired])).toEqual([["image", "image", false, true]]);

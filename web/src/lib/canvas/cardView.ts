@@ -100,14 +100,25 @@ const tuningLine = (tuning: Tuning) => `speed ${tuning.speed} · jump ${tuning.j
 
 const isNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 
+/** The names of the models that are plain shapes for now, from a result's `plainShapes` list. */
+const plainShapeNames = (plain: unknown): string[] =>
+  Array.isArray(plain) ? plain.flatMap((p) => (typeof p === "object" && p !== null && typeof (p as { entity?: unknown }).entity === "string" ? [(p as { entity: string }).entity] : [])) : [];
+
 // What a finished Describe Game step handed over (lib/graph/nodes/describeGame.ts), or null when the result is not that.
 function described(result: unknown): ResultView | null {
-  // A whole game (Make a game on): how much it has and what Claude left out, in words.
+  // A script game (Make a game: Script): how long it is, what Claude left out and which models are plain shapes for now, in words.
+  const s = result as { script?: unknown; lines?: unknown; leftOut?: unknown; reused?: unknown; plainShapes?: unknown } | null | undefined;
+  if (typeof s === "object" && s !== null && s.script === true && isNumber(s.lines)) {
+    const left = typeof s.leftOut === "string" && s.leftOut !== "" ? ` Left out: ${s.leftOut}` : "";
+    const shapes = plainShapeNames(s.plainShapes);
+    const drawn = shapes.length > 0 ? ` Drawn as plain shapes for now: ${shapes.join(", ")}. Press Play again to try building them.` : "";
+    return { kind: "text", text: `A script game, ${s.lines} ${s.lines === 1 ? "line" : "lines"}.${left}${drawn}${s.reused === true ? " Reused your earlier result." : ""}` };
+  }
+  // A game of rules (Make a game: Rules): how much it has and what Claude left out, in words.
   const g = result as { game?: unknown; entities?: unknown; rules?: unknown; leftOut?: unknown; reused?: unknown } | null | undefined;
   if (typeof g === "object" && g !== null && g.game === true && isNumber(g.entities) && isNumber(g.rules)) {
     const left = typeof g.leftOut === "string" && g.leftOut !== "" ? ` Left out: ${g.leftOut}` : "";
-    const plain = (g as { plainShapes?: unknown }).plainShapes;
-    const shapes = Array.isArray(plain) ? plain.flatMap((p) => (typeof p === "object" && p !== null && typeof (p as { entity?: unknown }).entity === "string" ? [(p as { entity: string }).entity] : [])) : [];
+    const shapes = plainShapeNames((g as { plainShapes?: unknown }).plainShapes);
     const drawn = shapes.length > 0 ? ` Drawn as plain shapes for now: ${shapes.join(", ")}. Press Play again to try building them.` : "";
     return { kind: "text", text: `A game with ${g.entities} things and ${g.rules} rules.${left}${drawn}${g.reused === true ? " Reused your earlier result." : ""}` };
   }
