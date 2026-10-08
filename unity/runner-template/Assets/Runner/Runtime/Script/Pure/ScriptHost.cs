@@ -135,6 +135,9 @@ namespace Runner.Scripting
             return Run(fn, values, out error);
         }
 
+        /// <summary>Calls a Lua function value (a timer's callback, say) under the same budget as <see cref="Call"/>.</summary>
+        public bool Invoke(DynValue function, out string error, params DynValue[] args) => Run(function, args, out error);
+
         /// <summary>A global of the script as text (for tests and the API), or null when it is not set.</summary>
         public string GetGlobalString(string name)
         {

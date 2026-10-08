@@ -42,6 +42,9 @@ namespace Runner.Scripting
 
         internal bool WasInside;
 
+        /// <summary>The Lua table that stands for this object (set by <see cref="GameApi"/>).</summary>
+        internal object Handle;
+
         internal ScriptObject(ScriptWorld world, int id, string kind, bool alive)
         {
             this.world = world;
