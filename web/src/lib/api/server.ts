@@ -6,8 +6,9 @@ import { getAuthPort } from "@/lib/auth/firebaseAdmin";
 import { allowedDomain } from "@/lib/auth/server";
 import { makeGraphApi } from "@/lib/graph/api";
 import { getGraphService } from "@/lib/graph/firebase";
+import { getRefineService } from "@/lib/refine/server";
 import { getRunService } from "@/lib/runs/firebase";
 
 export const getApi = () => makeApi({ auth: getAuthPort(), runs: getRunService(), domain: allowedDomain() });
-export const getGraphApi = () => makeGraphApi({ auth: getAuthPort(), graphs: getGraphService(), domain: allowedDomain() });
+export const getGraphApi = () => makeGraphApi({ auth: getAuthPort(), graphs: getGraphService(), domain: allowedDomain(), refine: getRefineService() });
 export const getSessionApi = () => makeSessionApi({ auth: getAuthPort(), domain: allowedDomain() });

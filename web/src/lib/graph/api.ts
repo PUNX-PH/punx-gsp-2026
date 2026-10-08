@@ -7,16 +7,20 @@ import type { AuthPort } from "@/lib/auth/ports";
 import { readBodyCapped, TooLargeError } from "@/lib/body";
 import { type Platform, PLATFORMS } from "@/lib/export/types";
 import type { GraphService } from "@/lib/graph/service";
+import type { RefineService } from "@/lib/refine/service";
 import { GraphError, type GraphRecord } from "@/lib/graph/types";
 
 const MAX_GRAPH_BODY_BYTES = 64 * 1024;
-const MAX_CREATE_BODY_BYTES = 1024;
+// A description is at most 500 characters, which is up to four bytes each in UTF-8 (an emoji), plus the JSON around it.
+const MAX_CREATE_BODY_BYTES = 4096;
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
 
 export interface GraphApiDeps {
   auth: AuthPort;
   graphs: GraphService;
   domain: string;
+  /** The prompt refiner. Without one, asking to improve a prompt says it is not set up. */
+  refine?: RefineService;
 }
 
 // What the pages need to know about a graph: never the owner.
@@ -54,7 +58,7 @@ async function readJson(req: Request, maxBytes: number, tooLarge: string, notJso
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
-export function makeGraphApi({ auth, graphs, domain }: GraphApiDeps) {
+export function makeGraphApi({ auth, graphs, domain, refine }: GraphApiDeps) {
   const guarded = makeGuard({
     auth,
     domain,
@@ -123,6 +127,18 @@ export function makeGraphApi({ auth, graphs, domain }: GraphApiDeps) {
         }
         const { sha256, name: shown, size, kind, width, height } = await graphs.addAsset(user, id, name, bytes);
         return json(201, { sha256, name: shown, size, kind, width, height });
+      }),
+
+    refinePrompt: (req: Request) =>
+      guarded(req, "refinePrompt", { changes: true }, async (user) => {
+        if (!refine) throw new GraphError(503, "Improving a prompt is not set up on this site yet.");
+        const body = await readJson(req, MAX_CREATE_BODY_BYTES, "The request is too large.", "The request is not valid JSON.");
+        if (!body.ok) return body.response;
+        const input = body.value;
+        if (!isObject(input) || typeof input.describe !== "string" || Array.from(input.describe).length > MAX_PROMPT_CHARACTERS) {
+          return json(400, { error: `Send { describe: your words, up to ${MAX_PROMPT_CHARACTERS} characters } as JSON.` });
+        }
+        return json(200, { refined: await refine.refine(user, input.describe) });
       }),
 
     playStep: (req: Request, id: string) =>

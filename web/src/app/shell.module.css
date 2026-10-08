@@ -377,9 +377,11 @@
 .makeItBar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .makeItBar .hint { max-width: 40ch; }
 .makeItBar .cta { flex: none; }
+.makeItButtons { display: flex; align-items: center; gap: 10px; flex: none; }
 
 .orStart { color: var(--muted); font-size: 14px; }
 
 @media (max-width: 860px) {
   .makeItBar { flex-direction: column; align-items: stretch; }
+  .makeItButtons { justify-content: flex-end; }
 }
