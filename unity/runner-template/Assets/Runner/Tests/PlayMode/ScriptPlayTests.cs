@@ -76,7 +76,7 @@ namespace Runner.Tests
             Assert.Greater(DrawnObjects(), 0, name + " drew nothing");
         }
 
-        static string[] Examples() => new[] { "runner", "flier", "catcher" };
+        static string[] Examples() => new[] { "runner", "flier", "catcher", "crosser", "collector" };
 
         [UnityTest]
         public IEnumerator A_game_ends_in_a_loss_when_driven_and_a_press_starts_a_new_round()
