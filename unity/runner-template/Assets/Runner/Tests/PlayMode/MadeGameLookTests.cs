@@ -63,7 +63,7 @@ end
         {
             yield return Boot();
             var all = Drawn();
-            var renderers = all.Where(r => r.gameObject.name != "Shadow").ToArray();
+            var renderers = all.Where(r => r.gameObject.name != "Shadow" && r.gameObject.name != "Hill").ToArray();
             Assert.GreaterOrEqual(renderers.Length, 3, "the ground, a box and a sphere");
             foreach (var r in renderers) Assert.AreEqual("Runner/Lit", r.sharedMaterial.shader.name, r.gameObject.name);
             // a ground camera gives each thing a soft contact shadow on the ground
@@ -76,7 +76,7 @@ end
         public IEnumerator Objects_rest_on_the_ground_even_when_the_script_left_z_at_zero()
         {
             yield return Boot();
-            var things = Drawn().Where(r => r.gameObject.name != "Ground").ToArray();
+            var things = Drawn().Where(r => r.gameObject.name != "Ground" && r.gameObject.name != "Hill").ToArray(); // the hills on the horizon are meant to be partly below the ground
             Assert.GreaterOrEqual(things.Length, 2);
             foreach (var r in things) Assert.GreaterOrEqual(r.bounds.min.y, -0.001f, r.gameObject.name + " sinks into the ground");
         }

@@ -34,6 +34,9 @@ namespace Runner.Scripting
         readonly Dictionary<string, GameObject> models; // fitted to one unit tall, hidden templates by kind
         readonly Material flat;
         Renderer groundRenderer;
+        Transform hills;                 // a ring of soft hills on the horizon, made in code from the game's own colors (ground cameras only)
+        readonly List<Renderer> hillRenderers = new List<Renderer>();
+        readonly MaterialPropertyBlock hillBlock = new MaterialPropertyBlock();
         Material shadowMaterial;         // null when the shadow shader is not in the build: no shadows then
         readonly MaterialPropertyBlock groundBlock = new MaterialPropertyBlock();
         Color? skyColor;                 // the environment's sky, when the game has one
@@ -88,7 +91,7 @@ namespace Runner.Scripting
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = Background;
             camera.nearClipPlane = 0.1f;
-            camera.farClipPlane = 400f;
+            camera.farClipPlane = 900f;
 
             ground = new GameObject("Ground");
             ground.transform.SetParent(root, false);
@@ -98,6 +101,7 @@ namespace Runner.Scripting
             groundBlock.SetColor(BaseColor, Color.Lerp(this.palette[0], Color.white, 0.22f)); // lit, so it needs to be a visible surface under the sun, not a near-black one
             groundBlock.SetFloat(Mottle, 0.45f);
             groundRenderer.SetPropertyBlock(groundBlock);
+            MakeHills(Color.Lerp(this.palette[0], Color.white, 0.22f), skyColor ?? new Color(0.62f, 0.76f, 0.92f));
             var shadowShader = Shader.Find("Runner/BlobShadow");
             if (shadowShader != null)
             {
@@ -120,8 +124,10 @@ namespace Runner.Scripting
             skyColor = Color.Lerp(sky, new Color(0.62f, 0.76f, 0.92f), 0.35f); // the pick, lifted toward daylight so the lit scene is not dim
             groundBlock.SetColor(BaseColor, field);
             groundRenderer.SetPropertyBlock(groundBlock);
+            PaintHills(field, skyColor.Value);
             if (sceneryModels.Count == 0) return;
-            var half = Mathf.Max(0f, (float)Runner.World.Width / 2f - 5.5f); // the runner's scenery stands 7 or 9 m from the middle: moved out so it stands 1.5 or 3.5 m beyond this field's edge
+            spacing = Mathf.Min(spacing, 7f); // close behind the hero the view is short: dense enough to always have something beside the path
+            var half = Mathf.Clamp((float)Runner.World.Width / 2f - 5.5f, 0f, 3f); // and never so far out that the camera looks past it // the runner's scenery stands 7 or 9 m from the middle: moved out so it stands 1.5 or 3.5 m beyond this field's edge
             scenery = new EnvironmentView(root, sceneryModels, Color.white, Color.white, flat, spacing, false, half, -SceneryBias);
             scenery.SetSceneryDetail(2);
             sceneryShown = false;
@@ -207,10 +213,15 @@ namespace Runner.Scripting
                 }
                 if (GroundMode) scenery.Sync(cy + SceneryBias);
             }
+            if (hills != null)
+            {
+                hills.gameObject.SetActive(GroundMode);
+                hills.localPosition = new Vector3(cx, 0f, cy);
+            }
             if (GroundMode)
             {
                 ground.transform.localPosition = new Vector3(cx, -0.01f, cy);
-                ground.transform.localScale = new Vector3(Mathf.Max(w * 6f, 120f), 1f, Mathf.Max(h * 8f, 160f));
+                ground.transform.localScale = new Vector3(Mathf.Max(w * 6f, 1200f), 1f, Mathf.Max(h * 8f, 1200f));
             }
 
             switch (cam.Mode)
@@ -240,8 +251,10 @@ namespace Runner.Scripting
                     // a third-person view sits close behind what it follows, whatever the length of the field: the field's height only sets the distance within a range
                     var baseSize = Mathf.Clamp(h, 8f, 14f) / zoom;
                     if (follow == null || !follow.Alive) cy -= Mathf.Min(h, 40f) * 0.3f;
-                    t.position = new Vector3(cx, cz + baseSize * 0.45f, cy - baseSize * 0.5f);
-                    t.LookAt(new Vector3(cx, cz, cy + baseSize * 0.4f));
+                    // the camera rises only a little with a jump (a third of it, up to 2 m), so a high jump leaves the screen's view steady and does not carry the whole picture up
+                    var lift = Mathf.Clamp(cz * 0.35f, 0f, 2f);
+                    t.position = new Vector3(cx, lift + baseSize * 0.4f, cy - baseSize * 0.5f);
+                    t.LookAt(new Vector3(cx, lift * 0.5f, cy + baseSize * 0.4f));
                     break;
                 }
                 default: // side and fixed
@@ -291,6 +304,36 @@ namespace Runner.Scripting
             var renderer = go.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = flat;
             return new Drawn { Root = go, Renderer = renderer, Shadow = MakeShadow() };
+        }
+
+        // Sixteen low ellipsoids in a ring about 100 m out, of different widths and heights: with the lit shader's fog they read as hazy hills on the horizon.
+        void MakeHills(Color field, Color sky)
+        {
+            hills = new GameObject("Hills").transform;
+            hills.SetParent(root, false);
+            const int count = 16;
+            for (var i = 0; i < count; i++)
+            {
+                var go = new GameObject("Hill");
+                go.transform.SetParent(hills, false);
+                go.AddComponent<MeshFilter>().sharedMesh = PrimitiveMeshes.Get("sphere");
+                var renderer = go.AddComponent<MeshRenderer>();
+                renderer.sharedMaterial = flat;
+                hillRenderers.Add(renderer);
+                var angle = (i + 0.37f * ((i * 7) % 5)) / count * Mathf.PI * 2f;
+                var radius = 95f + (i % 3) * 16f;
+                var width = 46f + (i * 37 % 31);
+                var height = 12f + (i * 53 % 19);
+                go.transform.localPosition = new Vector3(Mathf.Cos(angle) * radius, -height * 0.2f, Mathf.Sin(angle) * radius);
+                go.transform.localScale = new Vector3(width, height, width * 0.7f);
+            }
+            PaintHills(field, sky);
+        }
+
+        void PaintHills(Color field, Color sky)
+        {
+            hillBlock.SetColor(BaseColor, Color.Lerp(field, sky, 0.35f) * 0.9f);
+            foreach (var r in hillRenderers) r.SetPropertyBlock(hillBlock);
         }
 
         Transform MakeShadow()

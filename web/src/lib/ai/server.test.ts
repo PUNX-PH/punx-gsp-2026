@@ -9,8 +9,8 @@ afterEach(() => {
 });
 
 describe("aiConfigFromEnv", () => {
-  it("has the defaults when nothing is set: Claude Sonnet 5.5, 30 a person a day, 300 a day for the site", () => {
-    expect(aiConfigFromEnv({})).toEqual({ modelId: "claude-sonnet-5-5", perPerson: 30, total: 300 });
+  it("has the defaults when nothing is set: Claude Sonnet 5.5, 200 a person a day, 1500 a day for the site", () => {
+    expect(aiConfigFromEnv({})).toEqual({ modelId: "claude-sonnet-5-5", perPerson: 200, total: 1500 });
   });
 
   it("takes a model and the two limits from the environment", () => {
@@ -24,7 +24,7 @@ describe("aiConfigFromEnv", () => {
   it.each([["empty", ""], ["text", "abc"], ["negative", "-5"], ["fractional", "1.5"], ["with spaces", " 7 "], ["scientific", "1e3"], ["unset", undefined]])(
     "falls back to the default for a limit that is %s",
     (_label, value) => {
-      expect(aiConfigFromEnv({ AI_DAILY_LIMIT_PER_PERSON: value, AI_DAILY_LIMIT_TOTAL: value })).toMatchObject({ perPerson: 30, total: 300 });
+      expect(aiConfigFromEnv({ AI_DAILY_LIMIT_PER_PERSON: value, AI_DAILY_LIMIT_TOTAL: value })).toMatchObject({ perPerson: 200, total: 1500 });
     },
   );
 

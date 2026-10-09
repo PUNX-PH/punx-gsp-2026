@@ -9,8 +9,9 @@ import { dailyLimit } from "@/lib/dailyLimit";
 import type { DescribeGameModel, DescribeGameService } from "@/lib/ai/types";
 
 const DEFAULT_MODEL = "claude-sonnet-5-5";
-const DEFAULT_PER_PERSON = 30;
-const DEFAULT_TOTAL = 300;
+// One game is about seven answers (the plan, a design for each model and for each piece of scenery), so 30 a day was four games.
+const DEFAULT_PER_PERSON = 200;
+const DEFAULT_TOTAL = 1500;
 
 /** The model's name and the two daily limits, from the environment (none of them is a secret). */
 export function aiConfigFromEnv(env: Record<string, string | undefined>): { modelId: string; perPerson: number; total: number } {

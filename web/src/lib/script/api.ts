@@ -2,7 +2,7 @@
 // server's script check and the docs are all built from it, so they cannot disagree. docs/superpowers/specs/2026-10-08-lua-games-design.md is the
 // description; Runtime/Script/Pure/ScriptHost.cs holds the same limits in C# (a test keeps the two equal).
 
-export const SCRIPT_VERSION = 6;
+export const SCRIPT_VERSION = 7;
 
 export const SCRIPT_FILE = "game.lua";
 
