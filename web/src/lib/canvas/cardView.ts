@@ -202,6 +202,29 @@ function builtModel(result: unknown): ResultView | null {
 // it is trusted: the three colors must be #rrggbb and every piece must be one of ours, so only known words and hex colors reach the card.
 const WORLD_NAMES: Record<WorldStyle, string> = { desert: "Desert", meadow: "Meadow" };
 
+// What a finished Build World step handed over: the sky and ground colors, the pieces of scenery it made (named by what the AI wrote about each), and what
+// they came to. Nothing in it is trusted: the colors must be #rrggbb and the names are drawn as text.
+function builtWorld(result: unknown): ResultView | null {
+  const soft = result as { notBuilt?: unknown } | null | undefined;
+  if (typeof soft === "object" && soft !== null && typeof soft.notBuilt === "string") {
+    return { kind: "text", text: `Not built: ${soft.notBuilt} The game uses a plain world. Press Play again to try building it.` };
+  }
+  const r = result as { sky?: unknown; field?: unknown; pieces?: unknown; triangles?: unknown; skipped?: unknown; reused?: unknown } | null | undefined;
+  if (typeof r !== "object" || r === null) return null;
+  const { sky, field, pieces, triangles, skipped, reused } = r;
+  if (![sky, field].every((c): c is string => typeof c === "string" && HEX.test(c))) return null;
+  if (!Array.isArray(pieces) || !pieces.every((p) => typeof p?.name === "string") || typeof reused !== "boolean") return null;
+  const names = (pieces as { name: string }[]).map((p) => p.name);
+  const left = isNumber(skipped) && skipped > 0 ? ` (${skipped} could not be built)` : "";
+  return {
+    kind: "environment",
+    colors: [sky as string, field as string],
+    scenery: names.length === 0 ? `No scenery${left}` : `${plural(names.length, "piece")} of scenery${left}`,
+    reused,
+    ...(isNumber(triangles) ? { numbers: plural(triangles, "triangle") } : {}),
+  };
+}
+
 function builtEnvironment(result: unknown): ResultView | null {
   const soft = result as { notBuilt?: unknown } | null | undefined;
   if (typeof soft === "object" && soft !== null && typeof soft.notBuilt === "string") {
@@ -258,6 +281,7 @@ function fromRun(node: GraphNode, run: RunView): ResultView {
   if (node.type === "make-shape") return shapeMade(outcome.result) ?? { kind: "none" };
   if (node.type === "build-model") return builtModel(outcome.result) ?? { kind: "none" };
   if (node.type === "build-environment") return builtEnvironment(outcome.result) ?? { kind: "none" };
+  if (node.type === "build-world") return builtWorld(outcome.result) ?? { kind: "none" };
   if (node.type === "preview" && run.runId) return { kind: "open-game" };
   return { kind: "none" };
 }

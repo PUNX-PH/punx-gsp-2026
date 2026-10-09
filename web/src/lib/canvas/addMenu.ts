@@ -24,6 +24,7 @@ export function addChoices(graph: Graph, from?: PortRef, specs: Record<string, N
 
   const choices: Choice[] = [];
   for (const spec of Object.values(specs)) {
+    if (spec.hidden) continue; // a step only the site makes
     let wireInto: string | undefined;
     if (wire) {
       const input = spec.inputs.find((p) => p.type === wire);

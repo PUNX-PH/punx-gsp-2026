@@ -8,7 +8,7 @@ import { DEFAULT_TIMEOUT_MS, MAX_RETRIES } from "@/lib/ai/anthropic";
 import { dayOf } from "@/lib/ai/key";
 import type { UsageLimits } from "@/lib/ai/ports";
 import { AiRefusedError, AiUnavailableError, type DesignReply } from "@/lib/ai/types";
-import { type ArtStyle, DEFAULT_STYLE, repairStyle, repairWorld, type WorldPlan } from "@/lib/builder/world";
+import { type ArtStyle, repairStyle, repairWorld, type WorldPlan } from "@/lib/builder/world";
 import type { RecipeCache } from "@/lib/builder/ports";
 import { ASSET_ROLES } from "@/lib/engine/prompts";
 import type { AssetRequest, AssetRole } from "@/lib/engine/service";

@@ -137,7 +137,8 @@ export type WireValue =
       field: number;
       stripe: number;
       density: Density;
-      scenery: { kind: SceneryKind; sha256: string }[];
+      // a piece of the kit (a tree, a rock) or, from Build World, a custom piece made from words (`mobile` is its phone variant's hash)
+      scenery: { kind: SceneryKind | "custom"; sha256: string; mobile?: string }[];
       quality?: Quality;
       world?: { style: WorldStyle; terrain: string; road: string; backdrop: string };
     }

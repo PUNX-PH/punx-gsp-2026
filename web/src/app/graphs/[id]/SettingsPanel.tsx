@@ -333,6 +333,17 @@ function BuildEnvironmentPanel({ node, data, onSettings }: { node: GraphNode; da
   );
 }
 
+// The world is planned by the AI from the person's idea: its panel only says what it planned (nothing here is typed).
+function BuildWorldPanel({ node }: { node: GraphNode }) {
+  const scenery = Array.isArray(node.params.scenery) ? (node.params.scenery as unknown[]).filter((piece): piece is string => typeof piece === "string") : [];
+  return (
+    <>
+      <p className={styles.hint}>The world around the game, planned from your idea: a sky, a ground and the scenery below, each piece built from its words.</p>
+      {scenery.length === 0 ? <p className={styles.hint}>No scenery was planned.</p> : <ul className={styles.notes}>{scenery.map((piece, i) => <li key={i}>{piece}</li>)}</ul>}
+    </>
+  );
+}
+
 function TuningSliders({ node, data, onTune }: { node: GraphNode; data: StepData; onTune: SettingsPanelProps["onTune"] }) {
   const id = useId();
   const tuning = node.params.tuning as Tuning;
@@ -482,6 +493,7 @@ export function SettingsPanel({ node, data, uploading, error, onChooseFile, onTu
       {(node.type === "build-model" || node.type === "build-environment") && <StudioLink graphId={graphId} nodeId={node.id} what={node.type === "build-model" ? "model" : "world"} />}
       {node.type === "build-model" && <BuildModelPanel node={node} onSettings={onSettings} />}
       {node.type === "build-environment" && <BuildEnvironmentPanel node={node} data={data} onSettings={onSettings} />}
+      {node.type === "build-world" && <BuildWorldPanel node={node} />}
       {node.type === "describe-game" && (
         <>
           <ChoiceGroup

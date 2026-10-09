@@ -3,7 +3,7 @@
 // that every screen (and every error message) uses the same words.
 import { SHAPES, TRIANGLES } from "@/lib/blender/types";
 import { MODEL_KINDS, QUALITIES } from "@/lib/builder/kinds";
-import { ART_STYLES } from "@/lib/builder/world";
+import { ART_STYLES, MAX_SCENERY } from "@/lib/builder/world";
 import { ROLE_FILES, type WireType } from "@/lib/graph/types";
 import { DENSITIES } from "@/lib/settings";
 
@@ -22,6 +22,8 @@ export interface NodeSpec {
   help: string;
   /** The node the graph runs towards (the Preview). Only nodes that lead to it are run. */
   final: boolean;
+  /** True for a step only the site makes (from a game's plan): the Add step menu does not offer it. */
+  hidden?: boolean;
   inputs: PortSpec[];
   outputs: PortSpec[];
   defaultParams(): Record<string, unknown>;
@@ -166,6 +168,27 @@ function buildEnvironmentParams(params: Record<string, unknown>): string | null 
   return qualityProblem(params);
 }
 
+const SCENERY_WORDS_MAX = 300;
+
+/** Build World's settings: the plan's sky and ground (palette indexes 0 to 4), the scenery in words, an art style, and soft. Nobody types these: the site makes them. */
+function buildWorldParams(params: Record<string, unknown>): string | null {
+  const allowed = ["sky", "ground", "scenery", "style", "soft"];
+  for (const key of Object.keys(params)) if (!allowed.includes(key)) return "sky, ground, scenery, style and soft are the only settings a Build World step has.";
+  for (const key of ["sky", "ground"]) {
+    const v = params[key];
+    if (typeof v !== "number" || !Number.isInteger(v) || v < 0 || v > 4) return `${key} must be a whole number from 0 to 4.`;
+  }
+  const scenery = params.scenery;
+  if (!Array.isArray(scenery) || scenery.length > MAX_SCENERY) return `scenery must be a list of at most ${MAX_SCENERY} descriptions.`;
+  for (const piece of scenery) {
+    if (typeof piece !== "string" || piece.trim() === "") return "each piece of scenery needs words.";
+    if (Array.from(piece).length > SCENERY_WORDS_MAX) return `a piece of scenery is longer than ${SCENERY_WORDS_MAX} characters.`;
+  }
+  if (Object.hasOwn(params, "style") && (typeof params.style !== "string" || !(ART_STYLES as readonly string[]).includes(params.style))) return `style must be ${ART_STYLES.join(", ")}.`;
+  if (Object.hasOwn(params, "soft") && typeof params.soft !== "boolean") return "soft must be on or off.";
+  return null;
+}
+
 const port = (name: string, label: string, help: string, type: WireType, required = false, missing?: string): PortSpec => ({
   name,
   label,
@@ -253,6 +276,18 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     outputs: [port("environment", "environment", "The sky, the field, the edge stripes and the scenery.", "environment")],
     defaultParams: () => ({ theme: "", density: "some", quality: "standard" }),
     shapeProblem: buildEnvironmentParams,
+    incompleteProblem: () => null,
+  },
+  "build-world": {
+    type: "build-world",
+    label: "Build World",
+    help: "Builds the world around the game from its plan: the sky, the ground and the scenery, each piece made from words.",
+    final: false,
+    hidden: true,
+    inputs: [port("palette", "palette", "Colors for the world. Without one, a sample palette is used.", "palette")],
+    outputs: [port("environment", "environment", "The sky, the ground and the scenery.", "environment")],
+    defaultParams: () => ({ sky: 0, ground: 3, scenery: [] }),
+    shapeProblem: buildWorldParams,
     incompleteProblem: () => null,
   },
   "palette-from-image": {

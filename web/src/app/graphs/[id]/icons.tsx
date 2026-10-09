@@ -47,6 +47,13 @@ export function Icon({ type }: { type: string }) {
           <path d="M8 5.4v4M4.5 7.2L8 6l3.5 1.2M8 9.4l-2.4 4M8 9.4l2.4 4" />
         </>,
       );
+    case "build-world":
+      return svg(
+        <>
+          <circle cx="8" cy="8" r="5.5" />
+          <path d="M2.5 8h11M8 2.5c-2 1.6-2.8 3.4-2.8 5.5S6 11.9 8 13.5M8 2.5c2 1.6 2.8 3.4 2.8 5.5S10 11.9 8 13.5" />
+        </>,
+      );
     case "build-environment":
       return svg(
         <>
