@@ -183,8 +183,8 @@ export function modelSchema(kind: ModelKind | null, quality: Quality = "standard
 export const FREEFORM_SCHEMA = object({ recipe: text });
 
 export function freeformSystemPrompt(): string {
-  const { caps, budgets } = KIT.freeform;
-  return `You design one small 3D model for a game from a short description, and sometimes a reference picture. You model it the way a sculptor blocks out a figure: by composing simple parts. You answer with JSON only: an object with one field, recipe, whose value is the model written as JSON text (a string). The text is an object { "summary": "...", "materials": [...], "parts": [...] }.
+  const { caps, budgets, rigs } = KIT.freeform;
+  return `You design one small 3D model for a game from a short description, and sometimes a reference picture. You model it the way a sculptor blocks out a figure: by composing simple parts. You answer with JSON only: an object with one field, recipe, whose value is the model written as JSON text (a string). The text is an object { "summary": "...", "rig": "biped" or "quadruped" or left out, "materials": [...], "parts": [...] }.
 
 Space. Meters. x is side to side, y is up, z is forward (the way the model faces). The model stands on the ground: its lowest point is at y = 0, and it is centered on x = 0 and z = 0. A character is about 1 to 1.8 tall; an obstacle or a pickup is 0.3 to 1.5. Nothing may be farther than ${caps.extent} meters from the center.
 
@@ -202,6 +202,8 @@ The shapes (all are drawn about one meter across, centered, then scaled by size,
 At most ${caps.parts} parts.
 
 Materials: 1 to ${caps.materials} of { "color": a palette slot, "finish": one of ${FINISHES.join(", ")} }. matte is flat and chalky, painted is glossy, metal is shiny, rubber is dull, glow lights up (eyes, lamps, cores, never a whole body). Colors are palette slots, whole numbers 0 to 4, never hex colors: the person's own palette is applied later. The palette is: 0 background (the sky; usually the darkest), 1 ground (the road), 2 panel (lighter than the background), 3 accent (a spare color, for obstacles and pickups), 4 score (usually the lightest). Choose slots that stand out from 0 and 1, so the model reads against the sky and the ground.
+
+Rigs: moving limbs. Without a rig the whole model moves as one piece when it runs or jumps. When the model is a creature or a character with limbs that should swing, give it a "rig" and bind its parts to the rig's joints with a part's "joint" (a part with no joint is the body). "biped" (an upright character on two legs, with arms) has the joints ${rigs.biped.join(", ")}; "quadruped" (an animal on four legs) has ${rigs.quadruped.join(", ")}. Every part of a limb gets that limb's joint: the head joint holds the head and everything on it (ears, eyes, nose, hat); the tail joint holds the tail; an arm, a leg, a front leg or a back leg joint comes in a left and a right one, chosen by which side (+x or -x) the part is on, so write a limb on the +x side with mirror true and it makes both. A limb swings about its top (the hip or shoulder, so a leg should hang from the body with its top end sunk in the body), the head about its bottom (the neck) and the tail about the end nearest the body. A rock, a crate or a lamp has no rig. Use a rig only when it helps: a model with no joints is cheaper.
 
 How to model well. Block out the big masses first (body, head), then the limbs and features, then small details last. Give it a silhouette you would know from across the room: the shape matters more than the detail. Overlap parts so nothing floats or leaves a gap: a limb's end sinks into the body. Use mirror for symmetry. Keep proportions simple and a little exaggerated, like a toy.
 

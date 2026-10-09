@@ -604,6 +604,7 @@
   },
   "freeform": {
     "caps": { "parts": 48, "points": 10, "profile": 14, "sections": 10, "materials": 6, "extent": 12 },
+    "rigs": { "biped": ["head", "arm", "leg", "tail"], "quadruped": ["head", "leg_front", "leg_back", "tail"] },
     "budgets": { "hero": { "pc": 15000, "mobile": 5000 }, "prop": { "pc": 5000, "mobile": 1500 }, "scenery": { "pc": 8000, "mobile": 2500 } }
   },
   "tiers": {

@@ -217,7 +217,7 @@ const freeBody = (name, role = "prop", target = "pc") => {
 
 describe("checkBuildBody for a freeform model", () => {
   it("accepts the five fixtures for every role and target", () => {
-    for (const name of ["crate", "fox", "pine", "robot", "spaceship"]) {
+    for (const name of ["crate", "fox", "pine", "robot", "spaceship", "fox-rigged"]) {
       for (const role of Object.keys(KIT.freeform.budgets)) for (const target of ["pc", "mobile"]) assert.equal(checkBuildBody(freeBody(name, role, target)), null, `${name} ${role} ${target}`);
     }
   });
@@ -248,6 +248,20 @@ describe("checkBuildBody for a freeform model", () => {
     assert.match(changed((b) => (b.recipe.materials[0].color = 5)), /materials\[0\]\.color/);
     assert.match(changed((b) => (b.recipe.parts = [])), /recipe\.parts/);
     assert.match(changed((b) => (b.recipe.parts = Array(49).fill(b.recipe.parts[0]))), /recipe\.parts/);
+  });
+
+  it("checks a rig and the joints of parts", () => {
+    const changed = (change) => {
+      const body = freeBody("fox-rigged");
+      change(body);
+      return checkBuildBody(body);
+    };
+    assert.equal(changed(() => {}), null);
+    assert.match(changed((b) => (b.recipe.rig = "spider")), /recipe\.rig/);
+    assert.match(changed((b) => (b.recipe.rig = null)), /recipe\.rig/);
+    assert.match(changed((b) => (b.recipe.parts[1].joint = "arm")), /parts\[1\]\.joint/);
+    assert.match(changed((b) => (b.recipe.parts[1].joint = "__proto__")), /parts\[1\]\.joint/);
+    assert.match(changed((b) => delete b.recipe.rig), /parts\[1\]\.joint/);
   });
 
   it("checks the parts that carry lists", () => {

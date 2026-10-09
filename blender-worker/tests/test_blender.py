@@ -1254,6 +1254,46 @@ class BuildFreeform(unittest.TestCase):
         paths = {c["target"]["path"] for c in run["channels"]}
         self.assertTrue({"translation", "rotation"} <= paths, paths)
 
+    def test_a_rigged_model_has_a_node_for_each_joint_and_its_limbs_swing(self):
+        result = self.build(self.fixture("fox-rigged", "hero", "pc", ["Run", "Jump", "Loop"]))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        gltf = read_glb(self.out)
+        names = {n["name"] for n in gltf["nodes"]}
+        for joint in ("model", "head", "tail", "leg_front_l", "leg_front_r", "leg_back_l", "leg_back_r"):
+            self.assertIn(joint, names)
+        self.assertGreaterEqual(len(gltf["meshes"]), 6)  # the body, the head, the tail and four legs
+        self.assertEqual(self.stats()["clips"], ["Run", "Jump", "Loop"])
+        by_index = {i: n["name"] for i, n in enumerate(gltf["nodes"])}
+        run = next(a for a in gltf["animations"] if a["name"] == "Run")
+        turned = {by_index[c["target"]["node"]] for c in run["channels"] if c["target"]["path"] == "rotation"}
+        self.assertTrue({"leg_front_l", "leg_front_r", "leg_back_l", "leg_back_r", "head"} <= turned, turned)
+        # a leg hangs from its hip: the joint sits above the ground, at the top of the leg
+        leg = next(n for n in gltf["nodes"] if n["name"] == "leg_front_l")
+        self.assertGreater(leg["translation"][1], 0.3)
+        self.assertGreater(leg["translation"][0], 0.05)  # the +x side is the left one
+
+    def test_dropped_parts_leave_out_their_joint_and_the_clips_still_build(self):
+        body = self.fixture("fox-rigged", "prop", "mobile", ["Run"])
+        result = self.build(body)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertLessEqual(self.stats()["triangles"], 1500)
+        self.assertEqual(self.stats()["clips"], ["Run"])
+
+    def test_a_joint_needs_a_rig_that_has_it(self):
+        def mutated(change):
+            body = self.fixture("fox-rigged", "hero", "pc")
+            change(body)
+            return body
+
+        for name, body in {
+            "a joint of the other rig": mutated(lambda b: b["recipe"]["parts"][1].update(joint="arm")),
+            "an unknown joint": mutated(lambda b: b["recipe"]["parts"][1].update(joint="wing")),
+            "an unknown rig": mutated(lambda b: b["recipe"].update(rig="spider")),
+            "a joint with no rig": mutated(lambda b: b["recipe"].pop("rig")),
+        }.items():
+            with self.subTest(name):
+                self.assertEqual(self.build(body).returncode, EXIT_BAD_RECIPE, name)
+
     def test_a_collectible_loops_and_an_obstacle_stands_still(self):
         result = self.build(self.fixture("crate", "prop", "pc", ["Loop"]))
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -1268,7 +1308,7 @@ class BuildFreeform(unittest.TestCase):
         import freeform
 
         body = self.fixture("crate", "prop", "pc")
-        _, parts = freeform.check_model(body["recipe"], {"matte": {}, "metal": {}, "painted": {}, "rubber": {}, "glow": {}})
+        _, parts, _ = freeform.check_model(body["recipe"], {"matte": {}, "metal": {}, "painted": {}, "rubber": {}, "glow": {}})
         with self.assertRaises(freeform.BadModel):
             freeform.fit_parts(parts, 10)  # not even the first part is that small
 

@@ -31,6 +31,10 @@ with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "kit.json"), 
     FREEFORM = json.load(_kit_file)["freeform"]
 CAPS = {**FREEFORM["caps"], "extent": float(FREEFORM["caps"]["extent"])}  # extent: the largest |coordinate| a part may use
 BUDGETS = FREEFORM["budgets"]  # role -> target -> triangles
+RIGS = FREEFORM["rigs"]  # rig -> the joints a part may name
+# A joint's pivot, and whether it comes as a left and a right one: a "top" pivot is the top of its parts (a hip or a shoulder), "bottom" the bottom (a neck), and
+# "back" the end nearest the body of a tail that runs backwards. A sided joint is made twice (`leg_l`, `leg_r`): the part on the +x side goes to the left one.
+JOINT_PIVOTS = {"head": ("bottom", False), "tail": ("back", False), "arm": ("top", True), "leg": ("top", True), "leg_front": ("top", True), "leg_back": ("top", True)}
 
 
 # ---- shapes: each adds its faces to `bm` in the unit space and returns the bmesh geometry it made ----
@@ -190,7 +194,7 @@ def loft(bm, sides, sections):
 # ---- checking: a recipe is untrusted until it has passed ----
 
 SHAPES = ("ellipsoid", "capsule", "cylinder", "box", "torus", "lump", "tube", "revolve", "loft")
-PART_KEYS = {"shape", "at", "size", "rot", "material", "mirror", "detail", "taper", "bevel", "thickness", "seed", "points", "radius", "profile", "sections"}
+PART_KEYS = {"shape", "at", "size", "rot", "material", "mirror", "detail", "taper", "bevel", "thickness", "seed", "points", "radius", "profile", "sections", "joint"}
 SECTION_KEYS = {"z", "w", "h", "round", "dx", "dy"}
 
 
@@ -214,7 +218,7 @@ def _vec(v, n, low, high):
 
 
 def check_model(recipe, finishes):
-    """The recipe as clean numbers, or BadModel. Nothing of it is used except as a number, a choice from a list, or an index."""
+    """The recipe as clean numbers, or BadModel: (materials, parts, rig). Nothing of it is used except as a number, a choice from a list, or an index."""
     _need(isinstance(recipe, dict) and recipe.get("kind") == "model" and recipe.get("version") == 2)
     materials = recipe.get("materials")
     _need(isinstance(materials, list) and 1 <= len(materials) <= CAPS["materials"])
@@ -223,6 +227,8 @@ def check_model(recipe, finishes):
         _need(isinstance(m, dict) and set(m) == {"color", "finish"} and m["finish"] in finishes)
         _need(isinstance(m["color"], int) and not isinstance(m["color"], bool) and 0 <= m["color"] <= 4)
         clean_materials.append((m["color"], m["finish"]))
+    rig = recipe.get("rig")
+    _need(rig is None or (isinstance(rig, str) and rig in RIGS))
     parts = recipe.get("parts")
     _need(isinstance(parts, list) and 1 <= len(parts) <= CAPS["parts"])
     extent = CAPS["extent"]
@@ -242,6 +248,9 @@ def check_model(recipe, finishes):
             "mirror": p.get("mirror", False) is True,
             "detail": detail,
         }
+        if p.get("joint") is not None:
+            _need(rig is not None and isinstance(p["joint"], str) and p["joint"] in RIGS[rig])
+            part["joint"] = p["joint"]
         if p["shape"] == "cylinder":
             part["taper"] = _num(p.get("taper", 1.0), 0.0, 1.0)
         if p["shape"] == "box":
@@ -271,7 +280,7 @@ def check_model(recipe, finishes):
                 clean_sections.append({"z": _num(s["z"], -extent, extent), "w": _num(s.get("w", 1.0), 0.0, extent), "h": _num(s.get("h", 1.0), 0.0, extent), "round": _num(s.get("round", 1.0), 0.0, 1.0), "dx": _num(s.get("dx", 0.0), -extent, extent), "dy": _num(s.get("dy", 0.0), -extent, extent)})
             part["sections"] = clean_sections
         clean.append(part)
-    return clean_materials, clean
+    return clean_materials, clean, rig
 
 
 # ---- building ----
@@ -299,8 +308,9 @@ def _make(bm, part):
     return loft(bm, sides, part["sections"])
 
 
-def _add_part(bm, part):
-    """Adds the part (and its mirror image) to `bm`, in model axes."""
+def _add_part(bm, part, which="both"):
+    """Adds the part to `bm`, in model axes. `which` is "both" (the part, and its mirror image when it has one), "orig" (only the part) or "mirror" (only the
+    mirror image: the part is drawn and then reflected in place), so the two sides of a jointed part can go to two meshes."""
     # a tube's points are in the model's own units; every other shape is drawn in its unit space and scaled by `size`
     sx, sy, sz = (1.0, 1.0, 1.0) if part["shape"] == "tube" else part["size"]
     before = len(bm.faces)
@@ -314,7 +324,11 @@ def _add_part(bm, part):
     new_faces = list(bm.faces)[before:]
     for f in new_faces:
         f.material_index = part["material"]
-    if part["mirror"]:
+    if which == "mirror":
+        for v in {v for f in new_faces for v in f.verts}:
+            v.co.x = -v.co.x
+        bmesh.ops.reverse_faces(bm, faces=new_faces)
+    elif part["mirror"] and which == "both":
         geom = new_faces + list({e for f in new_faces for e in f.edges}) + list({v for f in new_faces for v in f.verts})
         copy = bmesh.ops.duplicate(bm, geom=geom)["geom"]
         copy_verts = [g for g in copy if isinstance(g, bmesh.types.BMVert)]
@@ -350,9 +364,10 @@ def fit_parts(parts, budget):
 
 def build_model(path, recipe, palette, finishes, budget=None, animate=None):
     """Builds the model and writes the GLB. Returns the real counts of the file, with `parts` (kept) and `dropped`. `animate`, when given, is called with
-    the model's object before the export (build.py puts the stock clips on it). With a `budget` (triangles) the model is fitted
-    to it by fit_parts and then checked by the real count of the GLB (dropping one more part and building again if it is somehow over); BadModel when it cannot fit."""
-    clean_materials, parts = check_model(recipe, finishes)
+    ({name: object}, {name: rest location}) before the export: the objects are "model" (the root) and, for a rigged model, one per joint (build.py puts the
+    stock clips on them). With a `budget` (triangles) the model is fitted to it by fit_parts and then checked by the real count of the GLB (dropping one more part
+    and building again if it is somehow over); BadModel when it cannot fit."""
+    clean_materials, parts, _ = check_model(recipe, finishes)
     dropped = 0
     if budget is not None:
         parts, _, dropped = fit_parts(parts, budget)
@@ -366,37 +381,111 @@ def build_model(path, recipe, palette, finishes, budget=None, animate=None):
     return {**counts, "parts": len(parts), "dropped": dropped}
 
 
-def _build(path, clean_materials, parts, palette, finishes, animate=None):
-    common.reset_scene()
-    library = [common.finish_material(f"{finish}_{i}", common.hex_to_linear(palette[color].lower()), finishes[finish]) for i, (color, finish) in enumerate(clean_materials)]
+def _group(parts):
+    """The parts' geometry grouped by the mesh it belongs to: "model" for everything that is not on a joint, else the joint's name (`leg_l` and `leg_r` for a sided joint,
+    by the side of the part's center, and its mirror image on the other)."""
+    bms = {}
 
-    bm = bmesh.new()
+    def bm_for(key):
+        if key not in bms:
+            bms[key] = bmesh.new()
+        return bms[key]
+
     for part in parts:
-        _add_part(bm, part)
+        joint = part.get("joint")
+        if joint is None:
+            _add_part(bm_for("model"), part)
+        elif not JOINT_PIVOTS[joint][1]:
+            _add_part(bm_for(joint), part)
+        else:
+            side, other = ("l", "r") if part["at"][0] >= 0 else ("r", "l")
+            _add_part(bm_for(f"{joint}_{side}"), part, "orig")
+            if part["mirror"]:
+                _add_part(bm_for(f"{joint}_{other}"), part, "mirror")
+    return bms
 
-    # model axes to Blender's, then one shaded mesh
-    for v in bm.verts:
-        v.co = Vector((v.co.x, -v.co.z, v.co.y))
-    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-5)
+
+def _pivot(name, bm):
+    """A joint's pivot, in Blender's axes: the top, the bottom or the near end (see JOINT_PIVOTS) of the geometry it holds."""
+    mode = JOINT_PIVOTS[name.rsplit("_", 1)[0] if name.endswith(("_l", "_r")) else name][0]
+    xs, ys, zs = [v.co.x for v in bm.verts], [v.co.y for v in bm.verts], [v.co.z for v in bm.verts]
+    cx, cy, cz = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, (min(zs) + max(zs)) / 2
+    if mode == "top":
+        return Vector((cx, cy, max(zs)))
+    if mode == "bottom":
+        return Vector((cx, cy, min(zs)))
+    return Vector((cx, min(ys), cz))  # "back": the model's z is Blender's -y, so the end nearest the body is the smallest y of a tail that runs backwards
+
+
+def _shade(bm, low, top):
     bm.verts.ensure_lookup_table()
     bm.normal_update()
-    zs = [v.co.z for v in bm.verts]
-    high.cavity_shading(bm, min(zs), max(zs))
+    high.cavity_shading(bm, low, top)
     for edge in bm.edges:
         if len(edge.link_faces) == 2:
             edge.smooth = edge.calc_face_angle(0.0) < SMOOTH_ANGLE
     for face in bm.faces:
         face.smooth = True
     bmesh.ops.triangulate(bm, faces=bm.faces[:])
-    mesh = bpy.data.meshes.new("model_mesh")
+
+
+def _mesh_object(name, bm, library):
+    mesh = bpy.data.meshes.new(f"{name}_mesh")
     bm.to_mesh(mesh)
     bm.free()
     for material in library:
         mesh.materials.append(material)
-    obj = bpy.data.objects.new("model", mesh)
+    obj = bpy.data.objects.new(name if name == "model" else f"{name}_mesh", mesh)
     bpy.context.scene.collection.objects.link(obj)
+    return obj
+
+
+def _build(path, clean_materials, parts, palette, finishes, animate=None):
+    common.reset_scene()
+    library = [common.finish_material(f"{finish}_{i}", common.hex_to_linear(palette[color].lower()), finishes[finish]) for i, (color, finish) in enumerate(clean_materials)]
+
+    bms = _group(parts)
+    # model axes to Blender's, then shaded meshes (the cavity shading reads the height of the whole model, so every mesh is shaded alike)
+    for bm in bms.values():
+        for v in bm.verts:
+            v.co = Vector((v.co.x, -v.co.z, v.co.y))
+        bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-5)
+    zs = [v.co.z for bm in bms.values() for v in bm.verts]
+    low, top = min(zs), max(zs)
+    pivots = {name: _pivot(name, bm) for name, bm in bms.items() if name != "model"}
+    for bm in bms.values():
+        _shade(bm, low, top)
+
+    objects, rest = {}, {}
+    if len(bms) == 1 and "model" in bms:
+        # no joints: one mesh object is the whole model (and the object the stock clips move)
+        objects["model"] = _mesh_object("model", bms["model"], library)
+    else:
+        root = bpy.data.objects.new("model", None)
+        root.empty_display_size = 0.05
+        bpy.context.scene.collection.objects.link(root)
+        objects["model"] = root
+        if "model" in bms:
+            body = _mesh_object("body", bms["model"], library)
+            body.parent = root
+        for name in sorted(pivots):
+            empty = bpy.data.objects.new(name, None)
+            empty.empty_display_size = 0.05
+            empty.rotation_mode = "XYZ"
+            bpy.context.scene.collection.objects.link(empty)
+            empty.parent = root
+            empty.location = pivots[name]
+            objects[name] = empty
+        bpy.context.view_layer.update()  # matrices must be current before the meshes are parented with their inverse
+        for name in sorted(pivots):
+            obj = _mesh_object(name, bms[name], library)
+            obj.parent = objects[name]
+            obj.matrix_parent_inverse = objects[name].matrix_world.inverted()
+    for name, obj in objects.items():
+        obj.rotation_mode = "XYZ"
+        rest[name] = tuple(obj.location)
     if animate is not None:
-        animate(obj)
+        animate(objects, rest)
         bpy.context.scene.frame_set(0)
     common.export_glb(path, animations=animate is not None, vertex_colors=True)
     return common.glb_counts(path)

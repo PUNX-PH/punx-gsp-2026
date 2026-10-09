@@ -239,7 +239,7 @@ function checkMotions(motions, recipe) {
 // ---- the freeform kind ("model"): a list of parts. The same rules as scripts/freeform.py check_model; the web app mirrors them (Task 8).
 const FREE = KIT.freeform;
 const SHAPES = ["ellipsoid", "capsule", "cylinder", "box", "torus", "lump", "tube", "revolve", "loft"];
-const PART_KEYS = ["shape", "at", "size", "rot", "material", "mirror", "detail", "taper", "bevel", "thickness", "seed", "points", "radius", "profile", "sections"];
+const PART_KEYS = ["shape", "at", "size", "rot", "material", "mirror", "detail", "taper", "bevel", "thickness", "seed", "points", "radius", "profile", "sections", "joint"];
 const SECTION_KEYS = ["z", "w", "h", "round", "dx", "dy"];
 const ROLES = Object.keys(FREE.budgets);
 const TARGETS = ["pc", "mobile"];
@@ -251,12 +251,14 @@ const wholeIn = (v, low, high) => Number.isInteger(v) && v >= low && v <= high;
 
 function checkModelRecipe(recipe) {
   const { extent } = FREE.caps;
-  const keys = keysProblem(recipe, ["version", "kind", "summary", "materials", "parts"], "recipe");
+  const keys = keysProblem(recipe, ["version", "kind", "summary", "materials", "parts", ...(Object.hasOwn(recipe, "rig") ? ["rig"] : [])], "recipe");
   if (keys) return keys;
   if (recipe.version !== 2) return "recipe.version: must be 2";
   if (typeof recipe.summary !== "string") return "recipe.summary: must be text";
   if (Array.from(recipe.summary).length > KIT.caps.summary) return `recipe.summary: longer than ${KIT.caps.summary} characters`;
   if (CONTROL.test(recipe.summary)) return "recipe.summary: has a control character";
+  const rigs = Object.keys(FREE.rigs);
+  if (Object.hasOwn(recipe, "rig") && (typeof recipe.rig !== "string" || !rigs.includes(recipe.rig))) return `recipe.rig: ${shown(recipe.rig)} is not one of ${rigs.join(", ")}`;
   const { materials, parts } = recipe;
   if (!Array.isArray(materials) || materials.length < 1 || materials.length > FREE.caps.materials) return `recipe.materials: a list of 1 to ${FREE.caps.materials}`;
   for (const [i, m] of materials.entries()) {
@@ -275,6 +277,7 @@ function checkModelRecipe(recipe) {
     if (Object.hasOwn(p, "material") && !wholeIn(p.material, 0, materials.length - 1)) return `${at}.material: must be a whole number 0 to ${materials.length - 1}`;
     if (Object.hasOwn(p, "detail") && !wholeIn(p.detail, 1, 3)) return `${at}.detail: must be 1, 2 or 3`;
     if (Object.hasOwn(p, "mirror") && typeof p.mirror !== "boolean") return `${at}.mirror: must be true or false`;
+    if (Object.hasOwn(p, "joint") && (typeof recipe.rig !== "string" || typeof p.joint !== "string" || !FREE.rigs[recipe.rig].includes(p.joint))) return `${at}.joint: ${shown(p.joint)} is not a joint of this model's rig`;
     const vec = (name, low, high) => (Object.hasOwn(p, name) ? vecProblem(p[name], 3, low, high, `${at}.${name}`) : null);
     const bad = vec("at", -extent, extent) ?? vec("size", 0.005, extent) ?? vec("rot", -360, 360);
     if (bad) return bad;

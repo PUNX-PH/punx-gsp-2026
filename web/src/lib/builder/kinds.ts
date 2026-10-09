@@ -186,6 +186,8 @@ export interface Kit {
   /** The freeform kind (a list of parts): its caps, and the triangle budget of each role for each target. */
   freeform: {
     caps: { parts: number; points: number; profile: number; sections: number; materials: number; extent: number };
+    /** The joints a part may name, by rig. A joint with sides (arm, leg, leg_front, leg_back) is made twice, `_l` and `_r`, by the side of the part. */
+    rigs: Record<"biped" | "quadruped", string[]>;
     budgets: Record<"hero" | "prop" | "scenery", Record<"pc" | "mobile", number>>;
   };
   kinds: Record<ModelKind, KindSpec>;
@@ -206,6 +208,7 @@ export const KIT: Kit = {
   },
   "freeform": {
     "caps": { "parts": 48, "points": 10, "profile": 14, "sections": 10, "materials": 6, "extent": 12 },
+    "rigs": { "biped": ["head", "arm", "leg", "tail"], "quadruped": ["head", "leg_front", "leg_back", "tail"] },
     "budgets": { "hero": { "pc": 15000, "mobile": 5000 }, "prop": { "pc": 5000, "mobile": 1500 }, "scenery": { "pc": 8000, "mobile": 2500 } }
   },
   "kinds": {

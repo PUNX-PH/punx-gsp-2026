@@ -7,6 +7,9 @@ import type { Role } from "@/lib/graph/types";
 export const FREEFORM_SHAPES = ["ellipsoid", "capsule", "cylinder", "box", "torus", "lump", "tube", "revolve", "loft"] as const;
 export type FreeformShape = (typeof FREEFORM_SHAPES)[number];
 
+export const FREEFORM_RIGS = Object.keys(KIT.freeform.rigs) as (keyof typeof KIT.freeform.rigs)[];
+export type FreeformRig = (typeof FREEFORM_RIGS)[number];
+
 export const FREEFORM_ROLES = ["hero", "prop", "scenery"] as const;
 export type FreeformRole = (typeof FREEFORM_ROLES)[number];
 export const TARGETS = ["pc", "mobile"] as const;
@@ -31,6 +34,8 @@ export interface FreeformPart {
   rot?: Vec3;
   material?: number;
   mirror?: boolean;
+  /** A joint of the recipe's rig: the part moves with that joint (a leg swings, a head nods). Without one it is part of the body. */
+  joint?: string;
   detail?: number;
   taper?: number;
   bevel?: number;
@@ -49,6 +54,8 @@ export interface FreeformRecipe {
   version: 2;
   kind: "model";
   summary: string;
+  /** A rig gives the model joints its parts can be bound to, and stock Run and Jump clips that swing them. Without one the whole body moves as one. */
+  rig?: FreeformRig;
   materials: FreeformMaterial[];
   parts: FreeformPart[];
 }
@@ -75,7 +82,7 @@ export const isFreeformRecipe = (recipe: unknown): recipe is FreeformRecipe => t
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const CONTROL = /[\u0000-\u001f\u007f]/;
-const PART_KEYS = ["shape", "at", "size", "rot", "material", "mirror", "detail", "taper", "bevel", "thickness", "seed", "points", "radius", "profile", "sections"];
+const PART_KEYS = ["shape", "at", "size", "rot", "material", "mirror", "detail", "taper", "bevel", "thickness", "seed", "points", "radius", "profile", "sections", "joint"];
 const SECTION_KEYS = ["z", "w", "h", "round", "dx", "dy"];
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -97,12 +104,13 @@ function keysProblem(obj: Record<string, unknown>, expected: readonly string[], 
 export function checkFreeformRecipe(recipe: unknown): string | null {
   if (!isObject(recipe)) return "recipe: must be an object";
   const { extent } = CAPS;
-  const keys = keysProblem(recipe, ["version", "kind", "summary", "materials", "parts"], "recipe");
+  const keys = keysProblem(recipe, ["version", "kind", "summary", "materials", "parts", ...(Object.hasOwn(recipe, "rig") ? ["rig"] : [])], "recipe");
   if (keys) return keys;
   if (recipe.version !== 2) return "recipe.version: must be 2";
   if (typeof recipe.summary !== "string") return "recipe.summary: must be text";
   if (Array.from(recipe.summary).length > KIT.caps.summary) return `recipe.summary: longer than ${KIT.caps.summary} characters`;
   if (CONTROL.test(recipe.summary)) return "recipe.summary: has a control character";
+  if (Object.hasOwn(recipe, "rig") && (typeof recipe.rig !== "string" || !(FREEFORM_RIGS as string[]).includes(recipe.rig))) return `recipe.rig: ${shown(recipe.rig)} is not one of ${FREEFORM_RIGS.join(", ")}`;
   const { materials, parts } = recipe;
   if (!Array.isArray(materials) || materials.length < 1 || materials.length > CAPS.materials) return `recipe.materials: a list of 1 to ${CAPS.materials}`;
   for (const [i, m] of materials.entries()) {
@@ -121,6 +129,7 @@ export function checkFreeformRecipe(recipe: unknown): string | null {
     if (Object.hasOwn(p, "material") && !wholeIn(p.material, 0, materials.length - 1)) return `${at}.material: must be a whole number 0 to ${materials.length - 1}`;
     if (Object.hasOwn(p, "detail") && !wholeIn(p.detail, 1, 3)) return `${at}.detail: must be 1, 2 or 3`;
     if (Object.hasOwn(p, "mirror") && typeof p.mirror !== "boolean") return `${at}.mirror: must be true or false`;
+    if (Object.hasOwn(p, "joint") && (typeof recipe.rig !== "string" || typeof p.joint !== "string" || !KIT.freeform.rigs[recipe.rig as FreeformRig].includes(p.joint))) return `${at}.joint: ${shown(p.joint)} is not a joint of this model's rig`;
     const vec = (name: string, low: number, high: number) => (Object.hasOwn(p, name) ? vecProblem(p[name], 3, low, high, `${at}.${name}`) : null);
     const bad = vec("at", -extent, extent) ?? vec("size", 0.005, extent) ?? vec("rot", -360, 360);
     if (bad) return bad;
@@ -192,7 +201,7 @@ function vector(v: unknown, low: number, high: number, fallback: Vec3): Vec3 {
   return Array.isArray(v) && v.length === 3 && v.every(isNumber) ? (v.map((x) => clamp(x as number, low, high)) as Vec3) : fallback;
 }
 
-function repairPart(raw: unknown, materials: number): FreeformPart | null {
+function repairPart(raw: unknown, materials: number, rig: FreeformRig | undefined): FreeformPart | null {
   if (!isObject(raw) || typeof raw.shape !== "string" || !(FREEFORM_SHAPES as readonly string[]).includes(raw.shape)) return null;
   const shape = raw.shape as FreeformShape;
   const { extent } = CAPS;
@@ -205,6 +214,8 @@ function repairPart(raw: unknown, materials: number): FreeformPart | null {
     mirror: raw.mirror === true,
     detail: isNumber(raw.detail) ? clamp(Math.round(raw.detail), 1, 3) : 2,
   };
+  // a joint the rig does not have is only dropped: the part is then part of the body
+  if (rig && typeof raw.joint === "string" && KIT.freeform.rigs[rig].includes(raw.joint)) part.joint = raw.joint;
   if (shape === "cylinder") part.taper = number(raw.taper, 0, 1, 1);
   if (shape === "box") part.bevel = number(raw.bevel, 0, 0.45, 0);
   if (shape === "torus") part.thickness = number(raw.thickness, 0.05, 0.9, 0.3);
@@ -276,13 +287,14 @@ export function repairFreeform(raw: unknown): { ok: true; recipe: FreeformRecipe
       finish: typeof m.finish === "string" && (FINISHES as readonly string[]).includes(m.finish) ? (m.finish as Finish) : "matte",
     }));
   if (materials.length === 0) materials.push({ color: 3, finish: "painted" });
+  const rig = typeof design.rig === "string" && (FREEFORM_RIGS as string[]).includes(design.rig) ? (design.rig as FreeformRig) : undefined;
   const parts = (Array.isArray(design.parts) ? design.parts : [])
-    .map((p) => repairPart(p, materials.length))
+    .map((p) => repairPart(p, materials.length, rig))
     .filter((p): p is FreeformPart => p !== null)
     .slice(0, CAPS.parts);
   if (parts.length === 0) return { ok: false };
   const summary = typeof design.summary === "string" ? Array.from(design.summary.replace(/[\u0000-\u001f\u007f]/g, " ").trim()).slice(0, KIT.caps.summary).join("") : "";
 
-  const recipe: FreeformRecipe = { version: 2, kind: "model", summary, materials, parts };
+  const recipe: FreeformRecipe = { version: 2, kind: "model", summary, ...(rig ? { rig } : {}), materials, parts };
   return checkFreeformRecipe(recipe) === null ? { ok: true, recipe } : { ok: false };
 }

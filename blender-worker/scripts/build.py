@@ -769,23 +769,51 @@ def run_world(args, recipe, palette):
         json.dump({"triangles": real["triangles"], "vertices": real["vertices"], "parts": 1, "meshes": real["meshes"], "clips": []}, handle)
 
 
-# The stock clips of a freeform model, all on its one object (its origin is the middle of its feet, so a turn or a stretch happens about them). They use the
-# same tracks and waves as every other clip, within the kit's ranges: Run is a bob with a little rock and pitch, Jump a stretch, Loop a slow turn with a bob.
+# The stock clips of a freeform model, by rig. The root ("model") is the whole body, with its origin at the middle of the feet, so a turn or a stretch happens about
+# them; a rigged model also has its joints (`leg_l`, `arm_r`, `head`, `tail`, ...), which swing about their pivots. The tracks and waves are the kit's, within its ranges. A track
+# on a joint the model lacks (a part was dropped for the budget, or the recipe gave none) is left out.
+def _track(joint, channel, axis, wave, amplitude, cycles, phase=0):
+    return {"joint": joint, "channel": channel, "axis": axis, "wave": wave, "amplitude": amplitude, "cycles": cycles, "phase": phase}
+
+
+def _swing(joint, amplitude, phase, cycles=1):
+    return _track(joint, "rotate", "x", "swing", amplitude, cycles, phase)
+
+
+def _tuck(joint, amplitude):
+    return _track(joint, "rotate", "x", "pulse", amplitude, 1)
+
+
+_STRETCH = [_track("model", "scale", "y", "pulse", 0.15, 1), _track("model", "scale", "x", "pulse", -0.08, 1), _track("model", "scale", "z", "pulse", -0.08, 1)]
+_LOOP = {"seconds": 2.0, "tracks": [_track("model", "rotate", "y", "spin", 90, 1), _track("model", "move", "y", "swing", 0.05, 2)]}
+
 STOCK_CLIPS = {
-    "Run": {"seconds": 0.6, "tracks": [
-        {"joint": "model", "channel": "move", "axis": "y", "wave": "bounce", "amplitude": 0.07, "cycles": 2, "phase": 0},
-        {"joint": "model", "channel": "rotate", "axis": "z", "wave": "swing", "amplitude": 6, "cycles": 1, "phase": 0},
-        {"joint": "model", "channel": "rotate", "axis": "x", "wave": "swing", "amplitude": 4, "cycles": 2, "phase": 0.25},
-    ]},
-    "Jump": {"seconds": 0.8, "tracks": [
-        {"joint": "model", "channel": "scale", "axis": "y", "wave": "pulse", "amplitude": 0.15, "cycles": 1, "phase": 0},
-        {"joint": "model", "channel": "scale", "axis": "x", "wave": "pulse", "amplitude": -0.08, "cycles": 1, "phase": 0},
-        {"joint": "model", "channel": "scale", "axis": "z", "wave": "pulse", "amplitude": -0.08, "cycles": 1, "phase": 0},
-    ]},
-    "Loop": {"seconds": 2.0, "tracks": [
-        {"joint": "model", "channel": "rotate", "axis": "y", "wave": "spin", "amplitude": 90, "cycles": 1, "phase": 0},
-        {"joint": "model", "channel": "move", "axis": "y", "wave": "swing", "amplitude": 0.05, "cycles": 2, "phase": 0},
-    ]},
+    # no rig: the whole body bobs, rocks and pitches; stretches; turns
+    "none": {
+        "Run": {"seconds": 0.6, "tracks": [_track("model", "move", "y", "bounce", 0.07, 2), _track("model", "rotate", "z", "swing", 6, 1), _swing("model", 4, 0.25, 2)]},
+        "Jump": {"seconds": 0.8, "tracks": _STRETCH},
+        "Loop": _LOOP,
+    },
+    # two legs and two arms swing in opposition, the head nods, the tail whips
+    "biped": {
+        "Run": {"seconds": 0.6, "tracks": [
+            _track("model", "move", "y", "bounce", 0.05, 2),
+            _swing("leg_l", 40, 0), _swing("leg_r", 40, 0.5), _swing("arm_l", 35, 0.5), _swing("arm_r", 35, 0),
+            _swing("head", 4, 0.25, 2), _track("tail", "rotate", "y", "swing", 15, 2),
+        ]},
+        "Jump": {"seconds": 0.8, "tracks": [_tuck("leg_l", -50), _tuck("leg_r", -50), _tuck("arm_l", -70), _tuck("arm_r", -70), _tuck("head", -8), *_STRETCH[:1]]},
+        "Loop": _LOOP,
+    },
+    # a trot: diagonal legs together, the head bobs, the tail swings
+    "quadruped": {
+        "Run": {"seconds": 0.5, "tracks": [
+            _track("model", "move", "y", "bounce", 0.04, 2),
+            _swing("leg_front_l", 45, 0), _swing("leg_front_r", 45, 0.5), _swing("leg_back_l", 45, 0.5), _swing("leg_back_r", 45, 0),
+            _swing("head", 6, 0.25, 2), _track("tail", "rotate", "y", "swing", 20, 2, 0.5),
+        ]},
+        "Jump": {"seconds": 0.8, "tracks": [_tuck("leg_front_l", -40), _tuck("leg_front_r", -40), _tuck("leg_back_l", 40), _tuck("leg_back_r", 40), _tuck("head", -10), *_STRETCH[:1]]},
+        "Loop": _LOOP,
+    },
 }
 
 
@@ -797,12 +825,16 @@ def run_model(args, body):
     palette = body["palette"]
     need(isinstance(palette, list) and len(palette) == 5 and all(isinstance(c, str) and HEX.match(c) for c in palette))
     clips = body["clips"]
-    need(isinstance(clips, list) and len(set(map(str, clips))) == len(clips) and all(isinstance(c, str) and c in STOCK_CLIPS for c in clips))
-    clips = [name for name in STOCK_CLIPS if name in clips]  # the order of the kit: Run, Jump, Loop
+    need(isinstance(clips, list) and len(set(map(str, clips))) == len(clips) and all(isinstance(c, str) and c in STOCK_CLIPS["none"] for c in clips))
+    clips = [name for name in STOCK_CLIPS["none"] if name in clips]  # the order of the kit: Run, Jump, Loop
+    rig = body["recipe"].get("rig") or "none"
+    need(rig in STOCK_CLIPS)
 
-    def animate(obj):
+    def animate(objects, rest):
         for name in clips:
-            bake_clip(name, STOCK_CLIPS[name], {"model": obj}, {"model": tuple(obj.location)})
+            motion = STOCK_CLIPS[rig][name]
+            tracks = [track for track in motion["tracks"] if track["joint"] in objects]
+            bake_clip(name, {"seconds": motion["seconds"], "tracks": tracks}, objects, rest)
 
     counts = freeform.build_model(args.out, body["recipe"], palette, KIT["tiers"]["high"]["finishes"], freeform.BUDGETS[body["role"]][body["target"]], animate if clips else None)
     with open(args.stats, "w", encoding="utf-8") as handle:
