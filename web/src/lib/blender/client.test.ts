@@ -218,12 +218,12 @@ describe("build", () => {
   });
 
   describe("a freeform body", () => {
-    const freeform = { ...JSON.parse(readFileSync(new URL("../../../../blender-worker/fixtures/recipes/freeform/crate.json", import.meta.url), "utf8")), role: "prop", target: "mobile" } as AnyBuildBody;
-    const headers = { "X-Triangles": "1400", "X-Parts": "30", "X-Clips": "", "X-Vertices": "900" };
+    const freeform = { ...JSON.parse(readFileSync(new URL("../../../../blender-worker/fixtures/recipes/freeform/crate.json", import.meta.url), "utf8")), role: "prop", target: "mobile", clips: ["Loop"] } as AnyBuildBody;
+    const headers = { "X-Triangles": "1400", "X-Parts": "30", "X-Clips": "Loop", "X-Vertices": "900" };
 
     it("posts the body as it is, and reads the counts, no clips and the vertices", async () => {
       const { worker, calls } = setup(async () => built(headers));
-      expect(await worker.build({ body: freeform, timeoutMs: 5000 })).toEqual({ bytes: GLB, triangles: 1400, parts: 30, clips: [], vertices: 900 });
+      expect(await worker.build({ body: freeform, timeoutMs: 5000 })).toEqual({ bytes: GLB, triangles: 1400, parts: 30, clips: ["Loop"], vertices: 900 });
       expect(JSON.parse(calls[0].init.body as string)).toMatchObject({ role: "prop", target: "mobile" });
     });
 

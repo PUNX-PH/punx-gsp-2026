@@ -10,7 +10,7 @@ import { AiRefusedError, AiUnavailableError, type DesignReply, type Designer } f
 import type { BlenderService } from "@/lib/blender/types";
 import { CLIPS_FOR_ROLE, KIT, type ClipKey, type ModelKind, type Quality, WORLD_PIECES } from "@/lib/builder/kinds";
 import { designKey, environmentKey, motionKey } from "@/lib/builder/keys";
-import { freeformRoleOf, isFreeformRecipe, repairFreeform, type FreeformRecipe } from "@/lib/builder/freeform";
+import { freeformClipsOf, freeformRoleOf, isFreeformRecipe, repairFreeform, type FreeformRecipe } from "@/lib/builder/freeform";
 import type { RecipeCache } from "@/lib/builder/ports";
 import {
   DEFAULT_ENVIRONMENT,
@@ -224,7 +224,8 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
 
   /**
    * A freeform model: designed from the words (there is no kit default to fall back on), then built twice, for the PC and for the phone (two cached
-   * worker calls; the worker fits each to its triangle budget). It has no motions: a freeform model does not animate yet.
+   * worker calls; the worker fits each to its triangle budget). It has no motions of its own: the worker puts the stock clips of its role on it
+   * (a hero runs and jumps, a collectible turns, an obstacle stands still).
    */
   async function buildFreeform(job: Parameters<BuilderService["buildModel"]>[0], input: BuildModelInput, description: string): Promise<BuiltModel> {
     if (description === "") throw say("describe it first.");
@@ -232,15 +233,16 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
     const { recipe, asked } = await designFreeformModel(deps.ai, job, input, description);
     const palette = [...input.palette];
     const role = freeformRoleOf(input.role);
-    const pc = await deps.blender.build(job, { label: "Build Model", body: { recipe, palette, role, target: "pc" } });
-    const mobile = await deps.blender.build(job, { label: "Build Model", body: { recipe, palette, role, target: "mobile" } });
+    const clips = freeformClipsOf(input.role);
+    const pc = await deps.blender.build(job, { label: "Build Model", body: { recipe, palette, role, target: "pc", clips } });
+    const mobile = await deps.blender.build(job, { label: "Build Model", body: { recipe, palette, role, target: "mobile", clips } });
     return {
       sha256: pc.sha256,
       size: pc.size,
       kind: "freeform",
       parts: pc.parts,
       triangles: pc.triangles,
-      clips: [],
+      clips: pc.clips,
       summary: recipe.summary !== "" ? recipe.summary : "A custom model.",
       skipped: [],
       reused: !asked && pc.reused && mobile.reused,

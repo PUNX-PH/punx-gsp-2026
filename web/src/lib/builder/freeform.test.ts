@@ -11,6 +11,7 @@ import {
   checkFreeformBody,
   FREEFORM_CAPS,
   freeformBudget,
+  freeformClipsOf,
   freeformRoleOf,
   repairFreeform,
   type FreeformBody,
@@ -24,7 +25,7 @@ import { SAMPLE_PALETTE } from "@/lib/graph/palette";
 import { type DerivedFiles } from "@/lib/graph/types";
 
 const read = (name: string) => JSON.parse(readFileSync(new URL(`../../../../blender-worker/fixtures/recipes/freeform/${name}.json`, import.meta.url), "utf8")) as { recipe: FreeformRecipe; palette: string[] };
-const body = (name: string, role: FreeformBody["role"] = "prop", target: FreeformBody["target"] = "pc"): FreeformBody => ({ ...read(name), role, target });
+const body = (name: string, role: FreeformBody["role"] = "prop", target: FreeformBody["target"] = "pc"): FreeformBody => ({ ...read(name), role, target, clips: ["Run"] });
 const NAMES = ["crate", "fox", "pine", "robot", "spaceship"];
 
 describe("checkFreeformBody", () => {
@@ -45,6 +46,9 @@ describe("checkFreeformBody", () => {
     expect(changed((b) => (b.target = "console"))).toMatch(/body\.target/);
     expect(changed((b) => (b.motions = {}))).toMatch(/body: unknown field/);
     expect(changed((b) => delete b.target)).toMatch(/body: missing field target/);
+    expect(changed((b) => (b.clips = ["Dance"]))).toMatch(/body.clips/);
+    expect(changed((b) => (b.clips = ["Run", "Run"]))).toMatch(/body.clips/);
+    expect(changed((b) => delete b.clips)).toMatch(/missing field clips/);
     expect(changed((b) => (b.palette = ["#fff"]))).toMatch(/palette/);
     expect(changed((b) => (b.recipe.version = 1))).toMatch(/recipe\.version/);
     expect(changed((b) => (b.recipe.parts[0].shape = "teapot"))).toMatch(/parts\[0\]\.shape/);
@@ -80,6 +84,9 @@ describe("checkFreeformBody", () => {
     expect(freeformRoleOf("hero")).toBe("hero");
     expect(freeformRoleOf("obstacle")).toBe("prop");
     expect(freeformRoleOf("collectible")).toBe("prop");
+    expect(freeformClipsOf("hero")).toEqual(["Run", "Jump"]);
+    expect(freeformClipsOf("collectible")).toEqual(["Loop"]);
+    expect(freeformClipsOf("obstacle")).toEqual([]);
   });
 });
 
@@ -92,7 +99,7 @@ describe("repairFreeform", () => {
     expect(repaired.ok).toBe(true);
     if (!repaired.ok) return;
     expect(repaired.recipe).toMatchObject({ version: 2, kind: "model", summary: "A ball.", parts: [{ shape: "ellipsoid", mirror: false, detail: 2, material: 0 }] });
-    expect(checkFreeformBody({ recipe: repaired.recipe, palette: SAMPLE_PALETTE, role: "hero", target: "pc" })).toBeNull();
+    expect(checkFreeformBody({ recipe: repaired.recipe, palette: SAMPLE_PALETTE, role: "hero", target: "pc", clips: [] })).toBeNull();
   });
 
   it("repairs all five fixtures unchanged in meaning (they are what a good answer looks like)", () => {
@@ -132,7 +139,7 @@ describe("repairFreeform", () => {
     expect(recipe.parts[2]).toMatchObject({ shape: "revolve", profile: [[0, 0], [1, 12]] });
     expect(recipe.parts.some((p) => p.shape === "loft")).toBe(false);
     expect(JSON.stringify(recipe)).not.toContain("evil");
-    expect(checkFreeformBody({ recipe, palette: SAMPLE_PALETTE, role: "hero", target: "mobile" })).toBeNull();
+    expect(checkFreeformBody({ recipe, palette: SAMPLE_PALETTE, role: "hero", target: "mobile", clips: [] })).toBeNull();
   });
 
   it("gives a missing material list one painted accent material", () => {
@@ -196,7 +203,7 @@ function setup(options: { designer?: ScriptedDesigner; failMobile?: boolean } = 
       const reused = seen.has(key);
       seen.add(key);
       const pc = request.body.target === "pc";
-      return { sha256: pc ? SHA_PC : SHA_MOBILE, size: pc ? 9000 : 5000, triangles: pc ? 2400 : 1200, parts: 3, clips: [], vertices: pc ? 1500 : 800, reused };
+      return { sha256: pc ? SHA_PC : SHA_MOBILE, size: pc ? 9000 : 5000, triangles: pc ? 2400 : 1200, parts: 3, clips: request.body.clips, vertices: pc ? 1500 : 800, reused };
     },
   };
   const designer = options.designer ?? new ScriptedDesigner({ designFreeform: async () => ({ raw: { recipe: FOX }, usage: { inputTokens: 2000, outputTokens: 500 } }) });
@@ -217,12 +224,12 @@ describe("Build Model with the freeform kind", () => {
     const t = setup();
     const built = await t.service.buildModel(JOB, request());
     expect(t.designer.calls.map((c) => c.method)).toEqual(["designFreeform"]);
-    expect(t.calls.map((b) => [b.role, b.target])).toEqual([["hero", "pc"], ["hero", "mobile"]]);
+    expect(t.calls.map((b) => [b.role, b.target, b.clips])).toEqual([["hero", "pc", ["Run", "Jump"]], ["hero", "mobile", ["Run", "Jump"]]]);
     expect(built).toMatchObject({
       sha256: SHA_PC,
       kind: "freeform",
       triangles: 2400,
-      clips: [],
+      clips: ["Run", "Jump"],
       summary: "A little fox.",
       skipped: [],
       reused: false,
@@ -235,7 +242,11 @@ describe("Build Model with the freeform kind", () => {
   it("an obstacle or a collectible is a prop for the budget", async () => {
     const t = setup();
     await t.service.buildModel(JOB, request({ role: "obstacle" }));
-    expect(t.calls.map((b) => b.role)).toEqual(["prop", "prop"]);
+    expect(t.calls.map((b) => [b.role, b.clips])).toEqual([["prop", []], ["prop", []]]);
+    const pickup = setup();
+    const built = await pickup.service.buildModel(JOB, request({ role: "collectible" }));
+    expect(pickup.calls.map((b) => b.clips)).toEqual([["Loop"], ["Loop"]]);
+    expect(built.clips).toEqual(["Loop"]);
   });
 
   it("a repeat makes no Claude call and no AI count, and says it reused the result", async () => {

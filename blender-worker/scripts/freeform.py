@@ -348,15 +348,16 @@ def fit_parts(parts, budget):
     return use, 1, len(parts) - len(use)
 
 
-def build_model(path, recipe, palette, finishes, budget=None):
-    """Builds the model and writes the GLB. Returns the real counts of the file, with `parts` (kept) and `dropped`. With a `budget` (triangles) the model is fitted
+def build_model(path, recipe, palette, finishes, budget=None, animate=None):
+    """Builds the model and writes the GLB. Returns the real counts of the file, with `parts` (kept) and `dropped`. `animate`, when given, is called with
+    the model's object before the export (build.py puts the stock clips on it). With a `budget` (triangles) the model is fitted
     to it by fit_parts and then checked by the real count of the GLB (dropping one more part and building again if it is somehow over); BadModel when it cannot fit."""
     clean_materials, parts = check_model(recipe, finishes)
     dropped = 0
     if budget is not None:
         parts, _, dropped = fit_parts(parts, budget)
     while True:
-        counts = _build(path, clean_materials, parts, palette, finishes)
+        counts = _build(path, clean_materials, parts, palette, finishes, animate)
         if budget is None or counts["triangles"] <= budget:
             break
         _need(len(parts) > 1)
@@ -365,7 +366,7 @@ def build_model(path, recipe, palette, finishes, budget=None):
     return {**counts, "parts": len(parts), "dropped": dropped}
 
 
-def _build(path, clean_materials, parts, palette, finishes):
+def _build(path, clean_materials, parts, palette, finishes, animate=None):
     common.reset_scene()
     library = [common.finish_material(f"{finish}_{i}", common.hex_to_linear(palette[color].lower()), finishes[finish]) for i, (color, finish) in enumerate(clean_materials)]
 
@@ -394,5 +395,8 @@ def _build(path, clean_materials, parts, palette, finishes):
         mesh.materials.append(material)
     obj = bpy.data.objects.new("model", mesh)
     bpy.context.scene.collection.objects.link(obj)
-    common.export_glb(path, animations=False, vertex_colors=True)
+    if animate is not None:
+        animate(obj)
+        bpy.context.scene.frame_set(0)
+    common.export_glb(path, animations=animate is not None, vertex_colors=True)
     return common.glb_counts(path)

@@ -243,6 +243,7 @@ const PART_KEYS = ["shape", "at", "size", "rot", "material", "mirror", "detail",
 const SECTION_KEYS = ["z", "w", "h", "round", "dx", "dy"];
 const ROLES = Object.keys(FREE.budgets);
 const TARGETS = ["pc", "mobile"];
+const STOCK_CLIPS = ["Run", "Jump", "Loop"]; // the clips a freeform model can have (build.py puts a stock motion for each on the model)
 
 const inRange = (v, low, high) => isNumber(v) && v >= low && v <= high;
 const vecProblem = (v, n, low, high, where) => (Array.isArray(v) && v.length === n && v.every((x) => inRange(x, low, high)) ? null : `${where}: must be ${n} numbers within ${low} to ${high}`);
@@ -315,13 +316,14 @@ function checkModelRecipe(recipe) {
   return null;
 }
 
-// A model body is { recipe, palette, role, target }: no motions yet (a freeform model has no clips), the role picks the triangle budget and
+// A model body is { recipe, palette, role, target, clips }: no motions (the clips are stock ones, by name), the role picks the triangle budget and
 // the target (pc or mobile) the column of it. build.py fits the model to that budget by the real count of the GLB, or refuses.
 function checkModelBody(body) {
-  const keys = keysProblem(body, ["recipe", "palette", "role", "target"], "body");
+  const keys = keysProblem(body, ["recipe", "palette", "role", "target", "clips"], "body");
   if (keys) return keys;
   if (typeof body.role !== "string" || !ROLES.includes(body.role)) return `body.role: ${shown(body.role)} is not one of ${ROLES.join(", ")}`;
   if (typeof body.target !== "string" || !TARGETS.includes(body.target)) return `body.target: ${shown(body.target)} is not pc or mobile`;
+  if (!Array.isArray(body.clips) || new Set(body.clips).size !== body.clips.length || !body.clips.every((c) => STOCK_CLIPS.includes(c))) return `body.clips: a list of at most one each of ${STOCK_CLIPS.join(", ")}`;
   const palette = body.palette;
   if (!Array.isArray(palette) || palette.length !== 5 || !palette.every((c) => typeof c === "string" && HEX.test(c))) return "palette: must be five #rrggbb colors";
   return checkModelRecipe(body.recipe);

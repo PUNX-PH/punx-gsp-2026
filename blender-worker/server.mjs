@@ -4,7 +4,7 @@
 //   POST /prepare?format=glb|fbx|obj&triangles=100..5000&color=original|#rrggbb   body: the model file
 //   POST /shape                                                                    body: {"shape": "...", "color": "#rrggbb"}
 //   POST /build                                                                    body: {"recipe": {...}, "motions": {...}, "palette": [5 colors]}
-//                                                                                  or, for a freeform model: {"recipe": {kind: "model", ...}, "palette": [...], "role": "hero|prop|scenery", "target": "pc|mobile"}
+//                                                                                  or, for a freeform model: {"recipe": {kind: "model", ...}, "palette": [...], "role": "hero|prop|scenery", "target": "pc|mobile", "clips": ["Run", ...]}
 //   GET  /health        (not /healthz: Cloud Run reserves some paths that end in "z" and answers them itself)
 //
 // A good answer is 200 with the GLB as the body and the triangle counts in X-Triangles-Before and X-Triangles-After (for /build:

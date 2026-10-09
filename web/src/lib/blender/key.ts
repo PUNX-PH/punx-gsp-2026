@@ -51,4 +51,4 @@ export const buildKey = (input: { graphId: string; body: AnyBuildBody }): Promis
   "motions" in input.body
     ? hashKey([JOB_VERSION, "build", input.graphId, input.body.recipe, input.body.motions, input.body.palette])
     : // a freeform model: the role and the target are part of the question (the same recipe is cut to another budget)
-      hashKey([JOB_VERSION, "build", input.graphId, input.body.recipe, input.body.palette, input.body.role, input.body.target]);
+      hashKey([JOB_VERSION, "build", input.graphId, input.body.recipe, input.body.palette, input.body.role, input.body.target, input.body.clips]);

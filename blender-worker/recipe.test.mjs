@@ -212,7 +212,7 @@ describe("checkBuildBody and the High tier", () => {
 const FREE = new URL("./fixtures/recipes/freeform/", import.meta.url);
 const freeBody = (name, role = "prop", target = "pc") => {
   const { recipe, palette } = JSON.parse(readFileSync(new URL(`${name}.json`, FREE), "utf8"));
-  return { recipe, palette, role, target };
+  return { recipe, palette, role, target, clips: ["Run", "Jump"] };
 };
 
 describe("checkBuildBody for a freeform model", () => {
@@ -232,6 +232,9 @@ describe("checkBuildBody for a freeform model", () => {
     assert.match(changed((b) => (b.target = "console")), /body\.target/);
     assert.match(changed((b) => (b.motions = {})), /body: unknown field/);
     assert.match(changed((b) => delete b.target), /body: missing field target/);
+    assert.match(changed((b) => (b.clips = ["Dance"])), /body.clips/);
+    assert.match(changed((b) => (b.clips = ["Run", "Run"])), /body.clips/);
+    assert.match(changed((b) => delete b.clips), /missing field clips/);
     assert.match(changed((b) => (b.palette = ["#fff"])), /palette/);
     assert.match(changed((b) => (b.recipe.version = 1)), /recipe\.version/);
     assert.match(changed((b) => (b.recipe.parts[0].shape = "teapot")), /parts\[0\]\.shape/);

@@ -769,16 +769,44 @@ def run_world(args, recipe, palette):
         json.dump({"triangles": real["triangles"], "vertices": real["vertices"], "parts": 1, "meshes": real["meshes"], "clips": []}, handle)
 
 
+# The stock clips of a freeform model, all on its one object (its origin is the middle of its feet, so a turn or a stretch happens about them). They use the
+# same tracks and waves as every other clip, within the kit's ranges: Run is a bob with a little rock and pitch, Jump a stretch, Loop a slow turn with a bob.
+STOCK_CLIPS = {
+    "Run": {"seconds": 0.6, "tracks": [
+        {"joint": "model", "channel": "move", "axis": "y", "wave": "bounce", "amplitude": 0.07, "cycles": 2, "phase": 0},
+        {"joint": "model", "channel": "rotate", "axis": "z", "wave": "swing", "amplitude": 6, "cycles": 1, "phase": 0},
+        {"joint": "model", "channel": "rotate", "axis": "x", "wave": "swing", "amplitude": 4, "cycles": 2, "phase": 0.25},
+    ]},
+    "Jump": {"seconds": 0.8, "tracks": [
+        {"joint": "model", "channel": "scale", "axis": "y", "wave": "pulse", "amplitude": 0.15, "cycles": 1, "phase": 0},
+        {"joint": "model", "channel": "scale", "axis": "x", "wave": "pulse", "amplitude": -0.08, "cycles": 1, "phase": 0},
+        {"joint": "model", "channel": "scale", "axis": "z", "wave": "pulse", "amplitude": -0.08, "cycles": 1, "phase": 0},
+    ]},
+    "Loop": {"seconds": 2.0, "tracks": [
+        {"joint": "model", "channel": "rotate", "axis": "y", "wave": "spin", "amplitude": 90, "cycles": 1, "phase": 0},
+        {"joint": "model", "channel": "move", "axis": "y", "wave": "swing", "amplitude": 0.05, "cycles": 2, "phase": 0},
+    ]},
+}
+
+
 def run_model(args, body):
     """A freeform model: the same rules as recipe.mjs (checked again here), fitted to the budget of its role and target by the real count of the GLB.
-    Exits 5 when the body breaks a rule or the model cannot fit; the stats carry the kept parts and how many were dropped to fit."""
-    need(set(body) == {"recipe", "palette", "role", "target"})
+    The body's `clips` (Run, Jump, Loop) are the stock clips put on the model. Exits 5 when the body breaks a rule or the model cannot fit; the stats carry the kept parts and how many were dropped to fit."""
+    need(set(body) == {"recipe", "palette", "role", "target", "clips"})
     need(body["role"] in freeform.BUDGETS and body["target"] in ("pc", "mobile"))
     palette = body["palette"]
     need(isinstance(palette, list) and len(palette) == 5 and all(isinstance(c, str) and HEX.match(c) for c in palette))
-    counts = freeform.build_model(args.out, body["recipe"], palette, KIT["tiers"]["high"]["finishes"], freeform.BUDGETS[body["role"]][body["target"]])
+    clips = body["clips"]
+    need(isinstance(clips, list) and len(set(map(str, clips))) == len(clips) and all(isinstance(c, str) and c in STOCK_CLIPS for c in clips))
+    clips = [name for name in STOCK_CLIPS if name in clips]  # the order of the kit: Run, Jump, Loop
+
+    def animate(obj):
+        for name in clips:
+            bake_clip(name, STOCK_CLIPS[name], {"model": obj}, {"model": tuple(obj.location)})
+
+    counts = freeform.build_model(args.out, body["recipe"], palette, KIT["tiers"]["high"]["finishes"], freeform.BUDGETS[body["role"]][body["target"]], animate if clips else None)
     with open(args.stats, "w", encoding="utf-8") as handle:
-        json.dump({**counts, "clips": []}, handle)
+        json.dump({**counts, "clips": clips}, handle)
 
 
 def main():

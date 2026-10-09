@@ -11,6 +11,9 @@ export const FREEFORM_ROLES = ["hero", "prop", "scenery"] as const;
 export type FreeformRole = (typeof FREEFORM_ROLES)[number];
 export const TARGETS = ["pc", "mobile"] as const;
 export type Target = (typeof TARGETS)[number];
+/** The stock clips a freeform model can have: the worker puts a motion for each on the model (there are no joints to animate). */
+export const FREEFORM_CLIPS = ["Run", "Jump", "Loop"] as const;
+export type FreeformClip = (typeof FREEFORM_CLIPS)[number];
 
 type Vec3 = [number, number, number];
 export interface FreeformSection {
@@ -55,11 +58,15 @@ export interface FreeformBody {
   palette: string[];
   role: FreeformRole;
   target: Target;
+  clips: FreeformClip[];
 }
 
 const { caps: CAPS, budgets: BUDGETS } = KIT.freeform;
 export const FREEFORM_CAPS = CAPS;
 export const freeformBudget = (role: FreeformRole, target: Target): number => BUDGETS[role][target];
+
+/** The clips a graph role needs: the hero runs and jumps, a collectible turns, an obstacle stands still. */
+export const freeformClipsOf = (role: Role): FreeformClip[] => (role === "hero" ? ["Run", "Jump"] : role === "collectible" ? ["Loop"] : []);
 
 /** The budget class of a graph role: the hero is the one big model, everything else the player meets is a prop. */
 export const freeformRoleOf = (role: Role): FreeformRole => (role === "hero" ? "hero" : "prop");
@@ -161,10 +168,12 @@ export function checkFreeformRecipe(recipe: unknown): string | null {
 /** null when the body is valid; otherwise a short problem that names the field. The worker's checkBuildBody has the same rules. */
 export function checkFreeformBody(body: unknown): string | null {
   if (!isObject(body)) return "body: must be an object";
-  const keys = keysProblem(body, ["recipe", "palette", "role", "target"], "body");
+  const keys = keysProblem(body, ["recipe", "palette", "role", "target", "clips"], "body");
   if (keys) return keys;
   if (typeof body.role !== "string" || !(FREEFORM_ROLES as readonly string[]).includes(body.role)) return `body.role: ${shown(body.role)} is not one of ${FREEFORM_ROLES.join(", ")}`;
   if (typeof body.target !== "string" || !(TARGETS as readonly string[]).includes(body.target)) return `body.target: ${shown(body.target)} is not pc or mobile`;
+  const clips = body.clips;
+  if (!Array.isArray(clips) || new Set(clips).size !== clips.length || !clips.every((c) => (FREEFORM_CLIPS as readonly unknown[]).includes(c))) return `body.clips: a list of at most one each of ${FREEFORM_CLIPS.join(", ")}`;
   const palette = body.palette;
   if (!Array.isArray(palette) || palette.length !== 5 || !palette.every((c) => typeof c === "string" && HEX.test(c))) return "palette: must be five #rrggbb colors";
   return checkFreeformRecipe(body.recipe);

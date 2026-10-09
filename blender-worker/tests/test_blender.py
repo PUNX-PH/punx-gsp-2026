@@ -1190,10 +1190,10 @@ class BuildFreeform(unittest.TestCase):
     def tearDown(self):
         self.dir.cleanup()
 
-    def fixture(self, name, role, target):
+    def fixture(self, name, role, target, clips=None):
         with open(os.path.join(HERE, "..", "fixtures", "recipes", "freeform", name + ".json"), encoding="utf-8") as handle:
             body = json.load(handle)
-        return {"recipe": body["recipe"], "palette": body["palette"], "role": role, "target": target}
+        return {"recipe": body["recipe"], "palette": body["palette"], "role": role, "target": target, "clips": clips or []}
 
     def build(self, body):
         recipe_path = os.path.join(self.dir.name, "recipe.json")
@@ -1242,6 +1242,27 @@ class BuildFreeform(unittest.TestCase):
         self.assertGreater(stats["dropped"], 0)
         self.assertEqual(stats["parts"], len(body["recipe"]["parts"]) - stats["dropped"])
 
+    def test_the_stock_clips_are_in_the_glb_and_move_the_model(self):
+        result = self.build(self.fixture("fox", "hero", "pc", ["Run", "Jump"]))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.stats()["clips"], ["Run", "Jump"])
+        gltf = read_glb(self.out)
+        self.assertEqual(sorted(a["name"] for a in gltf["animations"]), ["Jump", "Run"])
+        self.assertEqual(len(gltf["meshes"]), 1)
+        # Run moves the one node up and down: a translation channel with more than one distinct height
+        run = next(a for a in gltf["animations"] if a["name"] == "Run")
+        paths = {c["target"]["path"] for c in run["channels"]}
+        self.assertTrue({"translation", "rotation"} <= paths, paths)
+
+    def test_a_collectible_loops_and_an_obstacle_stands_still(self):
+        result = self.build(self.fixture("crate", "prop", "pc", ["Loop"]))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([a["name"] for a in read_glb(self.out)["animations"]], ["Loop"])
+        still = self.build(self.fixture("crate", "prop", "pc", []))
+        self.assertEqual(still.returncode, 0, still.stderr)
+        self.assertEqual(self.stats()["clips"], [])
+        self.assertNotIn("animations", read_glb(self.out))
+
     def test_a_model_that_cannot_fit_is_refused(self):
         sys.path.insert(0, SCRIPTS)
         import freeform
@@ -1263,6 +1284,8 @@ class BuildFreeform(unittest.TestCase):
             "an unknown shape": mutated(lambda b: b["recipe"]["parts"][0].update(shape="teapot")),
             "a rotation past 360": mutated(lambda b: b["recipe"]["parts"][0].update(rot=[0, 361, 0])),
             "an extra field": mutated(lambda b: b.update(motions={})),
+            "a clip that is not one": mutated(lambda b: b.update(clips=["Dance"])),
+            "a clip twice": mutated(lambda b: b.update(clips=["Run", "Run"])),
             "a material index out of range": mutated(lambda b: b["recipe"]["parts"][0].update(material=99)),
         }
         for name, body in cases.items():
