@@ -79,3 +79,7 @@ rebuilt WebGL template and the Windows and Android players (`tools/build-players
 `build.py` itself, PC target; settings.json like sample-built): PlayMode is now **33 of 33**. The tests show glTFast imports a node for every joint and a mesh for each (head, tail, four legs), the player takes the hero's Run and Jump, the legs really trot (a front leg against the
 other front leg and against the back leg on its own side, correlation under -0.3), the legs stay attached while they swing, Jump follows the air progress and Run returns, a collectible plays Loop and a crate has no clips. **Mutation:** with an un-rigged fox as the hero 4 of the 5 fail.
 So the claim "the runner plays rig clips" is now verified. Still not run in Unity: the rebuilt templates and players, the phone budgets.
+
+**Players rebuilt (2026-10-09, `tools/build-players.ps1 -Platform both`, both "Build Finished, Result: Success"):** `Builds/upload/windows.zip` (35.8 MB; a real zip made with Windows' `tar.exe -a -c` from `Builds/player-windows`, forward-slash entries, the `*DoNotShip*` Burst folder excluded; **not** Git Bash's GNU `tar`, which writes a plain tar
+named .zip) and `android.apk` (30.0 MB, from `Builds/player-android/Runner.apk`), `players.json` unchanged. There is no Unity runtime change in slice 9, so the players differ from slice 8's only by the new `sample-freeform` StreamingAssets. **Not uploaded** to `gs://punx-gsp-players`
+(the studio uploads through the Cloud Console; ask first), and the packager is not redeployed.
