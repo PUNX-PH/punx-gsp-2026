@@ -1,0 +1,26 @@
+/* The expense tables sit inside the shell, so every color is one of its tokens. */
+
+.heading { margin: 32px 0 12px; color: var(--text); font-size: 16px; font-weight: 600; }
+
+.table {
+  width: 100%;
+  max-width: 760px;
+  border-collapse: collapse;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td { padding: 10px 14px; text-align: right; border-bottom: 1px solid var(--line); color: var(--text); }
+.table th:first-child { text-align: left; font-weight: 500; }
+.table thead th { color: var(--muted); font-size: 12px; font-weight: 500; }
+.table tbody tr:last-child th,
+.table tbody tr:last-child td { border-bottom: 0; }
+
+@media (max-width: 640px) {
+  .table { font-size: 13px; }
+  .table th,
+  .table td { padding: 8px 8px; }
+}

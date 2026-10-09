@@ -1,5 +1,6 @@
 import Link from "next/link";
 import styles from "@/app/shell.module.css";
+import { isOwner } from "@/lib/expenses/owner";
 import { SignOutButton } from "./SignOutButton";
 
 /** The mark: three steps joined by two wires, in the colors the editor draws its own wires with. */
@@ -16,7 +17,7 @@ export function Mark() {
 }
 
 /** The bar every signed-in page of the site has: where you are, and who you are. */
-export function AppHeader({ email, current }: { email: string; current: "games" | "runs" }) {
+export function AppHeader({ email, current }: { email: string; current: "games" | "runs" | "expenses" }) {
   return (
     <header className={styles.header}>
       <Link href="/graphs" className={styles.brand}>
@@ -30,6 +31,11 @@ export function AppHeader({ email, current }: { email: string; current: "games" 
         <Link href="/runs" aria-current={current === "runs" ? "page" : undefined}>
           Runs
         </Link>
+        {isOwner(email) && (
+          <Link href="/expenses" aria-current={current === "expenses" ? "page" : undefined}>
+            Expenses
+          </Link>
+        )}
       </nav>
       <span className={styles.spacer} />
       <span className={styles.who}>{email}</span>
