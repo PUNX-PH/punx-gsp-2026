@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &1058278439
+--- !u!1 &1558437675
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,8 +127,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1058278441}
-  - component: {fileID: 1058278440}
+  - component: {fileID: 1558437677}
+  - component: {fileID: 1558437676}
   m_Layer: 0
   m_Name: Runner
   m_TagString: Untagged
@@ -136,26 +136,27 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1058278440
+--- !u!114 &1558437676
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1058278439}
+  m_GameObject: {fileID: 1558437675}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f0f05bc89c8382943b0d69eaad1c13af, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Runner.Runtime::Runner.View.RunnerBootstrap
   SettingsUrlOverride: 
---- !u!4 &1058278441
+  ScriptSeed: 0
+--- !u!4 &1558437677
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1058278439}
+  m_GameObject: {fileID: 1558437675}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -168,4 +169,4 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 1058278441}
+  - {fileID: 1558437677}
