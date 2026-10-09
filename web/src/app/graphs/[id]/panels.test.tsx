@@ -56,7 +56,7 @@ describe("SettingsPanel", () => {
   it("names the selected step and says what it is", () => {
     const html = panel("n3");
     expect(html).toContain("Game Template");
-    expect(html).toContain("A one-tap runner.");
+    expect(html).toContain("Puts the game together");
   });
 
   it("lets a picture be chosen (PNG or JPEG), shows the chosen one, and shows an upload error", () => {

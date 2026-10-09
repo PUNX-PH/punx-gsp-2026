@@ -125,7 +125,7 @@ describe("StepCardView", () => {
 
   it("puts a handle on each port, labelled where a step has several inputs", () => {
     const stub = (port: { name: string }, side: string) => <i data-handle={`${side}:${port.name}`} />;
-    const template = render(data("n3"), { renderHandle: stub });
+    const template = render(data("n3"), { renderHandle: stub, selected: true }); // selected, so every input of the template is drawn
     for (const port of ["palette", "hero", "obstacle", "collectible"]) expect(template).toContain(`data-handle="input:${port}"`);
     expect(template).toContain('data-handle="output:settings"');
     for (const label of ["hero model", "obstacle model", "collectible model"]) expect(template).toContain(label);
@@ -135,6 +135,21 @@ describe("StepCardView", () => {
     expect(single).toContain('data-handle="input:image"');
     expect(single).toContain('data-handle="output:palette"');
     expect(single).not.toContain("optional");
+  });
+
+  it("a card with many inputs shows only the required and the wired ones until it is selected, and says how many more there are", () => {
+    const stub = (port: { name: string }, side: string) => <i data-handle={`${side}:${port.name}`} />;
+    const base = data("n3"); // the real template: nineteen inputs, one of them (model 1) wired here
+    const many = { ...base, inputs: base.inputs.map((p) => ({ ...p, wired: p.name === "model1" })) };
+    expect(many.inputs.length).toBeGreaterThan(6);
+    const closed = render(many, { renderHandle: stub });
+    expect(closed).toContain(`${many.inputs.length - 1} more inputs`);
+    expect(closed).toContain('data-handle="input:model1"'); // wired: always drawn
+    expect(closed).not.toContain('data-handle="input:model5"');
+    expect(closed).toContain('data-handle="output:settings"');
+    const selected = render(many, { renderHandle: stub, selected: true });
+    expect(selected).not.toMatch(/more inputs/);
+    expect(selected).toContain('data-handle="input:model5"');
   });
 
   it("escapes a hostile file name and cuts a long one off in CSS, not in code (Review Focus 5)", () => {

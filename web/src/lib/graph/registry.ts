@@ -280,7 +280,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
   "game-template": {
     type: "game-template",
     label: "Game Template",
-    help: "A one-tap runner. Sets how fast it is, how high the hero jumps and how far apart the obstacles are.",
+    help: "Puts the game together: its rules, its models, its colors and its world. For a plain runner it also sets the speed, the jump and the spacing.",
     final: false,
     inputs: [
       port("palette", "palette", "The game's colors. Without one, a sample palette is used.", "palette"),

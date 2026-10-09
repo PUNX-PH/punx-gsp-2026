@@ -1,6 +1,6 @@
 // What a step's card looks like, drawn from the numbers in StepData (see lib/canvas/cardView.ts). Everything except the
 // connection handles lives here, so the card renders without a React Flow around it; StepCard supplies the handles.
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { cx } from "@/app/graphs/[id]/cx";
 import styles from "@/app/graphs/[id]/editor.module.css";
 import { CrossIcon, Icon, PlusIcon, StatusIcon } from "@/app/graphs/[id]/icons";
@@ -134,8 +134,16 @@ function Result({ result, onOpenGame }: { result: ResultView; onOpenGame?: () =>
   }
 }
 
+/** A card with more inputs than this (the Game Template has fourteen) shows only the ones that are required or wired, until it is selected or opened. */
+const COLLAPSE_ABOVE = 6;
+
 export function StepCardView({ data, selected, onAddFrom, onRemove, onOpenGame, renderHandle }: StepCardViewProps) {
   const manyInputs = data.inputs.length > 1;
+  const [opened, setOpened] = useState(false);
+  const collapsible = data.inputs.length > COLLAPSE_ABOVE;
+  const showAll = !collapsible || opened || selected === true;
+  const shown = showAll ? data.inputs : data.inputs.filter((port) => port.required || port.wired);
+  const hidden = data.inputs.length - shown.length;
 
   return (
     <div className={cx(styles.card, selected && styles.selected)} data-status={data.status} role="group" aria-label={data.label}>
@@ -163,13 +171,20 @@ export function StepCardView({ data, selected, onAddFrom, onRemove, onOpenGame, 
       {data.inputs.length === 1 && renderHandle?.(data.inputs[0], "input")}
       {manyInputs && (
         <ul className={styles.ports}>
-          {data.inputs.map((port) => (
+          {shown.map((port) => (
             <li key={port.name} className={styles.portRow}>
               {renderHandle?.(port, "input")}
               <span className={styles.portLabel}>{port.label}</span>
-              {!port.required && <span className={styles.optional}>optional</span>}
+              {!port.required && !port.wired && <span className={styles.optional}>optional</span>}
             </li>
           ))}
+          {collapsible && !selected && (
+            <li className={styles.portMore}>
+              <button type="button" className={cx(styles.moreInputs, "nodrag")} aria-expanded={opened} onClick={() => setOpened(!opened)}>
+                {opened ? "Show fewer inputs" : `${hidden} more inputs`}
+              </button>
+            </li>
+          )}
         </ul>
       )}
 

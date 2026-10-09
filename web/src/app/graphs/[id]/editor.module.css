@@ -193,6 +193,19 @@
 .portLabel { color: var(--text); }
 .optional { color: var(--muted); font-size: 11px; }
 
+/* A card with many inputs shows the wired ones, and this opens the rest. */
+.portMore { padding: 3px 12px; }
+.moreInputs {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent, var(--muted));
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
 /* ---- results ---- */
 
 .result {
