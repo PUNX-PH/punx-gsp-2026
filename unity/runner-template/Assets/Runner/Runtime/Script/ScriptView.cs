@@ -237,8 +237,9 @@ namespace Runner.Scripting
                 {
                     camera.orthographic = false;
                     camera.fieldOfView = 60f;
-                    var baseSize = h / zoom;
-                    if (follow == null || !follow.Alive) cy -= h * 0.3f;
+                    // a third-person view sits close behind what it follows, whatever the length of the field: the field's height only sets the distance within a range
+                    var baseSize = Mathf.Clamp(h, 8f, 14f) / zoom;
+                    if (follow == null || !follow.Alive) cy -= Mathf.Min(h, 40f) * 0.3f;
                     t.position = new Vector3(cx, cz + baseSize * 0.45f, cy - baseSize * 0.5f);
                     t.LookAt(new Vector3(cx, cz, cy + baseSize * 0.4f));
                     break;
