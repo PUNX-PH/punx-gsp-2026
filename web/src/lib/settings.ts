@@ -97,7 +97,7 @@ export function rolesNeeded(s: GameSettings): string[] {
 /** Every file a run must have besides settings.json: the role files, then the scenery files, then the world's three, each name once. */
 export function filesNeeded(s: GameSettings): string[] {
   if (s.game) return entityFilesNeeded(s.game);
-  if (s.script) return [s.script.file, ...s.script.models.map(entityFile)];
+  if (s.script) return [s.script.file, ...s.script.models.map(entityFile), ...(s.environment?.scenery ?? [])];
   return [...new Set([...rolesNeeded(s), ...(s.environment?.scenery ?? []), ...(s.environment?.world ? WORLD_FILES : [])])];
 }
 

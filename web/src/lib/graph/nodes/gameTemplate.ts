@@ -51,12 +51,26 @@ function scriptSettings(game: Extract<WireValue, { type: "game"; script: string 
   const have = new Set(files.map((f) => f.file));
   const names = game.assets.map((a) => a.entity).filter((name) => have.has(entityFile(name)));
   const tuning: Tuning = { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 };
-  const checked = validateSettings(JSON.stringify({ schemaVersion: 1, template: "runner", palette: game.palette, roles: ROLE_FILES, tuning, script: { file: SCRIPT_FILE, models: names } }));
+  // A connected environment gives the game its world: the sky, the ground's color and scenery along the field (the scenery files go in the run under fixed names).
+  const world = inputs.environment?.type === "environment" ? inputs.environment : null;
+  const scenery = world ? world.scenery.slice(0, SCENERY_FILES.length).map((piece, index) => ({ file: SCENERY_FILES[index], sha256: piece.sha256 })) : [];
+  const environment = world && scenery.length > 0 ? { sky: world.sky, field: world.field, stripe: world.stripe, density: world.density, scenery: scenery.map((s) => s.file) } : undefined;
+  const checked = validateSettings(
+    JSON.stringify({ schemaVersion: 1, template: "runner", palette: game.palette, roles: ROLE_FILES, tuning, script: { file: SCRIPT_FILE, models: names }, ...(environment ? { environment } : {}) }),
+  );
   if (!checked.ok) throw new NodeError(`Game Template: ${checked.error}`);
   const needed = new Set(names.map(entityFile));
   const models = Object.fromEntries(ROLES.map((role): [Role, ModelSource] => [role, { kind: "builtin", role }])) as Record<Role, ModelSource>;
   return {
-    output: { type: "settings" as const, settingsText: checked.text, tuning, models, entityFiles: files.filter((f) => needed.has(f.file)), script: game.script },
+    output: {
+      type: "settings" as const,
+      settingsText: checked.text,
+      tuning,
+      models,
+      entityFiles: files.filter((f) => needed.has(f.file)),
+      script: game.script,
+      ...(scenery.length > 0 ? { scenery } : {}),
+    },
     result: { script: true, models: names.length },
   };
 }

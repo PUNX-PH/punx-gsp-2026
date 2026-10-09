@@ -34,6 +34,15 @@ describe("the graph made from one description", () => {
     expect(graph.nodes[1].params).toMatchObject({ kind: "freeform", description: "a coin (collectible)" });
   });
 
+  it("builds the world around the game too, from the person's own words, soft and wired into the template", () => {
+    const graph = generatedGraph({ words: "a fox in a snowy forest", assets: [asset("fox")] });
+    const world = graph.nodes.find((n) => n.id === "world");
+    expect(world).toMatchObject({ type: "build-environment", params: { theme: "a fox in a snowy forest", density: "lots", quality: "standard", soft: true } });
+    expect(graph.edges).toContainEqual({ from: { node: "world", port: "environment" }, to: { node: "template", port: "environment" } });
+    expect(graph.edges).toContainEqual({ from: { node: "n1", port: "palette" }, to: { node: "world", port: "palette" } });
+    expect(parseGraph(graph).ok).toBe(true);
+  });
+
   it("keeps at most the six models the template has inputs for, and cuts overlong words and descriptions", () => {
     const graph = generatedGraph({ words: "w".repeat(900), assets: Array.from({ length: 9 }, (_, i) => ({ ...asset(`m${i}`), description: "d".repeat(900) })) });
     expect(graph.nodes.filter((node) => node.type === "build-model")).toHaveLength(6);
@@ -47,7 +56,10 @@ describe("a soft model step", () => {
     "build-model": async () => {
       throw new NodeError("Build Model: The Blender service did not answer. Try again.");
     },
-    "game-template": async (inputs) => ({ result: { sawModel: inputs.model1 !== undefined } }),
+    "build-environment": async () => {
+      throw new NodeError("Build Environment: The Blender service did not answer. Try again.");
+    },
+    "game-template": async (inputs) => ({ result: { sawModel: inputs.model1 !== undefined, sawWorld: inputs.environment !== undefined } }),
     preview: async () => ({ result: { played: true } }),
   };
 
@@ -56,8 +68,15 @@ describe("a soft model step", () => {
     const run = await runGraph(graph, { executors, ctx: {} as ExecutorContext, log: () => {} });
     expect(run.state).toBe("done");
     expect(run.nodes.n2).toEqual({ state: "done", result: { notBuilt: "The Blender service did not answer. Try again." } });
-    expect(run.nodes.template.result).toEqual({ sawModel: false });
+    expect(run.nodes.template.result).toEqual({ sawModel: false, sawWorld: false });
     expect(run.nodes.preview.state).toBe("done");
+  });
+
+  it("is the same for the world around the game: a soft Build Environment that fails leaves the plain world and the game plays", async () => {
+    const graph = generatedGraph({ words: "x", assets: [asset("fox")] });
+    const run = await runGraph(graph, { executors, ctx: {} as ExecutorContext, log: () => {} });
+    expect(run.nodes.world).toEqual({ state: "done", result: { notBuilt: "The Blender service did not answer. Try again." } });
+    expect(run.state).toBe("done");
   });
 
   it("is hard when the person made it themselves (no soft setting)", async () => {

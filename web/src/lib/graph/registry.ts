@@ -152,7 +152,10 @@ function buildModelParams(params: Record<string, unknown>): string | null {
 export const MAX_THEME_CHARACTERS = 200;
 
 function buildEnvironmentParams(params: Record<string, unknown>): string | null {
-  if (!hasExactlyAndMaybeQuality(params, ["theme", "density"])) return "theme, density and quality are the only settings a Build Environment step has.";
+  // `soft` is optional and true only for a step the site made from a described game: if it fails, the game goes on with the plain world.
+  const { soft, ...rest } = params;
+  if (Object.hasOwn(params, "soft") && typeof soft !== "boolean") return "soft must be on or off.";
+  if (!hasExactlyAndMaybeQuality(rest, ["theme", "density"])) return "theme, density, quality and soft are the only settings a Build Environment step has.";
   const { theme, density } = params;
   if (typeof theme !== "string") return "theme must be text.";
   if (Array.from(theme).length > MAX_THEME_CHARACTERS) return `the theme is longer than ${MAX_THEME_CHARACTERS} characters.`;

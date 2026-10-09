@@ -203,6 +203,10 @@ function builtModel(result: unknown): ResultView | null {
 const WORLD_NAMES: Record<WorldStyle, string> = { desert: "Desert", meadow: "Meadow" };
 
 function builtEnvironment(result: unknown): ResultView | null {
+  const soft = result as { notBuilt?: unknown } | null | undefined;
+  if (typeof soft === "object" && soft !== null && typeof soft.notBuilt === "string") {
+    return { kind: "text", text: `Not built: ${soft.notBuilt} The game uses a plain world. Press Play again to try building it.` };
+  }
   const r = result as { sky?: unknown; field?: unknown; stripe?: unknown; scenery?: unknown; reused?: unknown; quality?: unknown; world?: unknown; triangles?: unknown; vertices?: unknown; size?: unknown } | null | undefined;
   if (typeof r !== "object" || r === null) return null;
   const { sky, field, stripe, scenery, reused, quality, world, triangles, vertices, size } = r;

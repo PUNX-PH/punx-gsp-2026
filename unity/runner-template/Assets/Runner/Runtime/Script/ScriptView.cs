@@ -108,7 +108,7 @@ namespace Runner.Scripting
             block.SetColor(BaseColor, field);
             groundRenderer.SetPropertyBlock(block);
             if (sceneryModels.Count == 0) return;
-            var half = Mathf.Max(0f, (float)Runner.World.Width / 2f - 4f); // the runner's scenery stands 7 to 9 m from the middle of a track 4 m from it
+            var half = Mathf.Max(0f, (float)Runner.World.Width / 2f - 5.5f); // the runner's scenery stands 7 or 9 m from the middle: moved out so it stands 1.5 or 3.5 m beyond this field's edge
             scenery = new EnvironmentView(root, sceneryModels, Color.white, Color.white, flat, spacing, false, half, -SceneryBias);
             scenery.SetSceneryDetail(2);
             sceneryShown = false;

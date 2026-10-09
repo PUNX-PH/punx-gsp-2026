@@ -232,6 +232,43 @@ describe("Preview with a script", () => {
     expect((await runs.readFile(user, runId, "entity-hero.mobile.glb")).bytes).toEqual(phone);
   });
 
+  it("a connected environment gives a script game its world: settings with the sky, the ground and the scenery, and the run holds the scenery files", async () => {
+    const SCENERY = "c".repeat(64);
+    const world: WireValue = { type: "environment", sky: 0, field: 3, stripe: 4, density: "some", scenery: [{ kind: "tree", sha256: SCENERY }, { kind: "rock", sha256: SCENERY }] };
+    let n = 0;
+    const runs = makeRunService({ records: new MemoryRunRecords(), files: new MemoryFileStore(), now: Date.now, newId: () => `run${++n}` });
+    let last: string | null = null;
+    const bytes = makeGlb({ asset: { version: "2.0" } });
+    const ctx = {
+      user,
+      runs,
+      lastRun: { get: () => last, set: (id: string | null) => void (last = id) },
+      readAsset: async (sha: string) => (sha === SHA || sha === SCENERY ? bytes : null),
+    } as unknown as ExecutorContext;
+
+    const made = await gameTemplate({ game: scriptWire([{ file: entityFile("hero"), sha256: SHA }]), environment: world }, {}, ctx);
+    if (made.output?.type !== "settings") throw new Error("expected settings");
+    const checked = validateSettings(made.output.settingsText);
+    if (!checked.ok) throw new Error(checked.error);
+    expect(checked.settings.environment).toEqual({ sky: 0, field: 3, stripe: 4, density: "some", scenery: ["scenery1.glb", "scenery2.glb"] });
+    expect(checked.settings.script).toEqual({ file: "game.lua", models: ["hero"] });
+    expect(filesNeeded(checked.settings)).toEqual(["game.lua", entityFile("hero"), "scenery1.glb", "scenery2.glb"]);
+    expect(made.output.scenery).toEqual([{ file: "scenery1.glb", sha256: SCENERY }, { file: "scenery2.glb", sha256: SCENERY }]);
+
+    const done = await preview({ settings: made.output }, {}, ctx);
+    const runId = (done.result as { runId: string }).runId;
+    const run = (await runs.listRuns(user)).find((r) => r.id === runId)!;
+    expect(run.status).toBe("ready");
+    expect(Object.keys(run.files).sort()).toEqual(["entity-hero.glb", "game.lua", "scenery1.glb", "scenery2.glb", "settings.json"]);
+  });
+
+  it("without an environment the settings are what they were: no environment, no scenery", async () => {
+    const made = await gameTemplate({ game: scriptWire([{ file: entityFile("hero"), sha256: SHA }]) }, {}, {} as ExecutorContext);
+    if (made.output?.type !== "settings") throw new Error("expected settings");
+    expect(JSON.parse(made.output.settingsText).environment).toBeUndefined();
+    expect(made.output.scenery).toBeUndefined();
+  });
+
   it("takes the phone variant from a numbered model input too", async () => {
     const MOBILE = "b".repeat(64);
     const model = { type: "model" as const, sha256: SHA, name: "freeform.glb", size: 1, format: "glb" as const, mobile: { sha256: MOBILE, size: 1 } };

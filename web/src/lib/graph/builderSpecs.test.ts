@@ -134,7 +134,7 @@ describe("Build Environment", () => {
   });
 
   it("refuses a missing, an extra or a renamed setting", () => {
-    const sentence = "theme, density and quality are the only settings a Build Environment step has.";
+    const sentence = "theme, density, quality and soft are the only settings a Build Environment step has.";
     for (const bad of [{}, { theme: "" }, { density: "some" }, settings({ extra: 1 }), { theme: "", densities: "some" }]) expect(world.shapeProblem(bad)).toBe(sentence);
   });
 
@@ -146,7 +146,7 @@ describe("Build Environment", () => {
   });
 
   it("checks the keys before the values", () => {
-    expect(world.shapeProblem({ theme: 5, density: "many", extra: true })).toBe("theme, density and quality are the only settings a Build Environment step has.");
+    expect(world.shapeProblem({ theme: 5, density: "many", extra: true })).toBe("theme, density, quality and soft are the only settings a Build Environment step has.");
     expect(world.shapeProblem({ theme: 5, density: "many" })).toBe("theme must be text.");
   });
 });
