@@ -28,6 +28,9 @@ function context(reply: () => Promise<BuiltEnvironment> = async () => built) {
     async buildModel() {
       throw new Error("not used");
     },
+    async buildScenery() {
+      throw new Error("not used");
+    },
     async buildEnvironment(job, input) {
       asked.push({ job, input });
       return reply();

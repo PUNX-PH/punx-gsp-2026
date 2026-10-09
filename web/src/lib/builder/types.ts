@@ -81,7 +81,16 @@ export interface BuiltEnvironment {
   world?: BuiltWorld;
 }
 
+/** What Build World hands the builder for one piece of scenery: its words, the game's palette and art style. */
+export interface BuildSceneryInput {
+  description: string;
+  palette: readonly string[];
+  style?: ArtStyle;
+}
+
 export interface BuilderService {
   buildModel(job: BlenderJob, input: BuildModelInput): Promise<BuiltModel>;
+  /** A piece of scenery for the world around a game: a freeform model built for the PC and the phone, standing still. */
+  buildScenery(job: BlenderJob, input: BuildSceneryInput): Promise<BuiltModel>;
   buildEnvironment(job: BlenderJob, input: BuildEnvironmentInput): Promise<BuiltEnvironment>;
 }

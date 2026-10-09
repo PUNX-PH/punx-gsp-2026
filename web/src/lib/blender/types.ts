@@ -102,7 +102,7 @@ export interface MadeResult {
 }
 
 /** Which step a build is for: it names the step in the sentences and the log. */
-export type BuildLabel = "Build Model" | "Build Environment";
+export type BuildLabel = "Build Model" | "Build Environment" | "Build World";
 
 /** The stored GLB a build hands on, with what the card shows. `reused` is true when the cache answered. */
 export interface BuiltResult {

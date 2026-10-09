@@ -44,7 +44,7 @@ const REFUSED = {
 } as const;
 
 interface Kind {
-  step: "prepare-model" | "make-shape" | "build-model" | "build-environment";
+  step: "prepare-model" | "make-shape" | "build-model" | "build-environment" | "build-world";
   label: "Prepare Model" | "Make Shape" | BuildLabel;
   /** A refusal of a file used the worker's time, so it stays counted. Anything else Blender refuses is the service's fault and is given back. */
   keepsCountOnRefusal: boolean;
@@ -61,7 +61,7 @@ const SHAPE: Kind = { step: "make-shape", label: "Make Shape", keepsCountOnRefus
 // A build has no file of the person's to blame: its words came from Claude or from defaults, so every refusal is given back, and only
 // two of them say more than "did not answer".
 const buildKind = (label: BuildLabel): Kind => ({
-  step: label === "Build Model" ? "build-model" : "build-environment",
+  step: label === "Build Model" ? "build-model" : label === "Build World" ? "build-world" : "build-environment",
   label,
   keepsCountOnRefusal: false,
   refusal: (code) =>

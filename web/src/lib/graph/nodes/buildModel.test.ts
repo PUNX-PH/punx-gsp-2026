@@ -29,6 +29,9 @@ function context(files: Record<string, Uint8Array> = { [PICTURE_SHA]: new Uint8A
       asked.push({ job, input });
       return reply();
     },
+    async buildScenery() {
+      throw new Error("not used");
+    },
     async buildEnvironment() {
       throw new Error("not used");
     },

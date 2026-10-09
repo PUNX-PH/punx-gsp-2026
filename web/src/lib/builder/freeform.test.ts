@@ -245,6 +245,32 @@ function setup(options: { designer?: ScriptedDesigner; failMobile?: Error } = {}
 
 const request = (extra: Partial<BuildModelInput> = {}): BuildModelInput => ({ role: "hero", kind: "freeform", description: "a little fox", motions: { run: "", jump: "", loop: "" }, picture: null, palette: SAMPLE_PALETTE, ...extra });
 
+describe("Build World's scenery", () => {
+  it("is designed as a piece of scenery (role scenery, no clips) and built for the PC and the phone, in the game's style", async () => {
+    const t = setup();
+    const built = await t.service.buildScenery(JOB, { description: "a snowy pine with three tiers", palette: SAMPLE_PALETTE, style: "cartoon" });
+    expect(t.designer.calls).toHaveLength(1);
+    expect(t.designer.calls[0].request).toMatchObject({ role: "scenery", style: "cartoon", description: "a snowy pine with three tiers" });
+    expect(t.calls.map((b) => [b.role, b.target, b.clips])).toEqual([["scenery", "pc", []], ["scenery", "mobile", []]]);
+    expect(built).toMatchObject({ kind: "freeform", clips: [], reused: false, mobile: { sha256: SHA_MOBILE } });
+  });
+
+  it("is asked for once: the same words in the same style reuse the design and the builds", async () => {
+    const t = setup();
+    await t.service.buildScenery(JOB, { description: "a hay bale", palette: SAMPLE_PALETTE });
+    const again = await t.service.buildScenery(JOB, { description: "a hay bale", palette: SAMPLE_PALETTE });
+    expect(t.designer.calls).toHaveLength(1);
+    expect(again.reused).toBe(true);
+  });
+
+  it("says Build World, not Build Model, when it cannot be built", async () => {
+    const t = setup();
+    await expect(t.service.buildScenery(JOB, { description: "  ", palette: SAMPLE_PALETTE })).rejects.toThrow("Build World: describe it first.");
+    const down = setup({ designer: new ScriptedDesigner() });
+    await expect(down.service.buildScenery(JOB, { description: "a lamp", palette: SAMPLE_PALETTE })).rejects.toThrow("Build World: The AI service did not answer. Try again.");
+  });
+});
+
 describe("Build Model with the freeform kind", () => {
   it("designs once, builds the PC and the mobile variants with the hero budget, and returns both", async () => {
     const t = setup();

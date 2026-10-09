@@ -31,8 +31,9 @@ import {
 import { fitMotionsToMeshes, repairEnvironment, repairModelRecipe, repairMotions } from "@/lib/builder/repair";
 import type { BuildEnvironmentInput, BuildModelInput, BuilderService, BuiltEnvironment, BuiltModel, BuiltPiece, BuiltWorld } from "@/lib/builder/types";
 import { pictureForModel } from "@/lib/graph/image";
+import type { ArtStyle } from "@/lib/builder/world";
 import { MIN_START_MS, RAN_OUT_OF_TIME, timeLeft } from "@/lib/graph/playTime";
-import { NodeError } from "@/lib/graph/types";
+import { NodeError, type Role } from "@/lib/graph/types";
 
 /** What the AI half needs. Without it, any words in the step's boxes stop with the plain "did not answer" sentence. */
 export interface BuilderAi {
@@ -59,13 +60,21 @@ export interface BuilderDeps {
 const STEP = "build-model";
 const NO_ANSWER = "The AI service did not answer. Try again.";
 
-type Call = "design" | "motion" | "environment";
+type Call = "design" | "motion" | "environment" | "scenery";
 // Each call belongs to a step, which is how its failures are logged and what every sentence it says starts with.
-const STEP_OF: Record<Call, string> = { design: STEP, motion: STEP, environment: "build-environment" };
-const LABEL_OF: Record<Call, string> = { design: "Build Model", motion: "Build Model", environment: "Build Environment" };
+const STEP_OF: Record<Call, string> = { design: STEP, motion: STEP, environment: "build-environment", scenery: "build-world" };
+const LABEL_OF: Record<Call, string> = { design: "Build Model", motion: "Build Model", environment: "Build Environment", scenery: "Build World" };
 
 /** Anything but "high" is Standard: a graph saved before the Quality setting has none. */
 const qualityOf = (quality: Quality | undefined): Quality => (quality === "high" ? "high" : "standard");
+
+/** What a freeform design and build need: the role (or "scenery"), the picture if there is one, the palette and the game's art style. */
+interface FreeformInput {
+  role: Role | "scenery";
+  picture: BuildModelInput["picture"];
+  palette: readonly string[];
+  style?: ArtStyle;
+}
 
 export function makeBuilderService(deps: BuilderDeps): BuilderService {
   const log = deps.log ?? (() => {});
@@ -184,20 +193,21 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
   async function designFreeformModel(
     ai: BuilderAi,
     job: Parameters<BuilderService["buildModel"]>[0],
-    input: BuildModelInput,
+    input: FreeformInput,
     description: string,
   ): Promise<{ recipe: FreeformRecipe; asked: boolean }> {
+    const call: Call = input.role === "scenery" ? "scenery" : "design";
     const key = await designKey({ model: ai.modelId, uid: job.user.uid, description, kind: "freeform", role: input.role, pictureSha: input.picture?.sha256 ?? null, ...(input.style ? { style: input.style } : {}) });
     const found = await ai.designs.get(key);
     if (found && isFreeformRecipe(found.value)) {
-      log({ step: STEP, call: "design", outcome: "reused" });
+      log({ step: STEP_OF[call], call, outcome: "reused" });
       return { recipe: found.value, asked: false };
     }
 
     const { value: recipe, usage } = await askClaude(
       ai,
       job,
-      "design",
+      call,
       async (timeoutMs) => {
         let picture: Uint8Array | null = null;
         if (input.picture) {
@@ -216,30 +226,32 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
     try {
       await ai.designs.put(key, { value: recipe, model: ai.modelId, createdAt: deps.now(), inputTokens: usage.inputTokens, outputTokens: usage.outputTokens });
     } catch {
-      log({ step: STEP, call: "design", outcome: "cache-write-failed" });
+      log({ step: STEP_OF[call], call, outcome: "cache-write-failed" });
     }
-    log({ step: STEP, call: "design", outcome: "answered", ...usage });
+    log({ step: STEP_OF[call], call, outcome: "answered", ...usage });
     return { recipe, asked: true };
   }
 
   /**
-   * A freeform model: designed from the words (there is no kit default to fall back on), then built twice, for the PC and for the phone (two cached
+   * A freeform model (or a piece of scenery, which is one too): designed from the words (there is no kit default to fall back on), then built twice, for the PC and for the phone (two cached
    * worker calls; the worker fits each to its triangle budget). It has no motions of its own: the worker puts the stock clips of its role on it
    * (a hero runs and jumps, a collectible turns, an obstacle stands still).
    */
-  async function buildFreeform(job: Parameters<BuilderService["buildModel"]>[0], input: BuildModelInput, description: string): Promise<BuiltModel> {
-    if (description === "") throw say("describe it first.");
-    if (!deps.ai) throw say(NO_ANSWER);
+  async function buildFreeform(job: Parameters<BuilderService["buildModel"]>[0], input: FreeformInput, description: string): Promise<BuiltModel> {
+    const scenery = input.role === "scenery";
+    const label = scenery ? "Build World" : "Build Model";
+    if (description === "") throw new NodeError(`${label}: describe it first.`);
+    if (!deps.ai) throw new NodeError(`${label}: ${NO_ANSWER}`);
     const { recipe, asked } = await designFreeformModel(deps.ai, job, input, description);
     const palette = [...input.palette];
-    const role = freeformRoleOf(input.role);
-    const clips = freeformClipsOf(input.role);
-    const pc = await deps.blender.build(job, { label: "Build Model", body: { recipe, palette, role, target: "pc", clips } });
+    const role = input.role === "scenery" ? "scenery" : freeformRoleOf(input.role);
+    const clips = input.role === "scenery" ? [] : freeformClipsOf(input.role);
+    const pc = await deps.blender.build(job, { label, body: { recipe, palette, role, target: "pc", clips } });
     // A phone variant that cannot be built (no time left, the day's builds used, a worker that did not answer) leaves the PC model: the Android export then
     // takes the PC file, which is what a run with no variant does.
     let mobile: Awaited<ReturnType<BlenderService["build"]>> | null = null;
     try {
-      mobile = await deps.blender.build(job, { label: "Build Model", body: { recipe, palette, role, target: "mobile", clips } });
+      mobile = await deps.blender.build(job, { label, body: { recipe, palette, role, target: "mobile", clips } });
     } catch (error) {
       if (!(error instanceof NodeError)) throw error;
       log({ step: STEP, call: "mobile", outcome: "skipped" });
@@ -251,7 +263,7 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
       parts: pc.parts,
       triangles: pc.triangles,
       clips: pc.clips,
-      summary: recipe.summary !== "" ? recipe.summary : "A custom model.",
+      summary: recipe.summary !== "" ? recipe.summary : scenery ? "A piece of scenery." : "A custom model.",
       skipped: [],
       reused: !asked && pc.reused && (mobile?.reused ?? true),
       ...(pc.vertices === undefined ? {} : { vertices: pc.vertices }),
@@ -410,6 +422,10 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
         reused: !askedLook && !askedMotion && built.reused,
         ...(high ? { quality, ...(built.vertices === undefined ? {} : { vertices: built.vertices }) } : {}),
       };
+    },
+
+    async buildScenery(job, input) {
+      return buildFreeform(job, { role: "scenery", picture: null, palette: input.palette, ...(input.style ? { style: input.style } : {}) }, cleanPrompt(input.description));
     },
 
     async buildEnvironment(job, input: BuildEnvironmentInput): Promise<BuiltEnvironment> {
