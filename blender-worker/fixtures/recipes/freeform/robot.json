@@ -1,0 +1,296 @@
+{
+ "recipe": {
+  "version": 2,
+  "kind": "model",
+  "summary": "A boxy grey robot with a dark visor, red eyes, bolts and an antenna.",
+  "materials": [
+   {
+    "color": 3,
+    "finish": "metal"
+   },
+   {
+    "color": 1,
+    "finish": "metal"
+   },
+   {
+    "color": 0,
+    "finish": "metal"
+   },
+   {
+    "color": 2,
+    "finish": "glow"
+   },
+   {
+    "color": 2,
+    "finish": "painted"
+   }
+  ],
+  "parts": [
+   {
+    "shape": "box",
+    "at": [
+     0,
+     0.95,
+     0
+    ],
+    "size": [
+     0.8,
+     0.75,
+     0.55
+    ],
+    "material": 0,
+    "bevel": 0.14
+   },
+   {
+    "shape": "box",
+    "at": [
+     0,
+     0.95,
+     0.285
+    ],
+    "size": [
+     0.5,
+     0.4,
+     0.04
+    ],
+    "material": 4,
+    "bevel": 0.2
+   },
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0,
+     0.97,
+     0.31
+    ],
+    "size": [
+     0.14,
+     0.14,
+     0.05
+    ],
+    "material": 3
+   },
+   {
+    "shape": "box",
+    "at": [
+     0,
+     0.5,
+     0
+    ],
+    "size": [
+     0.5,
+     0.2,
+     0.4
+    ],
+    "material": 2,
+    "bevel": 0.2
+   },
+   {
+    "shape": "box",
+    "at": [
+     0,
+     1.62,
+     0.02
+    ],
+    "size": [
+     0.62,
+     0.5,
+     0.5
+    ],
+    "material": 1,
+    "bevel": 0.25
+   },
+   {
+    "shape": "box",
+    "at": [
+     0,
+     1.62,
+     0.27
+    ],
+    "size": [
+     0.5,
+     0.26,
+     0.05
+    ],
+    "material": 2,
+    "bevel": 0.3
+   },
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0.12,
+     1.62,
+     0.3
+    ],
+    "size": [
+     0.1,
+     0.1,
+     0.04
+    ],
+    "material": 3,
+    "mirror": true
+   },
+   {
+    "shape": "cylinder",
+    "taper": 1,
+    "at": [
+     0,
+     1.98,
+     0
+    ],
+    "size": [
+     0.035,
+     0.28,
+     0.035
+    ],
+    "material": 2,
+    "detail": 1
+   },
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0,
+     2.14,
+     0
+    ],
+    "size": [
+     0.1,
+     0.1,
+     0.1
+    ],
+    "material": 3
+   },
+   {
+    "shape": "capsule",
+    "at": [
+     0.55,
+     0.95,
+     0
+    ],
+    "size": [
+     0.18,
+     0.7,
+     0.2
+    ],
+    "material": 1,
+    "mirror": true
+   },
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0.55,
+     1.32,
+     0
+    ],
+    "size": [
+     0.3,
+     0.26,
+     0.3
+    ],
+    "material": 4,
+    "mirror": true
+   },
+   {
+    "shape": "box",
+    "at": [
+     0.55,
+     0.52,
+     0.04
+    ],
+    "size": [
+     0.24,
+     0.2,
+     0.28
+    ],
+    "material": 2,
+    "bevel": 0.25,
+    "mirror": true
+   },
+   {
+    "shape": "box",
+    "at": [
+     0.2,
+     0.22,
+     0
+    ],
+    "size": [
+     0.22,
+     0.4,
+     0.26
+    ],
+    "material": 0,
+    "bevel": 0.2,
+    "mirror": true
+   },
+   {
+    "shape": "box",
+    "at": [
+     0.2,
+     0.06,
+     0.1
+    ],
+    "size": [
+     0.3,
+     0.12,
+     0.46
+    ],
+    "material": 2,
+    "bevel": 0.3,
+    "mirror": true
+   },
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0.4,
+     1.12,
+     0.29
+    ],
+    "size": [
+     0.05,
+     0.05,
+     0.03
+    ],
+    "material": 1,
+    "mirror": true
+   },
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0.4,
+     0.78,
+     0.29
+    ],
+    "size": [
+     0.05,
+     0.05,
+     0.03
+    ],
+    "material": 1,
+    "mirror": true
+   },
+   {
+    "shape": "torus",
+    "at": [
+     0.55,
+     0.78,
+     0
+    ],
+    "size": [
+     0.24,
+     0.1,
+     0.24
+    ],
+    "thickness": 0.35,
+    "material": 2,
+    "mirror": true
+   }
+  ]
+ },
+ "palette": [
+  "#12151c",
+  "#a7b0bf",
+  "#e0453f",
+  "#5d6779",
+  "#ffd166"
+ ]
+}

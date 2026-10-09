@@ -1,0 +1,320 @@
+{
+ "recipe": {
+  "version": 2,
+  "kind": "model",
+  "summary": "A small orange fox with a bushy tail and big ears.",
+  "materials": [
+   {
+    "color": 1,
+    "finish": "matte"
+   },
+   {
+    "color": 2,
+    "finish": "matte"
+   },
+   {
+    "color": 0,
+    "finish": "matte"
+   },
+   {
+    "color": 3,
+    "finish": "matte"
+   }
+  ],
+  "parts": [
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0,
+     0.48,
+     -0.02
+    ],
+    "size": [
+     0.5,
+     0.46,
+     1
+    ],
+    "material": 0,
+    "detail": 3
+   },
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0,
+     0.56,
+     0.38
+    ],
+    "size": [
+     0.4,
+     0.42,
+     0.46
+    ],
+    "material": 0,
+    "detail": 3
+   },
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0,
+     0.4,
+     0.4
+    ],
+    "size": [
+     0.3,
+     0.3,
+     0.4
+    ],
+    "material": 1,
+    "detail": 3
+   },
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0,
+     0.68,
+     0.6
+    ],
+    "size": [
+     0.4,
+     0.34,
+     0.4
+    ],
+    "material": 0,
+    "detail": 3
+   },
+   {
+    "shape": "loft",
+    "at": [
+     0,
+     0.6,
+     0
+    ],
+    "size": [
+     1,
+     1,
+     1
+    ],
+    "material": 0,
+    "detail": 3,
+    "sections": [
+     {
+      "z": 0.66,
+      "w": 0.26,
+      "h": 0.2
+     },
+     {
+      "z": 0.84,
+      "w": 0.2,
+      "h": 0.15
+     },
+     {
+      "z": 0.98,
+      "w": 0.1,
+      "h": 0.08
+     },
+     {
+      "z": 1.02,
+      "w": 0,
+      "h": 0
+     }
+    ]
+   },
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0,
+     0.61,
+     1
+    ],
+    "size": [
+     0.08,
+     0.065,
+     0.07
+    ],
+    "material": 2
+   },
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0.1,
+     0.62,
+     0.8
+    ],
+    "size": [
+     0.1,
+     0.1,
+     0.2
+    ],
+    "material": 1,
+    "mirror": true,
+    "detail": 2
+   },
+   {
+    "shape": "cylinder",
+    "taper": 0,
+    "at": [
+     0.14,
+     0.93,
+     0.5
+    ],
+    "size": [
+     0.17,
+     0.3,
+     0.09
+    ],
+    "material": 0,
+    "mirror": true,
+    "rot": [
+     -10,
+     0,
+     -14
+    ],
+    "detail": 2
+   },
+   {
+    "shape": "cylinder",
+    "taper": 0,
+    "at": [
+     0.14,
+     0.9,
+     0.53
+    ],
+    "size": [
+     0.09,
+     0.19,
+     0.04
+    ],
+    "material": 2,
+    "mirror": true,
+    "rot": [
+     -10,
+     0,
+     -14
+    ],
+    "detail": 2
+   },
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0.12,
+     0.72,
+     0.8
+    ],
+    "size": [
+     0.06,
+     0.075,
+     0.05
+    ],
+    "material": 2,
+    "mirror": true
+   },
+   {
+    "shape": "capsule",
+    "at": [
+     0.15,
+     0.22,
+     0.38
+    ],
+    "size": [
+     0.15,
+     0.4,
+     0.16
+    ],
+    "material": 0,
+    "mirror": true
+   },
+   {
+    "shape": "capsule",
+    "at": [
+     0.16,
+     0.24,
+     -0.32
+    ],
+    "size": [
+     0.17,
+     0.4,
+     0.19
+    ],
+    "material": 0,
+    "mirror": true
+   },
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0.15,
+     0.05,
+     0.42
+    ],
+    "size": [
+     0.15,
+     0.1,
+     0.22
+    ],
+    "material": 3,
+    "mirror": true
+   },
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0.16,
+     0.05,
+     -0.28
+    ],
+    "size": [
+     0.17,
+     0.1,
+     0.25
+    ],
+    "material": 3,
+    "mirror": true
+   },
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0,
+     0.62,
+     -0.78
+    ],
+    "size": [
+     0.3,
+     0.3,
+     0.78
+    ],
+    "material": 0,
+    "rot": [
+     32,
+     0,
+     0
+    ],
+    "detail": 3
+   },
+   {
+    "shape": "ellipsoid",
+    "at": [
+     0,
+     0.86,
+     -1.18
+    ],
+    "size": [
+     0.24,
+     0.24,
+     0.36
+    ],
+    "material": 1,
+    "rot": [
+     32,
+     0,
+     0
+    ],
+    "detail": 3
+   }
+  ]
+ },
+ "palette": [
+  "#2b1d14",
+  "#e8772e",
+  "#f4ede0",
+  "#4a3426",
+  "#fff4dc"
+ ]
+}
