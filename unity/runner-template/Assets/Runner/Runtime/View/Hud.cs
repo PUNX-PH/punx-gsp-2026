@@ -32,11 +32,14 @@ namespace Runner.View
             if (ShowFps && Time.unscaledDeltaTime > 0f) fps = Mathf.Lerp(fps, 1f / Time.unscaledDeltaTime, 0.05f);
         }
 
+        /// <summary>One unit of the interface: a hundredth of the height, but no more than 1.5 hundredths of the width, so a tall narrow frame (a phone held upright, a panel beside the editor) gets smaller text, not text wider than the screen.</summary>
+        public static float UnitFor(float width, float height) => Mathf.Max(8f, Mathf.Min(height, width * 1.5f) / 100f);
+
         void OnGUI()
         {
             if (style == null) style = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = true, fontStyle = FontStyle.Bold };
             var screen = new Rect(0f, 0f, Screen.width, Screen.height);
-            var unit = Mathf.Max(12f, Screen.height / 100f); // one percent of the height: sizes and gaps are in these, so the interface scales with the screen
+            var unit = UnitFor(Screen.width, Screen.height); // sizes and gaps are in these, so the interface scales with the screen
 
             if (ErrorMessage != null)
             {
@@ -81,14 +84,14 @@ namespace Runner.View
             var hint = lines.Length > 1 && lines[lines.Length - 1].StartsWith("Tap") ? lines[lines.Length - 1] : "";
             var detail = lines.Length > 2 || (lines.Length == 2 && hint == "") ? string.Join("\n", lines, 1, lines.Length - 1 - (hint == "" ? 0 : 1)) : "";
 
-            var width = Mathf.Min(screen.width * 0.82f, unit * 52f);
+            var width = Mathf.Min(screen.width * 0.88f, unit * 52f);
             var height = unit * (hint == "" ? 20f : 24f) + (detail == "" ? 0f : unit * 4f);
             var panel = new Rect((screen.width - width) / 2f, (screen.height - height) / 2f, width, height);
             UiKit.Box(new Rect(panel.x, panel.y + unit * 0.8f, panel.width, panel.height), new Color(0f, 0f, 0f, 0.28f)); // a soft drop shadow
             UiKit.Box(panel, PanelColor);
 
             var y = panel.y + unit * 2.4f;
-            Text(new Rect(panel.x, y, panel.width, unit * 9f), title, 6.4f * unit, PanelTextColor, FontStyle.Bold, TextAnchor.MiddleCenter, false);
+            Text(new Rect(panel.x + unit * 2f, y, panel.width - unit * 4f, unit * 9f), title, 6.4f * unit, PanelTextColor, FontStyle.Bold, TextAnchor.MiddleCenter, false, true);
             y += unit * 9.5f;
             if (detail != "")
             {
@@ -106,16 +109,24 @@ namespace Runner.View
             GUI.color = old;
         }
 
-        void Text(Rect rect, string text, float size, Color color, FontStyle fontStyle, TextAnchor anchor = TextAnchor.MiddleCenter, bool shadow = true)
+        void Text(Rect rect, string text, float size, Color color, FontStyle fontStyle, TextAnchor anchor = TextAnchor.MiddleCenter, bool shadow = true, bool fit = false)
         {
             style.fontSize = Mathf.Max(10, Mathf.RoundToInt(size));
             style.fontStyle = fontStyle;
+            if (fit)
+            {
+                // one line, made smaller until it fits the width it was given
+                style.wordWrap = false;
+                var content = new GUIContent(text);
+                for (var i = 0; i < 16 && style.fontSize > 10 && style.CalcSize(content).x > rect.width; i++) style.fontSize = Mathf.Max(10, Mathf.FloorToInt(style.fontSize * 0.92f));
+            }
             style.alignment = anchor;
             style.normal.textColor = color;
             if (shadow) UiKit.Label(rect, text, style);
             else GUI.Label(rect, text, style);
             style.fontStyle = FontStyle.Bold;
             style.alignment = TextAnchor.MiddleCenter;
+            style.wordWrap = true;
         }
 
         void Label(Rect rect, string text, Color color)
