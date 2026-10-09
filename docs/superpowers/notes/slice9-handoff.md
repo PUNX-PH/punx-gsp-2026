@@ -83,3 +83,13 @@ So the claim "the runner plays rig clips" is now verified. Still not run in Unit
 **Players rebuilt (2026-10-09, `tools/build-players.ps1 -Platform both`, both "Build Finished, Result: Success"):** `Builds/upload/windows.zip` (35.8 MB; a real zip made with Windows' `tar.exe -a -c` from `Builds/player-windows`, forward-slash entries, the `*DoNotShip*` Burst folder excluded; **not** Git Bash's GNU `tar`, which writes a plain tar
 named .zip) and `android.apk` (30.0 MB, from `Builds/player-android/Runner.apk`), `players.json` unchanged. There is no Unity runtime change in slice 9, so the players differ from slice 8's only by the new `sample-freeform` StreamingAssets. **Not uploaded** to `gs://punx-gsp-players`
 (the studio uploads through the Cloud Console; ask first), and the packager is not redeployed.
+
+## Made games look lit and 3D by default (2026-10-09; the user's steer: "users prompt, we attach what quality needs")
+
+Seen in a screenshot of the live Frogger-style game: Claude asked for no models and the player drew flat unlit boxes. Fixes, none needing the person or Claude to ask:
+- **Prompt** (`web/src/lib/script/prompts.ts`): make the game 3D unless the person asks for 2D, flat, side-scrolling or pixel art (a "top-down" game is the top camera, 3D); ask for a model for every character and important object (the player first, then enemies, pickups, vehicles, animals, obstacles), primitives only for terrain, floors, water, walls and scenery.
+  `SCRIPT_VERSION` is 2, so earlier cached games (like "Reused your earlier result") are asked again.
+- **Unity player:** a made game (script or rules) is now always lit: `BootScript` and `BootGame` use `Runner/Lit` for the models and the primitives and apply the meadow's sun, sky and fog (`WorldLook`). The ground plane's triangles faced down and a lit shader culled it, so it was
+  invisible from above (`PrimitiveMeshes` plane, fixed; its colour is lighter); ground cameras (top, chase) get a daytime sky tinted by the palette; objects never sink below the ground (a script that leaves z at 0 still rests on it).
+  Seen by eye with a throwaway PlayMode probe that rendered the 3D lane runner with the freeform fox and crate (screenshots in the session scratchpad, not committed). Tests: `MadeGameLookTests` (4, all fail without the change); PlayMode 37, EditMode 346 of 349 as before.
+- **Still the player's flat Frogger-like look:** the 2D cameras (side2d, top2d) stay flat orthographic with the dark backdrop. The WebGL templates must be rebuilt and published (`tools/build-webgl.ps1`, `tools/publish-template.ps1`) and the Windows and Android players rebuilt and uploaded for it to show everywhere.
