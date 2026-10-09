@@ -74,3 +74,8 @@ Left as they are: the 8192-token cap on Claude's answer (a huge recipe shows as 
 `Unity.exe -batchmode -projectPath unity/runner-template -runTests -testPlatform EditMode|PlayMode` on 6000.3.25f1, from the slice 9 branch: **EditMode 349 tests, 346 passed, 0 failed, 3 skipped** (the `[Ignore]`d LiveScriptsTests and two Explicit
 WinnabilityGoldenTests, by design; 328 s); **PlayMode 28 of 28 passed** (12 s). No tracked file changed and no `.meta` file was missing. Still not run in Unity: a rigged freeform GLB playing its Run clip in the runner (needs a PlayMode test that loads one), the
 rebuilt WebGL template and the Windows and Android players (`tools/build-players.ps1`), the phone budgets.
+
+**Freeform in the Unity player (2026-10-09): checked.** `Assets/Runner/Tests/PlayMode/FreeformModelTests.cs` and `Assets/StreamingAssets/sample-freeform` (hero.glb the rigged quadruped fox from `fox-rigged.json`, obstacle.glb the crate, coin.glb the spaceship; all made by
+`build.py` itself, PC target; settings.json like sample-built): PlayMode is now **33 of 33**. The tests show glTFast imports a node for every joint and a mesh for each (head, tail, four legs), the player takes the hero's Run and Jump, the legs really trot (a front leg against the
+other front leg and against the back leg on its own side, correlation under -0.3), the legs stay attached while they swing, Jump follows the air progress and Run returns, a collectible plays Loop and a crate has no clips. **Mutation:** with an un-rigged fox as the hero 4 of the 5 fail.
+So the claim "the runner plays rig clips" is now verified. Still not run in Unity: the rebuilt templates and players, the phone budgets.
