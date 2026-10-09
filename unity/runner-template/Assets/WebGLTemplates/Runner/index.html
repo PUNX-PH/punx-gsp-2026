@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes">
-    <title>runner-template</title>
+    <title>{{{ PRODUCT_NAME }}}</title>
     <style>
       html, body { margin: 0; height: 100%; overflow: hidden; background: #0e1016; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
       #unity-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; background: #0e1016; outline: none; }
@@ -34,18 +34,18 @@
       var buildUrl = "Build";
       var config = {
         arguments: [],
-        dataUrl: buildUrl + "/runner-desktop.data.unityweb",
-        frameworkUrl: buildUrl + "/runner-desktop.framework.js.unityweb",
-        codeUrl: buildUrl + "/runner-desktop.wasm.unityweb",
+        dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
+        frameworkUrl: buildUrl + "/{{{ FRAMEWORK_FILENAME }}}",
+        codeUrl: buildUrl + "/{{{ CODE_FILENAME }}}",
         streamingAssetsUrl: "StreamingAssets",
-        companyName: "DefaultCompany",
-        productName: "runner-template",
-        productVersion: "0.1.0",
+        companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+        productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+        productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
         showBanner: unityShowBanner,
       };
 
       var script = document.createElement("script");
-      script.src = buildUrl + "/runner-desktop.loader.js";
+      script.src = buildUrl + "/{{{ LOADER_FILENAME }}}";
       script.onload = function () {
         createUnityInstance(canvas, config, function (progress) {
           document.querySelector("#unity-bar-fill").style.width = Math.max(4, 100 * progress) + "%";

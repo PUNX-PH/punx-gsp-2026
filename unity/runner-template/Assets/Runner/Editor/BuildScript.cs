@@ -72,6 +72,7 @@ namespace Runner.EditorTools
             EnsureScene();
             EnsureShadersIncluded("Runner/Flat", "Runner/Lit", "Runner/Sky", "Runner/BlobShadow");
 
+            PlayerSettings.WebGL.template = "PROJECT:Runner"; // our own page around the canvas (Assets/WebGLTemplates/Runner): no Unity logo or footer, the game fills the frame
             PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Brotli;
             PlayerSettings.WebGL.decompressionFallback = true; // any static server can host the build
             // Disk size without link-time optimization: LTO took over 14 minutes just to link, per target.

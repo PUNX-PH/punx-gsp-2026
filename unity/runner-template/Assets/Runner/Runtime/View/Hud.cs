@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Runner.View
 {
-    /// <summary>Score, game-over panel, fps and errors, drawn with IMGUI so it needs no assets.</summary>
+    /// <summary>Score, game-over panel, loading screen, fps and errors, drawn with IMGUI so it needs no assets (the rounded shapes are made in code, see <see cref="UiKit"/>).</summary>
     public sealed class Hud : MonoBehaviour
     {
         public bool Loading = true;
@@ -12,13 +12,15 @@ namespace Runner.View
         public bool ShowFps;
         public int QualityLevel; // shown beside the fps with debug=1
         public string Subtitle; // a line under the score (an engine game shows its lives here); none when null
-        public string EndText = "Game over\nTap to restart"; // what the end panel says
+        public string EndText = "Game over\nTap to restart"; // what the end panel says: a title, then optional lines, the last of which may be the hint to play again
         public Color PanelColor = new Color(0.2f, 0.2f, 0.3f);
         public Color PanelTextColor = Color.white;
         public Color ScoreColor = Color.white;
 
-        static readonly Color ErrorBackground = new Color(0.48f, 0.12f, 0.12f);
-        static readonly Color LoadingBackground = new Color(0.1f, 0.1f, 0.15f);
+        // IMGUI colors are read as linear in this project: the page's #0e1016 and the error red are given in sRGB and converted, so the loading screen is the page's own color
+        static readonly Color ErrorBackground = new Color(0.1f, 0.06f, 0.07f).linear;
+        static readonly Color LoadingBackground = new Color(0.055f, 0.063f, 0.086f).linear; // the page around the game is the same color, so nothing flashes
+        static readonly Color Pill = new Color(0f, 0f, 0f, 0.42f);
 
         GUIStyle style;
         float fps = 60f;
@@ -32,20 +34,21 @@ namespace Runner.View
 
         void OnGUI()
         {
-            if (style == null) style = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = true };
-            style.fontSize = Mathf.Max(14, Screen.height / 20);
+            if (style == null) style = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = true, fontStyle = FontStyle.Bold };
             var screen = new Rect(0f, 0f, Screen.width, Screen.height);
+            var unit = Mathf.Max(12f, Screen.height / 100f); // one percent of the height: sizes and gaps are in these, so the interface scales with the screen
 
             if (ErrorMessage != null)
             {
                 Fill(screen, ErrorBackground);
-                Label(new Rect(screen.width * 0.05f, 0f, screen.width * 0.9f, screen.height), ErrorMessage, Color.white);
+                Text(new Rect(screen.width * 0.08f, 0f, screen.width * 0.84f, screen.height), ErrorMessage, 3.2f * unit, new Color(1f, 0.82f, 0.8f), FontStyle.Normal);
                 return;
             }
             if (Loading)
             {
                 Fill(screen, LoadingBackground);
-                Label(screen, "Loading", Color.white);
+                var dots = new string('.', 1 + (int)(Time.realtimeSinceStartup * 2.5f) % 3);
+                Text(new Rect(0f, 0f, screen.width, screen.height), "Making your game" + dots, 2.8f * unit, new Color(0.78f, 0.8f, 0.86f), FontStyle.Normal);
                 return;
             }
 
@@ -54,30 +57,72 @@ namespace Runner.View
                 shownScore = Score;
                 scoreText = Score.ToString();
             }
-            Label(new Rect(0f, screen.height * 0.03f, screen.width, screen.height * 0.12f), scoreText, ScoreColor);
 
-            if (!string.IsNullOrEmpty(Subtitle)) Label(new Rect(0f, screen.height * 0.13f, screen.width, screen.height * 0.08f), Subtitle, ScoreColor);
+            // the score: a small pill at the top middle
+            var scoreSize = 4.4f * unit;
+            style.fontSize = Mathf.RoundToInt(scoreSize);
+            var scoreWidth = Mathf.Max(scoreSize * 2.6f, style.CalcSize(new GUIContent(scoreText)).x + scoreSize * 1.6f);
+            var scoreRect = new Rect((screen.width - scoreWidth) / 2f, unit * 2f, scoreWidth, scoreSize * 1.7f);
+            UiKit.Box(scoreRect, Pill);
+            Label(scoreRect, scoreText, ScoreColor);
 
-            if (GameOver)
+            if (!string.IsNullOrEmpty(Subtitle)) Text(new Rect(0f, scoreRect.yMax + unit * 0.5f, screen.width, 3.4f * unit * 1.6f), Subtitle, 3.2f * unit, ScoreColor, FontStyle.Normal);
+
+            if (GameOver) DrawEnd(screen, unit);
+            if (ShowFps) Text(new Rect(unit, screen.height - 5f * unit, screen.width * 0.4f, 4f * unit), fps.ToString("0") + " fps, quality " + QualityLevel, 2.6f * unit, ScoreColor, FontStyle.Normal, TextAnchor.MiddleLeft);
+        }
+
+        // Dim the scene, then a rounded panel with the outcome large, a line of detail, and the hint to play again quiet at the bottom.
+        void DrawEnd(Rect screen, float unit)
+        {
+            Fill(screen, new Color(0f, 0f, 0f, 0.5f));
+            var lines = (EndText ?? "").Split('\n');
+            var title = lines.Length > 0 ? lines[0] : "";
+            var hint = lines.Length > 1 && lines[lines.Length - 1].StartsWith("Tap") ? lines[lines.Length - 1] : "";
+            var detail = lines.Length > 2 || (lines.Length == 2 && hint == "") ? string.Join("\n", lines, 1, lines.Length - 1 - (hint == "" ? 0 : 1)) : "";
+
+            var width = Mathf.Min(screen.width * 0.82f, unit * 52f);
+            var height = unit * (hint == "" ? 20f : 24f) + (detail == "" ? 0f : unit * 4f);
+            var panel = new Rect((screen.width - width) / 2f, (screen.height - height) / 2f, width, height);
+            UiKit.Box(new Rect(panel.x, panel.y + unit * 0.8f, panel.width, panel.height), new Color(0f, 0f, 0f, 0.28f)); // a soft drop shadow
+            UiKit.Box(panel, PanelColor);
+
+            var y = panel.y + unit * 2.4f;
+            Text(new Rect(panel.x, y, panel.width, unit * 9f), title, 6.4f * unit, PanelTextColor, FontStyle.Bold, TextAnchor.MiddleCenter, false);
+            y += unit * 9.5f;
+            if (detail != "")
             {
-                var panel = new Rect(screen.width * 0.15f, screen.height * 0.35f, screen.width * 0.7f, screen.height * 0.3f);
-                Fill(panel, PanelColor);
-                Label(panel, EndText, PanelTextColor);
+                Text(new Rect(panel.x + unit * 2f, y, panel.width - unit * 4f, unit * 6f), detail, 3.2f * unit, new Color(PanelTextColor.r, PanelTextColor.g, PanelTextColor.b, 0.9f), FontStyle.Normal, TextAnchor.MiddleCenter, false);
+                y += unit * 6.5f;
             }
-            if (ShowFps) Label(new Rect(0f, screen.height * 0.9f, screen.width * 0.3f, screen.height * 0.1f), fps.ToString("0") + " fps, quality " + QualityLevel, ScoreColor);
+            if (hint != "") Text(new Rect(panel.x, panel.yMax - unit * 7.5f, panel.width, unit * 5f), hint, 2.8f * unit, new Color(PanelTextColor.r, PanelTextColor.g, PanelTextColor.b, 0.7f), FontStyle.Normal, TextAnchor.MiddleCenter, false);
         }
 
         static void Fill(Rect rect, Color color)
         {
+            var old = GUI.color;
             GUI.color = color;
             GUI.DrawTexture(rect, Texture2D.whiteTexture);
-            GUI.color = Color.white;
+            GUI.color = old;
+        }
+
+        void Text(Rect rect, string text, float size, Color color, FontStyle fontStyle, TextAnchor anchor = TextAnchor.MiddleCenter, bool shadow = true)
+        {
+            style.fontSize = Mathf.Max(10, Mathf.RoundToInt(size));
+            style.fontStyle = fontStyle;
+            style.alignment = anchor;
+            style.normal.textColor = color;
+            if (shadow) UiKit.Label(rect, text, style);
+            else GUI.Label(rect, text, style);
+            style.fontStyle = FontStyle.Bold;
+            style.alignment = TextAnchor.MiddleCenter;
         }
 
         void Label(Rect rect, string text, Color color)
         {
+            style.alignment = TextAnchor.MiddleCenter;
             style.normal.textColor = color;
-            GUI.Label(rect, text, style);
+            UiKit.Label(rect, text, style);
         }
     }
 }

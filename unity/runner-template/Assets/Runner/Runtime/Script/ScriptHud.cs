@@ -1,3 +1,4 @@
+using Runner.View;
 using UnityEngine;
 
 namespace Runner.Scripting
@@ -12,7 +13,7 @@ namespace Runner.Scripting
         void OnGUI()
         {
             if (View == null || View.Failed || View.Runner == null) return;
-            if (style == null) style = new GUIStyle(GUI.skin.label) { wordWrap = false, clipping = TextClipping.Overflow };
+            if (style == null) style = new GUIStyle(GUI.skin.label) { wordWrap = false, clipping = TextClipping.Overflow, fontStyle = FontStyle.Bold };
             var width = (float)Screen.width;
             var height = (float)Screen.height;
             foreach (var e in View.Runner.Api.Ui)
@@ -21,9 +22,9 @@ namespace Runner.Scripting
                 if (e.IsBar)
                 {
                     var rect = new Rect((float)e.X * width, (float)e.Y * height, (float)e.W * width, (float)e.H * height);
-                    Fill(rect, new Color(0f, 0f, 0f, 0.5f));
+                    UiKit.Box(rect, new Color(0f, 0f, 0f, 0.45f));
                     var fraction = e.Max > 0 ? Mathf.Clamp01((float)(e.Value / e.Max)) : 0f;
-                    Fill(new Rect(rect.x, rect.y, rect.width * fraction, rect.height), color);
+                    if (fraction > 0f) UiKit.Box(new Rect(rect.x, rect.y, Mathf.Max(rect.height, rect.width * fraction), rect.height), color);
                     continue;
                 }
                 style.fontSize = Mathf.Max(10, Mathf.RoundToInt((float)e.Size * height));
@@ -35,15 +36,15 @@ namespace Runner.Scripting
                 {
                     case "center":
                         style.alignment = TextAnchor.UpperCenter;
-                        GUI.Label(new Rect(x - width / 2f, y, width, lineHeight), e.Text, style);
+                        UiKit.Label(new Rect(x - width / 2f, y, width, lineHeight), e.Text, style);
                         break;
                     case "right":
                         style.alignment = TextAnchor.UpperRight;
-                        GUI.Label(new Rect(x - width, y, width, lineHeight), e.Text, style);
+                        UiKit.Label(new Rect(x - width, y, width, lineHeight), e.Text, style);
                         break;
                     default:
                         style.alignment = TextAnchor.UpperLeft;
-                        GUI.Label(new Rect(x, y, width, lineHeight), e.Text, style);
+                        UiKit.Label(new Rect(x, y, width, lineHeight), e.Text, style);
                         break;
                 }
             }
