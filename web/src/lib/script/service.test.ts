@@ -226,6 +226,30 @@ describe("the script service", () => {
     expect(text).toContain("asked");
   });
 
+  describe("the art style and the world Claude plans", () => {
+    const one = async (extra: Record<string, unknown>) => (await make([answer(GOOD, extra)]).service.create(job, input));
+
+    it("keeps a style from the list, and falls back to stylized for anything else", async () => {
+      expect((await one({ style: "cartoon" })).style).toBe("cartoon");
+      expect((await one({ style: "photoreal" })).style).toBe("stylized");
+      expect((await one({})).style).toBe("stylized");
+    });
+
+    it("reads the world: palette slots 1 to 5 become indexes 0 to 4, scenery is cleaned and capped at four, empty pieces dropped", async () => {
+      const r = await one({
+        world: { sky: 5, ground: 2, scenery: [{ description: "a snowy pine" }, { description: "   " }, { description: "a neon sign" }, { description: "a" }, { description: "b" }, { description: "c" }] },
+      });
+      expect(r.world).toEqual({ sky: 4, ground: 1, scenery: [{ description: "a snowy pine" }, { description: "a neon sign" }, { description: "a" }, { description: "b" }] });
+    });
+
+    it("clamps wild slots, and has no world when Claude planned none", async () => {
+      expect((await one({ world: { sky: 99, ground: -4, scenery: [] } })).world).toEqual({ sky: 4, ground: 0, scenery: [] });
+      expect((await one({ world: { scenery: [] } })).world).toBeNull();
+      expect((await one({ world: "a forest" })).world).toBeNull();
+      expect((await one({})).world).toBeNull();
+    });
+  });
+
   describe("the models Claude asks for", () => {
     const base = { entity: "hero", role: "hero", kind: "biped", description: "a red fox" };
     const script = (names: string[]) => `${GOOD}\nfunction extra() ${names.map((n) => `world.spawn("${n}")`).join(" ")} end\n`;
@@ -233,23 +257,22 @@ describe("the script service", () => {
     it("keeps the ones the script spawns by name, and cleans and caps what it says about them", async () => {
       const r = await make([answer(script(["hero"]), { assets: [{ ...base, description: "x".repeat(500) }] })]).service.create(job, input);
       expect(r.assets).toHaveLength(1);
-      expect(r.assets[0]).toMatchObject({ entity: "hero", role: "hero", kind: "biped" });
+      expect(r.assets[0]).toMatchObject({ entity: "hero", role: "hero" }); // no kit kind is asked for any more: every model is freeform
       expect(r.assets[0].description.length).toBeLessThanOrEqual(300);
     });
 
-    it("drops a model the script never spawns, a primitive's name, a bad name, a bad role or kind, a repeat", async () => {
+    it("drops a model the script never spawns, a primitive's name, a bad name, a bad role, a repeat (a kind is not asked for or checked)", async () => {
       const assets = [
         { ...base, entity: "ghost" }, // not in the script
         { ...base, entity: "box" }, // a primitive
         { ...base, entity: "Hero" }, // not allowed: a capital first
         { ...base, entity: "has space" },
         { ...base, entity: "coin", role: "wizard" },
-        { ...base, entity: "gem", kind: "dragon" },
         { ...base, entity: "tree" },
         { ...base, entity: "tree", description: "again" },
         { entity: "rock", role: "obstacle", kind: "prop" }, // no description
       ];
-      const names = ["box", "Hero", "has space", "coin", "gem", "tree", "rock"]; // ghost is left out of the script on purpose
+      const names = ["box", "Hero", "has space", "coin", "tree", "rock"]; // ghost is left out of the script on purpose
       const r = await make([answer(script(names), { assets })]).service.create(job, input);
       expect(r.assets.map((a) => a.entity)).toEqual(["tree"]);
       expect(r.assets[0].description).toBe("a red fox");

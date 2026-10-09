@@ -8,7 +8,7 @@ import { DEFAULT_TIMEOUT_MS, MAX_RETRIES } from "@/lib/ai/anthropic";
 import { dayOf } from "@/lib/ai/key";
 import type { UsageLimits } from "@/lib/ai/ports";
 import { AiRefusedError, AiUnavailableError, type DesignReply } from "@/lib/ai/types";
-import { MODEL_KINDS, type ModelKind } from "@/lib/builder/kinds";
+import { type ArtStyle, DEFAULT_STYLE, repairStyle, repairWorld, type WorldPlan } from "@/lib/builder/world";
 import type { RecipeCache } from "@/lib/builder/ports";
 import { ASSET_ROLES } from "@/lib/engine/prompts";
 import type { AssetRequest, AssetRole } from "@/lib/engine/service";
@@ -28,6 +28,10 @@ export interface StoredScript {
   palette: string[];
   leftOut: string;
   assets: AssetRequest[];
+  /** One art style for every model of the game. */
+  style: ArtStyle;
+  /** The sky, the ground and the scenery around the field, or null when Claude planned none. */
+  world: WorldPlan | null;
 }
 
 /** What the cache holds. */
@@ -82,7 +86,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 const spawnsByName = (script: string, name: string): boolean => script.includes(`"${name}"`) || script.includes(`'${name}'`);
 
 /**
- * The models Claude asked for, kept only when the name is allowed and is not a primitive's, the script uses it, and the role and kind are real; one per
+ * The models Claude asked for, kept only when the name is allowed and is not a primitive's, the script uses it, and the role is real; one per
  * name, at most the cap. A model nobody spawns is never built: building costs time and an AI count.
  */
 function checkedAssets(raw: unknown, script: string): AssetRequest[] {
@@ -91,9 +95,10 @@ function checkedAssets(raw: unknown, script: string): AssetRequest[] {
   for (const item of raw) {
     if (!isObject(item) || typeof item.entity !== "string" || typeof item.description !== "string") continue;
     if (!MODEL_NAME.test(item.entity) || (PRIMITIVE_KINDS as readonly string[]).includes(item.entity) || !spawnsByName(script, item.entity)) continue;
-    if (!(ASSET_ROLES as readonly string[]).includes(item.role as string) || !(MODEL_KINDS as readonly string[]).includes(item.kind as string)) continue;
+    if (!(ASSET_ROLES as readonly string[]).includes(item.role as string)) continue;
     if (out.some((a) => a.entity === item.entity)) continue;
-    out.push({ entity: item.entity, role: item.role as AssetRole, kind: item.kind as ModelKind, description: cleanPrompt(item.description).slice(0, MAX_ASSET_DESCRIPTION) });
+    // every model is freeform: the kit `kind` is no longer asked for (the field is kept for the rules path, and is not used here)
+    out.push({ entity: item.entity, role: item.role as AssetRole, kind: "prop", description: cleanPrompt(item.description).slice(0, MAX_ASSET_DESCRIPTION) });
     if (out.length === SCRIPT_LIMITS.assets) break;
   }
   return out;
@@ -107,6 +112,8 @@ function readCached(value: CachedScript): StoredScript | null {
     palette: paintingPalette(Array.isArray(value.palette) ? value.palette : []),
     leftOut: typeof value.leftOut === "string" ? value.leftOut : "",
     assets: Array.isArray(value.assets) ? value.assets : [],
+    style: repairStyle(value.style),
+    world: value.world === undefined || value.world === null ? null : repairWorld(value.world),
   };
 }
 
@@ -152,7 +159,7 @@ export function makeScriptService(deps: ScriptDeps): ScriptService {
     if (!checked.ok) return { ok: false, reason: checked.reason };
     const leftOut = typeof reply.raw.leftOut === "string" ? cleanPrompt(reply.raw.leftOut).slice(0, MAX_LEFT_OUT) : "";
     const palette = paintingPalette(Array.isArray(reply.raw.palette) ? reply.raw.palette : []);
-    return { ok: true, stored: { script, palette, leftOut, assets: checkedAssets(reply.raw.assets, script) } };
+    return { ok: true, stored: { script, palette, leftOut, assets: checkedAssets(reply.raw.assets, script), style: repairStyle(reply.raw.style), world: repairWorld(reply.raw.world) } };
   }
 
   return {

@@ -292,6 +292,19 @@ describe("Build Model with the freeform kind", () => {
     expect(t.designer.calls).toHaveLength(2);
   });
 
+  it("tells Claude the game's art style, and the same words in another style are another design", async () => {
+    const t = setup();
+    await t.service.buildModel(JOB, request({ style: "cartoon" }));
+    expect(t.designer.calls[0].request).toMatchObject({ style: "cartoon" });
+    await t.service.buildModel(JOB, request({ style: "cartoon" }));
+    expect(t.designer.calls).toHaveLength(1); // the same style: reused
+    await t.service.buildModel(JOB, request({ style: "flat" }));
+    expect(t.designer.calls).toHaveLength(2);
+    await t.service.buildModel(JOB, request());
+    expect(t.designer.calls).toHaveLength(3); // no style is its own question
+    expect(t.designer.calls[2].request).not.toHaveProperty("style");
+  });
+
   it("needs words: there is no kit default for a custom model", async () => {
     const t = setup();
     await expect(t.service.buildModel(JOB, request({ description: "  " }))).rejects.toThrow("Build Model: describe it first.");

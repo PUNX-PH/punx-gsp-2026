@@ -187,7 +187,7 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
     input: BuildModelInput,
     description: string,
   ): Promise<{ recipe: FreeformRecipe; asked: boolean }> {
-    const key = await designKey({ model: ai.modelId, uid: job.user.uid, description, kind: "freeform", role: input.role, pictureSha: input.picture?.sha256 ?? null });
+    const key = await designKey({ model: ai.modelId, uid: job.user.uid, description, kind: "freeform", role: input.role, pictureSha: input.picture?.sha256 ?? null, ...(input.style ? { style: input.style } : {}) });
     const found = await ai.designs.get(key);
     if (found && isFreeformRecipe(found.value)) {
       log({ step: STEP, call: "design", outcome: "reused" });
@@ -205,7 +205,7 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
           if (!small.ok) throw say(small.error);
           picture = small.jpeg;
         }
-        return ai.designer.designFreeform({ description, role: input.role, picture, timeoutMs });
+        return ai.designer.designFreeform({ description, role: input.role, picture, ...(input.style ? { style: input.style } : {}), timeoutMs });
       },
       (raw) => {
         const repaired = repairFreeform(raw);

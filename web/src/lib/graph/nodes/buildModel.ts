@@ -1,6 +1,7 @@
 // The Build Model node: a rigged, animated model made from the person's words (or from the kind alone). It only passes things along; the
 // kit, the AI, the cache, the limits, the clock and Blender are behind the builder service.
 import type { ModelKind } from "@/lib/builder/kinds";
+import type { ArtStyle } from "@/lib/builder/world";
 import { paintingPalette } from "@/lib/graph/palette";
 import { type Executor, NodeError, type Role } from "@/lib/graph/types";
 
@@ -31,6 +32,7 @@ export const buildModel: Executor = async (inputs, params, ctx) => {
       picture,
       palette,
       ...(high ? { quality: "high" as const } : {}),
+      ...(typeof params.style === "string" ? { style: params.style as ArtStyle } : {}),
     },
   );
   return {

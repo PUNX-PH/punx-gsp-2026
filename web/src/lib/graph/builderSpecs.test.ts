@@ -40,6 +40,12 @@ describe("Build Model", () => {
     expect(spec.shapeProblem(params({ role }))).toBe("role must be hero, obstacle or collectible.");
   });
 
+  it("accepts an art style, and refuses one that is not in the list", () => {
+    expect(spec.shapeProblem(params({ style: "cartoon" }))).toBeNull();
+    expect(spec.shapeProblem(params({ style: "photoreal" }))).toMatch(/style must be/);
+    expect(spec.shapeProblem(params({ style: 3 }))).toMatch(/style must be/);
+  });
+
   it.each([["auto"], ["biped"], ["vehicle"], ["blob"], ["prop"], ["freeform"]])("accepts the kind %s", (kind) => {
     expect(spec.shapeProblem(params({ kind }))).toBeNull();
   });
@@ -63,7 +69,7 @@ describe("Build Model", () => {
   });
 
   it("refuses a missing, an extra or a renamed setting", () => {
-    const sentence = "role, kind, description, run, jump, loop, quality and soft are the only settings a Build Model step has.";
+    const sentence = "role, kind, description, run, jump, loop, quality, style and soft are the only settings a Build Model step has.";
     const withoutRun = spec.defaultParams();
     delete withoutRun.run;
     for (const bad of [{}, withoutRun, params({ extra: 1 }), { ...withoutRun, runs: "" }]) expect(spec.shapeProblem(bad)).toBe(sentence);

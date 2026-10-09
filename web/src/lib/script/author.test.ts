@@ -94,8 +94,10 @@ describe("the answer schema", () => {
   const schema = scriptAnswerSchema() as { required: string[]; properties: Record<string, { type: string }> };
 
   it("is small: a string for the script, a string, and a short list (the API refuses a big grammar)", () => {
-    expect(JSON.stringify(schema).length).toBeLessThan(1500);
-    expect(schema.required).toEqual(["script", "palette", "leftOut", "assets"]);
+    expect(JSON.stringify(schema).length).toBeLessThan(2000);
+    expect(schema.required).toEqual(["script", "palette", "leftOut", "assets", "style", "world"]);
+    expect(schema.properties.style.type).toBe("string");
+    expect(schema.properties.world.type).toBe("object");
     expect(schema.properties.palette.type).toBe("array");
     expect(schema.properties.script.type).toBe("string");
     expect(schema.properties.leftOut.type).toBe("string");

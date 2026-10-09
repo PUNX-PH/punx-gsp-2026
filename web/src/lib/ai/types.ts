@@ -2,6 +2,7 @@
 // behind Build Model, and the two ways the model can fail. The rules (limits, cache, checking the answer) live in the other files of lib/ai.
 import type { User } from "@/lib/auth/ports";
 import type { ClipKey, ModelKind, Quality } from "@/lib/builder/kinds";
+import type { ArtStyle } from "@/lib/builder/world";
 import type { Role, Tuning } from "@/lib/graph/types";
 
 /** What Describe Game gives the graph. The palette is in the template's slot order and already readable; the numbers are playable. */
@@ -42,7 +43,7 @@ export interface Designer {
   // `quality` is there only for High: a Standard request is what it always was.
   designModel(request: { description: string; role: Role; kind: ModelKind | null; picture: Uint8Array | null; quality?: Quality; timeoutMs?: number }): Promise<DesignReply>;
   /** A freeform model: the answer is { recipe: "<JSON text>" }, repaired by lib/builder/freeform.ts. */
-  designFreeform(request: { description: string; role: Role; picture: Uint8Array | null; timeoutMs?: number }): Promise<DesignReply>;
+  designFreeform(request: { description: string; role: Role; picture: Uint8Array | null; style?: ArtStyle; timeoutMs?: number }): Promise<DesignReply>;
   designMotion(request: { kind: ModelKind; joints: string[]; texts: Partial<Record<ClipKey, string>>; quality?: Quality; timeoutMs?: number }): Promise<DesignReply>;
   designEnvironment(request: { theme: string; quality?: Quality; timeoutMs?: number }): Promise<DesignReply>;
 }

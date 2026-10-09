@@ -2,6 +2,7 @@
 import type { BlenderJob } from "@/lib/blender/types";
 import type { ClipKey, ClipName, ModelKind, Quality, SceneryKind, WorldStyle } from "@/lib/builder/kinds";
 import type { Skipped } from "@/lib/builder/recipes";
+import type { ArtStyle } from "@/lib/builder/world";
 import type { Role } from "@/lib/graph/types";
 import type { Density } from "@/lib/settings";
 
@@ -17,6 +18,8 @@ export interface BuildModelInput {
   palette: readonly string[];
   /** Absent means Standard. */
   quality?: Quality;
+  /** The art style of the game (freeform models only); absent means the designer's own choice. */
+  style?: ArtStyle;
 }
 
 /** A built model, stored in the graph's folder, with what the card shows. */

@@ -22,7 +22,7 @@ function scripts(over: Partial<StoredScript> = {}, asked = true) {
   const service: ScriptService = {
     async create(job, input) {
       calls.push({ job, input: input as unknown as Record<string, unknown> });
-      return { script: SCRIPT, palette: PALETTE, leftOut: "no sound", assets: [], ...over, asked };
+      return { script: SCRIPT, palette: PALETTE, leftOut: "no sound", assets: [], style: "stylized" as const, world: null, ...over, asked };
     },
   };
   return { service, calls };

@@ -3,6 +3,7 @@
 // that every screen (and every error message) uses the same words.
 import { SHAPES, TRIANGLES } from "@/lib/blender/types";
 import { MODEL_KINDS, QUALITIES } from "@/lib/builder/kinds";
+import { ART_STYLES } from "@/lib/builder/world";
 import { ROLE_FILES, type WireType } from "@/lib/graph/types";
 import { DENSITIES } from "@/lib/settings";
 
@@ -129,10 +130,12 @@ const MOTION_BOXES = [
 
 function buildModelParams(params: Record<string, unknown>): string | null {
   // `soft` is optional and true only for a step the site made from a described game: if it fails, the game goes on and the model is a plain shape.
-  const { soft, ...rest } = params;
+  const { soft, style, ...rest } = params;
   if (Object.hasOwn(params, "soft") && typeof soft !== "boolean") return "soft must be on or off.";
+  // `style` is optional: the art style of the game, which the site sets from the game's plan
+  if (Object.hasOwn(params, "style") && (typeof style !== "string" || !(ART_STYLES as readonly string[]).includes(style))) return `style must be ${ART_STYLES.join(", ")}.`;
   if (!hasExactlyAndMaybeQuality(rest, ["role", "kind", "description", "run", "jump", "loop"])) {
-    return "role, kind, description, run, jump, loop, quality and soft are the only settings a Build Model step has.";
+    return "role, kind, description, run, jump, loop, quality, style and soft are the only settings a Build Model step has.";
   }
   const { role, kind, description } = params;
   if (typeof role !== "string" || !Object.hasOwn(ROLE_FILES, role)) return "role must be hero, obstacle or collectible.";

@@ -209,7 +209,9 @@ How to model well. Block out the big masses first (body, head), then the limbs a
 
 Budget. The game has a triangle budget for each model: a hero ${budgets.hero.pc} on a PC and ${budgets.hero.mobile} on a phone, anything else ${budgets.prop.pc} and ${budgets.prop.mobile}. A program fits the model to it by lowering every part's detail first, and then dropping parts from the END of your list. So put the parts that matter most first (the body, the head, the big shapes) and the small decorations (eyes, buttons, spots) last, use detail 1 on small parts, and aim for a hero of about 3000 triangles at most and a prop of about 1000.
 
-The role says what the model is for. A hero is the character the player controls: friendly and readable. An obstacle is something the hero must avoid: plain and clearly in the way. A collectible is something the hero picks up: small and bright.
+The role says what the model is for. A hero is the character the player controls: friendly and readable. An obstacle is something the hero must avoid: plain and clearly in the way. A collectible is something the hero picks up: small and bright. A scenery piece stands around the playing field to set the scene: it does not move and is never the focus, so make it simple, a little larger than the characters when it is a tree or a building, and cheap.
+
+The art style (when the message names one) is how the whole game looks, so every model of the game shares it: stylized is friendly low-poly with a few big shapes; cartoon is bold, rounded and exaggerated, with thick simple forms; painted is soft, with gentle curves and muted colors; flat is plain geometric shapes with no fine detail; realistic keeps true-to-life proportions and more small parts (within the budget).
 
 summary is one plain sentence of at most ${KIT.caps.summary} characters about the model you made. No markup and no line breaks.
 
