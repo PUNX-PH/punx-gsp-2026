@@ -1179,6 +1179,97 @@ class BuildWorld(unittest.TestCase):
                 self.assertEqual(self.build(body).returncode, EXIT_BAD_RECIPE, name)
 
 
+class BuildFreeform(unittest.TestCase):
+    """build.py with a freeform model: it fits the budget of its role and target by the real triangles of the GLB, or exits 5."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.out = os.path.join(self.dir.name, "out.glb")
+        self.stats_path = os.path.join(self.dir.name, "stats.json")
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def fixture(self, name, role, target):
+        with open(os.path.join(HERE, "..", "fixtures", "recipes", "freeform", name + ".json"), encoding="utf-8") as handle:
+            body = json.load(handle)
+        return {"recipe": body["recipe"], "palette": body["palette"], "role": role, "target": target}
+
+    def build(self, body):
+        recipe_path = os.path.join(self.dir.name, "recipe.json")
+        with open(recipe_path, "w", encoding="utf-8") as handle:
+            json.dump(body, handle)
+        return run_script("build.py", "--recipe", recipe_path, "--out", self.out, "--stats", self.stats_path)
+
+    def stats(self):
+        with open(self.stats_path, encoding="utf-8") as handle:
+            return json.load(handle)
+
+    def test_a_model_inside_its_budget_is_built_whole(self):
+        result = self.build(self.fixture("crate", "prop", "pc"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        stats = self.stats()
+        self.assertEqual(stats["dropped"], 0)
+        self.assertLessEqual(stats["triangles"], 5000)
+        self.assertEqual(stats["triangles"], triangles(read_glb(self.out)))
+        self.assertEqual(stats["clips"], [])
+
+    def test_the_same_recipe_is_cut_to_the_mobile_budget_and_stays_under_it(self):
+        pc = self.build(self.fixture("fox", "hero", "pc"))
+        self.assertEqual(pc.returncode, 0, pc.stderr)
+        full = self.stats()["triangles"]
+        mobile = self.build(self.fixture("fox", "hero", "mobile"))
+        self.assertEqual(mobile.returncode, 0, mobile.stderr)
+        stats = self.stats()
+        self.assertLessEqual(stats["triangles"], 5000)
+        self.assertLess(stats["triangles"], full)
+        self.assertEqual(stats["triangles"], triangles(read_glb(self.out)))
+
+    def test_detail_is_dropped_before_any_part(self):
+        # the robot is about 6,400 triangles: over the mobile hero budget at its own detail, and it fits once the detail comes down
+        result = self.build(self.fixture("robot", "hero", "mobile"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        stats = self.stats()
+        self.assertLessEqual(stats["triangles"], 5000)
+        self.assertEqual(stats["dropped"], 0)
+
+    def test_parts_are_dropped_from_the_end_when_detail_is_not_enough(self):
+        body = self.fixture("fox", "prop", "mobile")  # 1,500 triangles: far under what the fox needs even at the lowest detail
+        result = self.build(body)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        stats = self.stats()
+        self.assertLessEqual(stats["triangles"], 1500)
+        self.assertGreater(stats["dropped"], 0)
+        self.assertEqual(stats["parts"], len(body["recipe"]["parts"]) - stats["dropped"])
+
+    def test_a_model_that_cannot_fit_is_refused(self):
+        sys.path.insert(0, SCRIPTS)
+        import freeform
+
+        body = self.fixture("crate", "prop", "pc")
+        _, parts = freeform.check_model(body["recipe"], {"matte": {}, "metal": {}, "painted": {}, "rubber": {}, "glow": {}})
+        with self.assertRaises(freeform.BadModel):
+            freeform.fit_parts(parts, 10)  # not even the first part is that small
+
+    def test_bad_bodies_exit_5(self):
+        def mutated(change):
+            body = self.fixture("crate", "prop", "pc")
+            change(body)
+            return body
+
+        cases = {
+            "a role that is not one": mutated(lambda b: b.update(role="boss")),
+            "a target that is not one": mutated(lambda b: b.update(target="console")),
+            "an unknown shape": mutated(lambda b: b["recipe"]["parts"][0].update(shape="teapot")),
+            "a rotation past 360": mutated(lambda b: b["recipe"]["parts"][0].update(rot=[0, 361, 0])),
+            "an extra field": mutated(lambda b: b.update(motions={})),
+            "a material index out of range": mutated(lambda b: b["recipe"]["parts"][0].update(material=99)),
+        }
+        for name, body in cases.items():
+            with self.subTest(name):
+                self.assertEqual(self.build(body).returncode, EXIT_BAD_RECIPE, name)
+
+
 if __name__ == "__main__":
     # Test names can follow a "--" (blender ... -P test_blender.py -- BlenderScripts.test_one_palette_color_paints_the_whole_model).
     names = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []

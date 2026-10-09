@@ -17,8 +17,11 @@ Plan: `plans/2026-10-09-slice9-art-pipeline.md` (21 tasks). Spec: `specs/2026-10
 
 ## Not done (in order of what to do next)
 
-1. **Wire `model` into the worker:** `build.py` main dispatch for `kind == "model"` (it calls `freeform.build_model`), the same checks in `recipe.mjs` (worker refuses before Blender starts), stats, a `JOB_VERSION` bump, and
-   **budget enforcement by the real GLB count per target** (Task 4: `target` pc|mobile in the body; drop `detail` first, then parts from the end; refuse if it cannot fit; never return over budget). Tests via the plan's tasks 2 to 4.
+1. ~~Wire `model` into the worker~~ **Done (2026-10-09).** A model body is `{ recipe, palette, role: hero|prop|scenery, target: pc|mobile }` (no motions yet); `recipe.mjs` checks it (`checkModelBody`), `build.py`'s `run_model` calls
+   `freeform.build_model` with the budget from `kit.json` `freeform.budgets` (the caps are there too, one source for Python and JS). Fitting (`freeform.fit_parts`): detail down 3, 2, 1 on every part, then parts from the end of the list, counted
+   on scratch meshes before the one export, then verified by the real GLB count (one more part dropped if somehow over); exit 5 when not even one part fits. Stats carry `parts` (kept), `dropped`, `vertices`; the server returns `X-Vertices` for a model.
+   Tests: `recipe.test.mjs` (freeform block, 63 worker tests pass) and `tests/test_blender.py` `BuildFreeform` (6 pass). **`JOB_VERSION` not bumped:** old recipes build identical output; but `buildKey` (`web/src/lib/blender/key.ts`) must include
+   `role` and `target` for models (Task 9). The server does not yet send `X-Dropped`; add it if the card should say "detail reduced".
 2. **Web side (Tasks 8, 9, 10):** `recipes.ts`/`repair.ts`/`kinds.ts` for the `model` recipe, the **design prompt that teaches Claude to compose** (axes, feet on y = 0, the palette slots, mirror for symmetry, the shapes and their limits, the triangle
    budget, silhouettes first), the answer as JSON text in ONE string field (a big schema is refused by the API: "compiled grammar is too large"), `style`/`detail`/`view` on asset requests, the builder building PC and mobile
    variants as two cached calls, Build Model's card showing triangles per variant. The studio window already shows any GLB.

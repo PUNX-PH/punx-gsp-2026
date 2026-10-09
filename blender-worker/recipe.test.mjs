@@ -207,3 +207,65 @@ describe("checkBuildBody and the High tier", () => {
     }
   });
 });
+
+// ---- the freeform kind ("model"): the fixtures from the art gate, wrapped as the web app will send them
+const FREE = new URL("./fixtures/recipes/freeform/", import.meta.url);
+const freeBody = (name, role = "prop", target = "pc") => {
+  const { recipe, palette } = JSON.parse(readFileSync(new URL(`${name}.json`, FREE), "utf8"));
+  return { recipe, palette, role, target };
+};
+
+describe("checkBuildBody for a freeform model", () => {
+  it("accepts the five fixtures for every role and target", () => {
+    for (const name of ["crate", "fox", "pine", "robot", "spaceship"]) {
+      for (const role of Object.keys(KIT.freeform.budgets)) for (const target of ["pc", "mobile"]) assert.equal(checkBuildBody(freeBody(name, role, target)), null, `${name} ${role} ${target}`);
+    }
+  });
+
+  it("refuses what is not in the vocabulary or out of range, and names the field", () => {
+    const changed = (change) => {
+      const body = freeBody("fox");
+      change(body);
+      return checkBuildBody(body);
+    };
+    assert.match(changed((b) => (b.role = "boss")), /body\.role/);
+    assert.match(changed((b) => (b.target = "console")), /body\.target/);
+    assert.match(changed((b) => (b.motions = {})), /body: unknown field/);
+    assert.match(changed((b) => delete b.target), /body: missing field target/);
+    assert.match(changed((b) => (b.palette = ["#fff"])), /palette/);
+    assert.match(changed((b) => (b.recipe.version = 1)), /recipe\.version/);
+    assert.match(changed((b) => (b.recipe.parts[0].shape = "teapot")), /parts\[0\]\.shape/);
+    assert.match(changed((b) => (b.recipe.parts[0].script = "x")), /unknown field/);
+    assert.match(changed((b) => (b.recipe.parts[0].rot = [0, 361, 0])), /parts\[0\]\.rot/);
+    assert.match(changed((b) => (b.recipe.parts[0].size = [0, 1, 1])), /parts\[0\]\.size/);
+    assert.match(changed((b) => (b.recipe.parts[0].material = 99)), /parts\[0\]\.material/);
+    assert.match(changed((b) => (b.recipe.parts[0].detail = 4)), /parts\[0\]\.detail/);
+    assert.match(changed((b) => (b.recipe.parts[0].at = [0, 0, 99])), /parts\[0\]\.at/);
+    assert.match(changed((b) => (b.recipe.materials[0].finish = "gold")), /materials\[0\]\.finish/);
+    assert.match(changed((b) => (b.recipe.materials[0].color = 5)), /materials\[0\]\.color/);
+    assert.match(changed((b) => (b.recipe.parts = [])), /recipe\.parts/);
+    assert.match(changed((b) => (b.recipe.parts = Array(49).fill(b.recipe.parts[0]))), /recipe\.parts/);
+  });
+
+  it("checks the parts that carry lists", () => {
+    const withPart = (part) => {
+      const body = freeBody("crate");
+      body.recipe.parts = [part];
+      return checkBuildBody(body);
+    };
+    assert.equal(withPart({ shape: "tube", points: [[0, 0, 0], [0, 1, 0]], radius: 0.1 }), null);
+    assert.match(withPart({ shape: "tube", points: [[0, 0, 0]], radius: 0.1 }), /points/);
+    assert.match(withPart({ shape: "tube", points: [[0, 0, 0], [0, 0, 0]], radius: 0.1 }), /same/);
+    assert.equal(withPart({ shape: "revolve", profile: [[0, 0], [0.5, 0.2], [0, 1]] }), null);
+    assert.match(withPart({ shape: "revolve", profile: [[-1, 0], [0.5, 0.2]] }), /radius/);
+    assert.equal(withPart({ shape: "loft", sections: [{ z: 0, w: 1, h: 1 }, { z: 1, w: 0, h: 0 }] }), null);
+    assert.match(withPart({ shape: "loft", sections: [{ z: 0, w: 1, h: 1, q: 1 }, { z: 1 }] }), /sections/);
+    assert.match(withPart({ shape: "loft", sections: [{ w: 1, h: 1 }, { z: 1 }] }), /sections/);
+  });
+
+  it("never throws on odd values", () => {
+    for (const recipe of [{ kind: "model" }, { kind: "model", parts: null, materials: 4 }, { kind: "model", version: 2, summary: "x", materials: [null], parts: [] }]) {
+      assert.equal(typeof checkBuildBody({ recipe, palette: null, role: 1, target: 2 }), "string");
+    }
+  });
+});

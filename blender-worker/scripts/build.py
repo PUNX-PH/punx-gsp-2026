@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bmesh  # noqa: E402
 import bpy  # noqa: E402
 import common  # noqa: E402
+import freeform  # noqa: E402
 import high  # noqa: E402
 import world  # noqa: E402
 from mathutils import Matrix, Vector  # noqa: E402
@@ -768,11 +769,26 @@ def run_world(args, recipe, palette):
         json.dump({"triangles": real["triangles"], "vertices": real["vertices"], "parts": 1, "meshes": real["meshes"], "clips": []}, handle)
 
 
+def run_model(args, body):
+    """A freeform model: the same rules as recipe.mjs (checked again here), fitted to the budget of its role and target by the real count of the GLB.
+    Exits 5 when the body breaks a rule or the model cannot fit; the stats carry the kept parts and how many were dropped to fit."""
+    need(set(body) == {"recipe", "palette", "role", "target"})
+    need(body["role"] in freeform.BUDGETS and body["target"] in ("pc", "mobile"))
+    palette = body["palette"]
+    need(isinstance(palette, list) and len(palette) == 5 and all(isinstance(c, str) and HEX.match(c) for c in palette))
+    counts = freeform.build_model(args.out, body["recipe"], palette, KIT["tiers"]["high"]["finishes"], freeform.BUDGETS[body["role"]][body["target"]])
+    with open(args.stats, "w", encoding="utf-8") as handle:
+        json.dump({**counts, "clips": []}, handle)
+
+
 def main():
     args = common.parse_args(configure)
     try:
         with open(args.recipe, encoding="utf-8") as handle:
             body = json.load(handle)
+        if isinstance(body, dict) and isinstance(body.get("recipe"), dict) and body["recipe"].get("kind") == "model":
+            run_model(args, body)
+            return
         recipe, motions, palette, spec, joints = check_body(body)
         if recipe["kind"] == "world":
             run_world(args, recipe, palette)
@@ -797,7 +813,7 @@ def main():
             if motion and motion["tracks"]:
                 bake_clip(clip_name, motion, objects, rest)
                 clips.append(clip_name)
-    except (BadRecipe, OSError, ValueError, KeyError):
+    except (BadRecipe, freeform.BadModel, OSError, ValueError, KeyError):
         sys.exit(EXIT_BAD_RECIPE)
 
     bpy.context.scene.frame_set(0)

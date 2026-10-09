@@ -13,7 +13,9 @@ Shapes (all in a unit space about one unit across and centered on the origin, th
   `sections` are { z, w, h, round, dx, dy }). `mirror` adds the same part on the other side of the model (x to -x).
 Model axes: x side to side, y up, z forward; Blender's are X, Z up and -Y forward, so a model point (x, y, z) is the Blender point (x, -z, y), as in build.py.
 """
+import json
 import math
+import os
 
 import bmesh
 import bpy
@@ -25,7 +27,10 @@ import high
 SIDES = {1: 12, 2: 20, 3: 32}  # `detail`: segments round a part
 SMOOTH_ANGLE = math.radians(50.0)
 
-CAPS = {"parts": 48, "points": 10, "profile": 14, "sections": 10, "materials": 6, "extent": 12.0}  # extent: the largest |coordinate| a part may use
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "kit.json"), encoding="utf-8") as _kit_file:
+    FREEFORM = json.load(_kit_file)["freeform"]
+CAPS = {**FREEFORM["caps"], "extent": float(FREEFORM["caps"]["extent"])}  # extent: the largest |coordinate| a part may use
+BUDGETS = FREEFORM["budgets"]  # role -> target -> triangles
 
 
 # ---- shapes: each adds its faces to `bm` in the unit space and returns the bmesh geometry it made ----
@@ -294,35 +299,79 @@ def _make(bm, part):
     return loft(bm, sides, part["sections"])
 
 
-def build_model(path, recipe, palette, finishes):
-    """Builds the model and writes the GLB. Returns the real counts of the file."""
+def _add_part(bm, part):
+    """Adds the part (and its mirror image) to `bm`, in model axes."""
+    # a tube's points are in the model's own units; every other shape is drawn in its unit space and scaled by `size`
+    sx, sy, sz = (1.0, 1.0, 1.0) if part["shape"] == "tube" else part["size"]
+    before = len(bm.faces)
+    verts = _make(bm, part)
+    turn = Euler([math.radians(a) for a in part["rot"]], "XYZ").to_matrix()
+    offset = Vector(part["at"])
+    for v in verts:
+        if not v.is_valid:
+            continue
+        v.co = turn @ Vector((v.co.x * sx, v.co.y * sy, v.co.z * sz)) + offset
+    new_faces = list(bm.faces)[before:]
+    for f in new_faces:
+        f.material_index = part["material"]
+    if part["mirror"]:
+        geom = new_faces + list({e for f in new_faces for e in f.edges}) + list({v for f in new_faces for v in f.verts})
+        copy = bmesh.ops.duplicate(bm, geom=geom)["geom"]
+        copy_verts = [g for g in copy if isinstance(g, bmesh.types.BMVert)]
+        copy_faces = [g for g in copy if isinstance(g, bmesh.types.BMFace)]
+        for v in copy_verts:
+            v.co.x = -v.co.x
+        bmesh.ops.reverse_faces(bm, faces=copy_faces)
+
+
+def part_triangles(part):
+    """The triangles a part will make once the model is triangulated (its mirror image included), counted on a scratch mesh: no scene, no export."""
+    bm = bmesh.new()
+    _add_part(bm, part)
+    count = sum(len(f.verts) - 2 for f in bm.faces)
+    bm.free()
+    return count
+
+
+def fit_parts(parts, budget):
+    """The parts, brought inside `budget` triangles in the fixed order: every part's detail down a step at a time (3, then 2, then 1), then parts from the end of the
+    list. Returns (parts, detail_cap, dropped), or raises BadModel when not even the first part fits."""
+    for cap in (3, 2, 1):
+        use = [{**p, "detail": min(p["detail"], cap)} for p in parts]
+        counts = [part_triangles(p) for p in use]
+        if sum(counts) <= budget:
+            return use, cap, 0
+    while counts and sum(counts) > budget:
+        counts.pop()
+        use.pop()
+    _need(use)
+    return use, 1, len(parts) - len(use)
+
+
+def build_model(path, recipe, palette, finishes, budget=None):
+    """Builds the model and writes the GLB. Returns the real counts of the file, with `parts` (kept) and `dropped`. With a `budget` (triangles) the model is fitted
+    to it by fit_parts and then checked by the real count of the GLB (dropping one more part and building again if it is somehow over); BadModel when it cannot fit."""
     clean_materials, parts = check_model(recipe, finishes)
+    dropped = 0
+    if budget is not None:
+        parts, _, dropped = fit_parts(parts, budget)
+    while True:
+        counts = _build(path, clean_materials, parts, palette, finishes)
+        if budget is None or counts["triangles"] <= budget:
+            break
+        _need(len(parts) > 1)
+        parts = parts[:-1]
+        dropped += 1
+    return {**counts, "parts": len(parts), "dropped": dropped}
+
+
+def _build(path, clean_materials, parts, palette, finishes):
     common.reset_scene()
     library = [common.finish_material(f"{finish}_{i}", common.hex_to_linear(palette[color].lower()), finishes[finish]) for i, (color, finish) in enumerate(clean_materials)]
 
     bm = bmesh.new()
     for part in parts:
-        # a tube's points are in the model's own units; every other shape is drawn in its unit space and scaled by `size`
-        sx, sy, sz = (1.0, 1.0, 1.0) if part["shape"] == "tube" else part["size"]
-        before = len(bm.faces)
-        verts = _make(bm, part)
-        turn = Euler([math.radians(a) for a in part["rot"]], "XYZ").to_matrix()
-        offset = Vector(part["at"])
-        for v in verts:
-            if not v.is_valid:
-                continue
-            v.co = turn @ Vector((v.co.x * sx, v.co.y * sy, v.co.z * sz)) + offset
-        new_faces = list(bm.faces)[before:]
-        for f in new_faces:
-            f.material_index = part["material"]
-        if part["mirror"]:
-            geom = new_faces + list({e for f in new_faces for e in f.edges}) + list({v for f in new_faces for v in f.verts})
-            copy = bmesh.ops.duplicate(bm, geom=geom)["geom"]
-            copy_verts = [g for g in copy if isinstance(g, bmesh.types.BMVert)]
-            copy_faces = [g for g in copy if isinstance(g, bmesh.types.BMFace)]
-            for v in copy_verts:
-                v.co.x = -v.co.x
-            bmesh.ops.reverse_faces(bm, faces=copy_faces)
+        _add_part(bm, part)
 
     # model axes to Blender's, then one shaded mesh
     for v in bm.verts:

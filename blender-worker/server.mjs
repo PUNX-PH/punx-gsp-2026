@@ -4,6 +4,7 @@
 //   POST /prepare?format=glb|fbx|obj&triangles=100..5000&color=original|#rrggbb   body: the model file
 //   POST /shape                                                                    body: {"shape": "...", "color": "#rrggbb"}
 //   POST /build                                                                    body: {"recipe": {...}, "motions": {...}, "palette": [5 colors]}
+//                                                                                  or, for a freeform model: {"recipe": {kind: "model", ...}, "palette": [...], "role": "hero|prop|scenery", "target": "pc|mobile"}
 //   GET  /health        (not /healthz: Cloud Run reserves some paths that end in "z" and answers them itself)
 //
 // A good answer is 200 with the GLB as the body and the triangle counts in X-Triangles-Before and X-Triangles-After (for /build:
@@ -214,8 +215,8 @@ export function createWorker(options) {
         const { triangles, parts, clips, vertices } = counts ?? {};
         const clipsOk = Array.isArray(clips) && new Set(clips).size === clips.length && clips.every((c) => BUILD_CLIPS.includes(c));
         if (glb.length === 0 || !Number.isInteger(triangles) || triangles < 1 || !Number.isInteger(parts) || parts < 1 || !clipsOk) throw new Refusal(500, "failed");
-        // A High build also reports how many shared vertices the GLB holds (it is what the game decodes); without it the answer is not usable.
-        if (job.recipe.recipe?.quality === "high") {
+        // A High build, and a freeform model, also report how many shared vertices the GLB holds (it is what the game decodes); without it the answer is not usable.
+        if (job.recipe.recipe?.quality === "high" || job.recipe.recipe?.kind === "model") {
           if (!Number.isInteger(vertices) || vertices < 1) throw new Refusal(500, "failed");
           return { glb, triangles, parts, clips, vertices };
         }

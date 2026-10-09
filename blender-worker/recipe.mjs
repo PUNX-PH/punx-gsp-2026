@@ -236,9 +236,101 @@ function checkMotions(motions, recipe) {
   return null;
 }
 
+// ---- the freeform kind ("model"): a list of parts. The same rules as scripts/freeform.py check_model; the web app mirrors them (Task 8).
+const FREE = KIT.freeform;
+const SHAPES = ["ellipsoid", "capsule", "cylinder", "box", "torus", "lump", "tube", "revolve", "loft"];
+const PART_KEYS = ["shape", "at", "size", "rot", "material", "mirror", "detail", "taper", "bevel", "thickness", "seed", "points", "radius", "profile", "sections"];
+const SECTION_KEYS = ["z", "w", "h", "round", "dx", "dy"];
+const ROLES = Object.keys(FREE.budgets);
+const TARGETS = ["pc", "mobile"];
+
+const inRange = (v, low, high) => isNumber(v) && v >= low && v <= high;
+const vecProblem = (v, n, low, high, where) => (Array.isArray(v) && v.length === n && v.every((x) => inRange(x, low, high)) ? null : `${where}: must be ${n} numbers within ${low} to ${high}`);
+const wholeIn = (v, low, high) => Number.isInteger(v) && v >= low && v <= high;
+
+function checkModelRecipe(recipe) {
+  const { extent } = FREE.caps;
+  const keys = keysProblem(recipe, ["version", "kind", "summary", "materials", "parts"], "recipe");
+  if (keys) return keys;
+  if (recipe.version !== 2) return "recipe.version: must be 2";
+  if (typeof recipe.summary !== "string") return "recipe.summary: must be text";
+  if (Array.from(recipe.summary).length > KIT.caps.summary) return `recipe.summary: longer than ${KIT.caps.summary} characters`;
+  if (CONTROL.test(recipe.summary)) return "recipe.summary: has a control character";
+  const { materials, parts } = recipe;
+  if (!Array.isArray(materials) || materials.length < 1 || materials.length > FREE.caps.materials) return `recipe.materials: a list of 1 to ${FREE.caps.materials}`;
+  for (const [i, m] of materials.entries()) {
+    if (!isObject(m)) return `recipe.materials[${i}]: must be an object`;
+    const mk = keysProblem(m, ["color", "finish"], `recipe.materials[${i}]`);
+    if (mk) return mk;
+    if (!wholeIn(m.color, 0, 4)) return `recipe.materials[${i}].color: must be a whole number 0 to 4`;
+    if (typeof m.finish !== "string" || !FINISHES.includes(m.finish)) return `recipe.materials[${i}].finish: ${shown(m.finish)} is not one of ${FINISHES.join(", ")}`;
+  }
+  if (!Array.isArray(parts) || parts.length < 1 || parts.length > FREE.caps.parts) return `recipe.parts: a list of 1 to ${FREE.caps.parts}`;
+  for (const [i, p] of parts.entries()) {
+    const at = `recipe.parts[${i}]`;
+    if (!isObject(p)) return `${at}: must be an object`;
+    for (const k of Object.keys(p)) if (!PART_KEYS.includes(k)) return `${at}: unknown field ${shown(k)}`;
+    if (typeof p.shape !== "string" || !SHAPES.includes(p.shape)) return `${at}.shape: ${shown(p.shape)} is not one of ${SHAPES.join(", ")}`;
+    if (Object.hasOwn(p, "material") && !wholeIn(p.material, 0, materials.length - 1)) return `${at}.material: must be a whole number 0 to ${materials.length - 1}`;
+    if (Object.hasOwn(p, "detail") && !wholeIn(p.detail, 1, 3)) return `${at}.detail: must be 1, 2 or 3`;
+    if (Object.hasOwn(p, "mirror") && typeof p.mirror !== "boolean") return `${at}.mirror: must be true or false`;
+    const vec = (name, low, high) => (Object.hasOwn(p, name) ? vecProblem(p[name], 3, low, high, `${at}.${name}`) : null);
+    const bad = vec("at", -extent, extent) ?? vec("size", 0.005, extent) ?? vec("rot", -360, 360);
+    if (bad) return bad;
+    const num = (name, low, high) => (Object.hasOwn(p, name) && !inRange(p[name], low, high) ? `${at}.${name}: must be a number ${low} to ${high}` : null);
+    const numeric = { cylinder: [["taper", 0, 1]], box: [["bevel", 0, 0.45]], torus: [["thickness", 0.05, 0.9]], lump: [["seed", 0, 1000]], tube: [["radius", 0.005, extent], ["taper", 0, 1]] }[p.shape] ?? [];
+    for (const [name, low, high] of numeric) {
+      const problem = num(name, low, high);
+      if (problem) return problem;
+    }
+    if (p.shape === "tube") {
+      const pts = p.points;
+      if (!Array.isArray(pts) || pts.length < 2 || pts.length > FREE.caps.points) return `${at}.points: a list of 2 to ${FREE.caps.points} points`;
+      for (const pt of pts) {
+        const problem = vecProblem(pt, 3, -extent, extent, `${at}.points`);
+        if (problem) return problem;
+      }
+      if (pts.some((pt, j) => j > 0 && Math.hypot(pt[0] - pts[j - 1][0], pt[1] - pts[j - 1][1], pt[2] - pts[j - 1][2]) <= 1e-4)) return `${at}.points: two points in a row are the same`;
+    }
+    if (p.shape === "revolve") {
+      const profile = p.profile;
+      if (!Array.isArray(profile) || profile.length < 2 || profile.length > FREE.caps.profile) return `${at}.profile: a list of 2 to ${FREE.caps.profile} pairs`;
+      for (const pair of profile) {
+        const problem = vecProblem(pair, 2, -extent, extent, `${at}.profile`);
+        if (problem) return problem;
+        if (pair[0] < 0) return `${at}.profile: a radius cannot be negative`;
+      }
+    }
+    if (p.shape === "loft") {
+      const sections = p.sections;
+      if (!Array.isArray(sections) || sections.length < 2 || sections.length > FREE.caps.sections) return `${at}.sections: a list of 2 to ${FREE.caps.sections} sections`;
+      for (const s of sections) {
+        if (!isObject(s) || !Object.keys(s).every((k) => SECTION_KEYS.includes(k)) || !Object.hasOwn(s, "z")) return `${at}.sections: each is { z, w, h, round, dx, dy } with z`;
+        for (const [name, low, high] of [["z", -extent, extent], ["w", 0, extent], ["h", 0, extent], ["round", 0, 1], ["dx", -extent, extent], ["dy", -extent, extent]]) {
+          if (Object.hasOwn(s, name) && !inRange(s[name], low, high)) return `${at}.sections.${name}: must be a number ${low} to ${high}`;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// A model body is { recipe, palette, role, target }: no motions yet (a freeform model has no clips), the role picks the triangle budget and
+// the target (pc or mobile) the column of it. build.py fits the model to that budget by the real count of the GLB, or refuses.
+function checkModelBody(body) {
+  const keys = keysProblem(body, ["recipe", "palette", "role", "target"], "body");
+  if (keys) return keys;
+  if (typeof body.role !== "string" || !ROLES.includes(body.role)) return `body.role: ${shown(body.role)} is not one of ${ROLES.join(", ")}`;
+  if (typeof body.target !== "string" || !TARGETS.includes(body.target)) return `body.target: ${shown(body.target)} is not pc or mobile`;
+  const palette = body.palette;
+  if (!Array.isArray(palette) || palette.length !== 5 || !palette.every((c) => typeof c === "string" && HEX.test(c))) return "palette: must be five #rrggbb colors";
+  return checkModelRecipe(body.recipe);
+}
+
 /** null when the body is valid; otherwise a short problem that names the field. Never throws. */
 export function checkBuildBody(body) {
   if (!isObject(body)) return "body: must be an object";
+  if (isObject(body.recipe) && body.recipe.kind === "model") return checkModelBody(body);
   const keys = keysProblem(body, ["recipe", "motions", "palette"], "body");
   if (keys) return keys;
   const palette = body.palette;
