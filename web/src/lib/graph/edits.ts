@@ -18,7 +18,7 @@ export const editPrompt = (graph: Graph, nodeId: string, prompt: string): Edit =
 /** Changes some of a step's settings (the Blender steps: triangles, color, shape) and keeps the rest. */
 export const editSettings = (graph: Graph, nodeId: string, change: Record<string, unknown>): Edit => ({ graph: withParams(graph, nodeId, change), touched: [nodeId] });
 
-/** Sets a Game Template's tuning. */
+/** Sets an Assemble Game's tuning. */
 export const setTuning = (graph: Graph, nodeId: string, tuning: Tuning): Graph =>
   withParams(graph, nodeId, { tuning: { speed: tuning.speed, jumpHeight: tuning.jumpHeight, obstacleSpacing: tuning.obstacleSpacing } });
 
@@ -30,7 +30,7 @@ export interface Edit {
   touched: string[];
 }
 
-// A card is 232 px wide and up to about 260 px tall (a Game Template with its four labelled inputs), so a new step must be at
+// A card is 232 px wide and up to about 260 px tall (an Assemble Game with its four labelled inputs), so a new step must be at
 // least that far from every other one in x or in y to avoid covering any part of it.
 const STEP_GAP_X = 260;
 const STEP_GAP_Y = 280;
@@ -108,7 +108,7 @@ export const editAsset = (graph: Graph, nodeId: string, sha256: string | null): 
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Sets a Game Template's tuning, rounded to two decimals so a slider's float noise is never stored. */
+/** Sets an Assemble Game's tuning, rounded to two decimals so a slider's float noise is never stored. */
 export const editTuning = (graph: Graph, nodeId: string, tuning: Tuning): Edit => ({
   graph: setTuning(graph, nodeId, { speed: round2(tuning.speed), jumpHeight: round2(tuning.jumpHeight), obstacleSpacing: round2(tuning.obstacleSpacing) }),
   touched: [nodeId],

@@ -272,7 +272,7 @@ describe("a Describe Game step", () => {
   });
 });
 
-describe("a Game Template and a feel", () => {
+describe("an Assemble Game and a feel", () => {
   const node = (id: string, type: string, params: Record<string, unknown>) => ({ id, type, params, position: { x: 0, y: 0 } });
   const withFeel = (): Graph => ({
     schemaVersion: 1,

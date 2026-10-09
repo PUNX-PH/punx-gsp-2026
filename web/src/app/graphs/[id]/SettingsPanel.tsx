@@ -1,7 +1,7 @@
 "use client";
 
 // The settings of the selected step, in plain words: a file picker for the steps that take a file, three sliders for the
-// Game Template (with a live line when the combination cannot be played), and a short explanation for the others.
+// Assemble Game (with a live line when the combination cannot be played), and a short explanation for the others.
 import Link from "next/link";
 import { useId, useState } from "react";
 import type { Platform } from "@/lib/export/types";

@@ -1,4 +1,4 @@
-// The graph the site makes from one description: Describe Game (the person's words), a Build Model step for each model the AI asked for, the Game Template and
+// The graph the site makes from one description: Describe Game (the person's words), a Build Model step for each model the AI asked for, the Assemble Game and
 // the Preview, already wired. Pure: the AI's answer goes in, a graph comes out; the person never wires anything. Every model step is `soft`, so one that cannot
 // be built leaves a plain shape in the game instead of stopping it.
 import type { AssetRequest } from "@/lib/engine/service";

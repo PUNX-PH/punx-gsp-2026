@@ -55,7 +55,7 @@ describe("SettingsPanel", () => {
 
   it("names the selected step and says what it is", () => {
     const html = panel("n3");
-    expect(html).toContain("Game Template");
+    expect(html).toContain("Assemble Game");
     expect(html).toContain("Puts the game together");
   });
 
@@ -80,7 +80,7 @@ describe("SettingsPanel", () => {
     expect(html).toContain("1.5 KB");
   });
 
-  it("gives a Game Template three sliders in plain words, with their ranges and values", () => {
+  it("gives an Assemble Game three sliders in plain words, with their ranges and values", () => {
     const html = panel("n3");
     expect(html.match(/type="range"/g)).toHaveLength(3);
     for (const label of ["How fast it runs", "How high it jumps", "How far apart the obstacles are"]) expect(html).toContain(label);
@@ -131,7 +131,7 @@ describe("AddMenu", () => {
 
   it("has a button for every choice with its name and help", () => {
     const html = renderToString(<AddMenu choices={addChoices(starterGraph())} onPick={noop} onClose={noop} />);
-    for (const name of ["Reference Image", "3D Model", "Prepare Model", "Make Shape", "Build Model", "Palette from Image", "Describe Game", "Game Template", "Preview"]) expect(html).toContain(name);
+    for (const name of ["Reference Image", "3D Model", "Prepare Model", "Make Shape", "Build Model", "Palette from Image", "Describe Game", "Assemble Game", "Preview"]) expect(html).toContain(name);
     expect(html).toContain("A model of your own, as a GLB, FBX or OBJ file.");
     expect(html.match(/role="menuitem"/g)).toHaveLength(10);
   });
@@ -157,7 +157,7 @@ describe("SettingsPanel for the Preview", () => {
   });
 });
 
-describe("SettingsPanel for Describe Game and a locked Game Template", () => {
+describe("SettingsPanel for Describe Game and a locked Assemble Game", () => {
   const node = (id: string, type: string, params: Record<string, unknown>) => ({ id, type, params, position: { x: 0, y: 0 } });
   const described = (prompt: string): Graph => ({
     schemaVersion: 1,

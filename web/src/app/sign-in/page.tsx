@@ -163,7 +163,7 @@ export default function SignInPage() {
 }
 
 /**
- * The steps of a game as the editor draws them: a picture and the words go into Describe Game, which feeds the Game Template, which feeds the Preview.
+ * The steps of a game as the editor draws them: a picture and the words go into Describe Game, which feeds the Assemble Game, which feeds the Preview.
  * The wires draw themselves once. It is decoration for a page the person has seen, so it is hidden from screen readers.
  */
 function Diagram() {
@@ -187,7 +187,7 @@ function Diagram() {
         <span className={styles.typed}>A fox that jumps over logs and collects berries</span>
       </div>
       <div className={styles.node} style={{ left: "56%", top: "5.7%", width: "42%", height: "24%", ["--dot" as string]: "var(--wire-settings)" }}>
-        <span className={styles.nodeName}>Game Template</span>
+        <span className={styles.nodeName}>Assemble Game</span>
         <span className={styles.nodeBody}>Script game, 5 colors</span>
       </div>
       <div className={styles.node} style={{ left: "56%", top: "63%", width: "42%", height: "34%", ["--dot" as string]: "var(--accent)" }}>

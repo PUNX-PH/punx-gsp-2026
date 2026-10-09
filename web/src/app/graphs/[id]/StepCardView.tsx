@@ -134,7 +134,7 @@ function Result({ result, onOpenGame }: { result: ResultView; onOpenGame?: () =>
   }
 }
 
-/** A card with more inputs than this (the Game Template has fourteen) shows only the ones that are required or wired, until it is selected or opened. */
+/** A card with more inputs than this (the Assemble Game has fourteen) shows only the ones that are required or wired, until it is selected or opened. */
 const COLLAPSE_ABOVE = 6;
 
 export function StepCardView({ data, selected, onAddFrom, onRemove, onOpenGame, renderHandle }: StepCardViewProps) {

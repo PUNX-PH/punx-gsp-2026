@@ -71,7 +71,7 @@ describe("addChoices and Build Model", () => {
     expect(addChoices(graph, { node: "n1", port: "image" }).find((c) => c.type === "build-model")?.wireInto).toBe("image");
   });
 
-  it("offers the Game Template from Build Model's model output, into its hero input", () => {
+  it("offers the Assemble Game from Build Model's model output, into its hero input", () => {
     expect(addChoices(withBuilt(), { node: "n9", port: "model" }).map((c) => [c.type, c.wireInto])).toEqual([["prepare-model", "model"], ["game-template", "hero"]]);
   });
 });
@@ -93,7 +93,7 @@ describe("addChoices and Build Environment", () => {
     expect(addChoices(graph, { node: "n5", port: "model" }).some((c) => c.type === "build-environment")).toBe(false);
   });
 
-  it("offers only the Game Template from Build Environment's environment output, into its environment input", () => {
+  it("offers only the Assemble Game from Build Environment's environment output, into its environment input", () => {
     expect(addChoices(withWorld(), { node: "n9", port: "environment" }).map((c) => [c.type, c.wireInto])).toEqual([["game-template", "environment"]]);
   });
 });
@@ -104,7 +104,7 @@ describe("addChoices and Describe Game", () => {
     expect(choice).toMatchObject({ label: "Describe Game", help: NODE_SPECS["describe-game"].help });
   });
 
-  it("offers the Game Template from an open feel output, into its feel input", () => {
+  it("offers the Assemble Game from an open feel output, into its feel input", () => {
     const graph: Graph = { ...withoutPreview(), nodes: [...withoutPreview().nodes, { id: "n9", type: "describe-game", params: { prompt: "" }, position: { x: 0, y: 400 } }] };
     expect(addChoices(graph, { node: "n9", port: "feel" }).map((c) => [c.type, c.wireInto])).toEqual([["game-template", "feel"]]);
     expect(addChoices(graph, { node: "n9", port: "palette" }).map((c) => [c.type, c.wireInto])).toEqual([["prepare-model", "palette"], ["make-shape", "palette"], ["build-model", "palette"], ["build-environment", "palette"], ["game-template", "palette"]]);

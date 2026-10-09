@@ -101,7 +101,7 @@ const gameWire = (files: { file: string; sha256: string }[] = [], over: Partial<
   type: "game", spec: { ...spec(), ...over }, leftOut: "", assets: [], entityFiles: files,
 });
 
-describe("Game Template with a game wired in", () => {
+describe("Assemble Game with a game wired in", () => {
   it("makes settings that carry the game, check as settings, and need no role files", async () => {
     const done = await gameTemplate({ game: gameWire() }, { tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } }, {} as ExecutorContext);
     expect(done.output?.type).toBe("settings");

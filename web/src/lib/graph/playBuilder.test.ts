@@ -75,7 +75,7 @@ describe("Build Model played through the graph service", () => {
     expect((await runs.readFile(alice, played.runId!, "hero.glb")).bytes).toEqual(BUILT);
   });
 
-  it("stops at the Game Template, with the role sentence, when the model was built for another role", async () => {
+  it("stops at the Assemble Game, with the role sentence, when the model was built for another role", async () => {
     const { blender } = fakeBlender();
     const { service } = setup(blender);
     const made = await service.createGraph(alice, {});
@@ -87,7 +87,7 @@ describe("Build Model played through the graph service", () => {
     if (played.kind !== "ran") return;
     expect(played.result.state).toBe("failed");
     expect(played.result.nodes.n1.state).toBe("done");
-    expect(played.result.nodes.n2).toMatchObject({ state: "failed", error: "Game Template: the hero model was built as an obstacle. Set its role to hero." });
+    expect(played.result.nodes.n2).toMatchObject({ state: "failed", error: "Assemble Game: the hero model was built as an obstacle. Set its role to hero." });
     expect(played.result.nodes.n3.state).toBe("skipped");
   });
 
@@ -137,7 +137,7 @@ describe("Build Model played through the graph service", () => {
 });
 
 describe("Build Environment played through the graph service", () => {
-  /** Build Model into the hero, Build Environment into the world, both into the Game Template, then the Preview. */
+  /** Build Model into the hero, Build Environment into the world, both into the Assemble Game, then the Preview. */
   const worldGraph = (density = "lots"): Graph => ({
     schemaVersion: 1,
     nodes: [

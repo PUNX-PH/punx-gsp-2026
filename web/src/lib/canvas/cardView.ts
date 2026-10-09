@@ -49,9 +49,9 @@ export type StepData = {
   status: StepStatus;
   statusText: string;
   result: ResultView;
-  /** A Game Template whose three numbers are set by a feel wired into it, so its sliders are locked. */
+  /** An Assemble Game whose three numbers are set by a feel wired into it, so its sliders are locked. */
   tuningLocked: boolean;
-  /** The numbers a Game Template's last run used (what a locked slider shows), or null before a run or after a failure. */
+  /** The numbers an Assemble Game's last run used (what a locked slider shows), or null before a run or after a failure. */
   liveTuning: Tuning | null;
   /** The five colors a Prepare Model or Make Shape panel offers: the wired palette's once it has been made, otherwise the sample palette. */
   swatches?: string[];

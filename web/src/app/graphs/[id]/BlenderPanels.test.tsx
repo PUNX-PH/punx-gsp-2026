@@ -151,6 +151,6 @@ describe("the Blender cards", () => {
   it("has an icon of its own for each Blender step, not the default square", () => {
     const fallback = '<rect x="3" y="3" width="10" height="10" rx="2"';
     for (const id of ["n2", "n3"]) expect(render(id, { kind: "none" })).not.toContain(fallback);
-    expect(render("n4", { kind: "none" })).not.toContain(fallback); // and the Game Template's is unchanged
+    expect(render("n4", { kind: "none" })).not.toContain(fallback); // and the Assemble Game's is unchanged
   });
 });

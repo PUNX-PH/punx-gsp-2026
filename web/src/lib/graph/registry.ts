@@ -320,8 +320,8 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
   },
   "game-template": {
     type: "game-template",
-    label: "Game Template",
-    help: "Puts the game together: its rules, its models, its colors and its world. For a plain runner it also sets the speed, the jump and the spacing.",
+    label: "Assemble Game",
+    help: "Puts the game together: its rules, its models, its colors and its world, ready to play in the preview.",
     final: false,
     inputs: [
       port("palette", "palette", "The game's colors. Without one, a sample palette is used.", "palette"),
@@ -343,7 +343,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     label: "Preview",
     help: "Plays the game.",
     final: true,
-    inputs: [port("settings", "game", "The game to play.", "settings", true, "Preview needs a game. Connect a Game Template.")],
+    inputs: [port("settings", "game", "The game to play.", "settings", true, "Preview needs a game. Connect the Assemble Game step.")],
     outputs: [],
     defaultParams: () => ({}),
     shapeProblem: noParams,

@@ -106,7 +106,7 @@ describe("the Build World settings", () => {
     expect(check(params({ theme: "x" }))).toMatch(/only settings a Build World step has/);
     expect(check(params({ sky: 5 }))).toMatch(/sky must be a whole number/);
     expect(check(params({ ground: 1.5 }))).toMatch(/ground must be a whole number/);
-    expect(check(params({ scenery: ["a", "b", "c", "d", "e"] }))).toMatch(/at most 4/);
+    expect(check(params({ scenery: ["a", "b", "c", "d"] }))).toMatch(/at most 3/);
     expect(check(params({ scenery: ["  "] }))).toMatch(/needs words/);
     expect(check(params({ scenery: [5] }))).toMatch(/needs words/);
     expect(check(params({ scenery: ["x".repeat(301)] }))).toMatch(/longer than 300/);

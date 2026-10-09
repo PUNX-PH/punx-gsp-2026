@@ -16,7 +16,7 @@ const runner = JSON.parse(readFileSync(join(process.cwd(), "src", "lib", "engine
 
 function gameSettings(model?: string) {
   const game = structuredClone(runner);
-  game.entities.spike.model = "box"; // Game Template draws a model without a file as a box, so a stored game has none that it lacks
+  game.entities.spike.model = "box"; // Assemble Game draws a model without a file as a box, so a stored game has none that it lacks
   if (model) game.entities.hero.model = model;
   return JSON.stringify({
     schemaVersion: 1, template: "runner", palette: padPalette(game.look.palette),

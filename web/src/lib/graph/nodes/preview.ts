@@ -33,7 +33,7 @@ export const preview: Executor = async (inputs, _params, ctx) => {
   }
 
   // The phone variants of the entities' models come last (a run is ready once its own files are there; these are extras the Android export prefers).
-  for (const piece of game.entityFiles ?? []) {
+  for (const piece of [...(game.entityFiles ?? []), ...(game.scenery ?? [])]) {
     if (piece.mobile === undefined) continue;
     const bytes = await ctx.readAsset(piece.mobile);
     if (!bytes) throw new NodeError("Preview: a model file is missing. Choose it again.");

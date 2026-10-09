@@ -102,7 +102,7 @@ describe("wiringProblem and the Describe Game step", () => {
     node("n4", "palette-from-image"),
   ];
 
-  it("accepts a picture in, and a palette and a feel out to the Game Template", () => {
+  it("accepts a picture in, and a palette and a feel out to the Assemble Game", () => {
     expect(wiringProblem(graph, [], wire("n1", "image", "n2", "image"))).toBeNull();
     expect(wiringProblem(graph, [], wire("n2", "palette", "n3", "palette"))).toBeNull();
     expect(wiringProblem(graph, [], wire("n2", "feel", "n3", "feel"))).toBeNull();
@@ -125,7 +125,7 @@ describe("wiringProblem and the environment wire", () => {
     node("g", "game-template", { tuning: { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 } }),
   ];
 
-  it("accepts an environment into Game Template's environment input", () => {
+  it("accepts an environment into Assemble Game's environment input", () => {
     expect(wiringProblem(graph, [], wire("e", "environment", "g", "environment"), specs)).toBeNull();
   });
 

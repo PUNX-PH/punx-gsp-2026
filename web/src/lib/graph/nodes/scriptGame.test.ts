@@ -139,7 +139,7 @@ describe("Describe Game in script mode", () => {
   });
 });
 
-describe("Game Template with a script wired in", () => {
+describe("Assemble Game with a script wired in", () => {
   const tuning = { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 };
 
   it("makes settings that name game.lua, check as settings, carry the script, and need no role files", async () => {
@@ -172,7 +172,7 @@ describe("Game Template with a script wired in", () => {
   });
 
   it("refuses a script that does not pass the check, with the reason", async () => {
-    await expect(gameTemplate({ game: scriptWire([], { script: "function update(dt) os.exit() end" }) }, { tuning }, {} as ExecutorContext)).rejects.toThrow(/Game Template: .*`os`/);
+    await expect(gameTemplate({ game: scriptWire([], { script: "function update(dt) os.exit() end" }) }, { tuning }, {} as ExecutorContext)).rejects.toThrow(/Assemble Game: .*`os`/);
   });
 
   it("leaves a game of rules and the runner as they were", async () => {
@@ -262,6 +262,32 @@ describe("Preview with a script", () => {
     expect(Object.keys(run.files).sort()).toEqual(["entity-hero.glb", "game.lua", "scenery1.glb", "scenery2.glb", "settings.json"]);
   });
 
+  it("custom scenery from Build World goes in the run with its phone variants, under the fixed names", async () => {
+    const PC = "c".repeat(64);
+    const PHONE = "d".repeat(64);
+    const world: WireValue = { type: "environment", sky: 0, field: 3, stripe: 3, density: "lots", scenery: [{ kind: "custom", sha256: PC, mobile: PHONE }, { kind: "custom", sha256: PC }] };
+    let n = 0;
+    const runs = makeRunService({ records: new MemoryRunRecords(), files: new MemoryFileStore(), now: Date.now, newId: () => `run${++n}` });
+    let last: string | null = null;
+    const pc = makeGlb({ asset: { version: "2.0" } });
+    const phone = makeGlb({ asset: { version: "2.0" }, extras: { phone: true } });
+    const ctx = {
+      user,
+      runs,
+      lastRun: { get: () => last, set: (id: string | null) => void (last = id) },
+      readAsset: async (sha: string) => (sha === PC ? pc : sha === PHONE ? phone : null),
+    } as unknown as ExecutorContext;
+
+    const made = await gameTemplate({ game: scriptWire(), environment: world }, {}, ctx);
+    if (made.output?.type !== "settings") throw new Error("expected settings");
+    expect(made.output.scenery).toEqual([{ file: "scenery1.glb", sha256: PC, mobile: PHONE }, { file: "scenery2.glb", sha256: PC }]);
+    const done = await preview({ settings: made.output }, {}, ctx);
+    const runId = (done.result as { runId: string }).runId;
+    const run = (await runs.listRuns(user)).find((r) => r.id === runId)!;
+    expect(Object.keys(run.files).sort()).toEqual(["game.lua", "scenery1.glb", "scenery1.mobile.glb", "scenery2.glb", "settings.json"]);
+    expect(run.status).toBe("ready");
+  });
+
   it("without an environment the settings are what they were: no environment, no scenery", async () => {
     const made = await gameTemplate({ game: scriptWire([{ file: entityFile("hero"), sha256: SHA }]) }, {}, {} as ExecutorContext);
     if (made.output?.type !== "settings") throw new Error("expected settings");
@@ -294,7 +320,7 @@ describe("Preview with a script", () => {
 // What a Build Model step hands on (its wire value), here a stored GLB.
 const buildModelStep = async (): Promise<WireValue> => ({ type: "model", sha256: SHA, name: "hero.glb", size: 1, format: "glb", role: "hero" });
 
-describe("Game Template's numbered model inputs", () => {
+describe("Assemble Game's numbered model inputs", () => {
   const tuning = { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 };
   const assets = [
     { entity: "hero", role: "hero" as const, kind: "biped" as const, description: "x" },
@@ -323,7 +349,7 @@ describe("Game Template's numbered model inputs", () => {
   });
 });
 
-describe("Describe Game, Game Template and Preview together, as Play runs them", () => {
+describe("Describe Game, Assemble Game and Preview together, as Play runs them", () => {
   it("turns words into a ready run with the script, one model and the settings", async () => {
     let n = 0;
     const runs = makeRunService({ records: new MemoryRunRecords(), files: new MemoryFileStore(), now: Date.now, newId: () => `run${++n}` });

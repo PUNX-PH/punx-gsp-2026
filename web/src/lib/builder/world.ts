@@ -1,5 +1,5 @@
 // The art style and the world of a made game, as Claude plans them in the same answer as the script: one style for every model, and the sky, the ground and
-// the scenery around the field. Claude's answer is untrusted: these repair it (palette slots clamped, words cleaned and cut, at most four pieces of scenery),
+// the scenery around the field. Claude's answer is untrusted: these repair it (palette slots clamped, words cleaned and cut, at most three pieces of scenery),
 // they never fail the game. Pure.
 import { cleanPrompt } from "@/lib/ai/answer";
 
@@ -9,7 +9,7 @@ export type ArtStyle = (typeof ART_STYLES)[number];
 /** The look a game gets when Claude names none (or one that is not in the list). */
 export const DEFAULT_STYLE: ArtStyle = "stylized";
 
-export const MAX_SCENERY = 4;
+export const MAX_SCENERY = 3;
 const MAX_SCENERY_WORDS = 300;
 
 /** The world around a game's field: palette indexes 0 to 4 for the sky and the ground, and the scenery in words (each piece is built as a model of its own). */

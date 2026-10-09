@@ -1,4 +1,4 @@
-// The Game Template's three sliders, and the live "will this be playable" line under them. The message is the one Play
+// The Assemble Game's three sliders, and the live "will this be playable" line under them. The message is the one Play
 // would give (it comes from the same validator the Unity template is held to), with the technical path replaced by the
 // plain name of the field.
 import { SAMPLE_PALETTE } from "@/lib/graph/palette";

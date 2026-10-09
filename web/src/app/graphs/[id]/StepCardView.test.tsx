@@ -106,7 +106,7 @@ describe("StepCardView", () => {
     expect(model).toContain("1.5 KB");
   });
 
-  it("shows the settings of a Game Template, and a way to open the game on a Preview", () => {
+  it("shows the settings of an Assemble Game, and a way to open the game on a Preview", () => {
     expect(render(data("n3", { run: played() }))).toContain("speed 6 · jump 2.2 · spacing 12");
     expect(render(data("n4", { run: played() }), { onOpenGame: () => {} })).toContain("Open game");
     expect(render(data("n4"))).not.toContain("Open game");

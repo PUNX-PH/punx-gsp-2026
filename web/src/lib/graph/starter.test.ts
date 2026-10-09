@@ -4,7 +4,7 @@ import { parseGraph } from "@/lib/graph/schema";
 import { builtStarterGraph, describedStarterGraph, starterGraph } from "@/lib/graph/starter";
 
 describe("describedStarterGraph", () => {
-  it("is a graph the parser accepts: a picture, Describe Game, the Game Template and the Preview, wired with the whole game", () => {
+  it("is a graph the parser accepts: a picture, Describe Game, the Assemble Game and the Preview, wired with the whole game", () => {
     const graph = describedStarterGraph();
     expect(parseGraph(graph).ok).toBe(true);
     expect(graph.nodes.map((n) => [n.id, n.type])).toEqual([

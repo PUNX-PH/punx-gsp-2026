@@ -149,7 +149,7 @@ export type WireValue =
       settingsText: string;
       tuning: Tuning;
       models: Record<Role, ModelSource>;
-      scenery?: { file: string; sha256: string }[];
+      scenery?: { file: string; sha256: string; mobile?: string }[];
       world?: { file: string; sha256: string }[];
       // Present (even empty) only for an engine game or a script game: the entity files, which are then the only files of the run besides the script.
       entityFiles?: EntityFile[];

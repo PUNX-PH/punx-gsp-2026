@@ -235,11 +235,11 @@ describe("the script service", () => {
       expect((await one({})).style).toBe("stylized");
     });
 
-    it("reads the world: palette slots 1 to 5 become indexes 0 to 4, scenery is cleaned and capped at four, empty pieces dropped", async () => {
+    it("reads the world: palette slots 1 to 5 become indexes 0 to 4, scenery is cleaned and capped at three, empty pieces dropped", async () => {
       const r = await one({
         world: { sky: 5, ground: 2, scenery: [{ description: "a snowy pine" }, { description: "   " }, { description: "a neon sign" }, { description: "a" }, { description: "b" }, { description: "c" }] },
       });
-      expect(r.world).toEqual({ sky: 4, ground: 1, scenery: [{ description: "a snowy pine" }, { description: "a neon sign" }, { description: "a" }, { description: "b" }] });
+      expect(r.world).toEqual({ sky: 4, ground: 1, scenery: [{ description: "a snowy pine" }, { description: "a neon sign" }, { description: "a" }] });
     });
 
     it("clamps wild slots, and has no world when Claude planned none", async () => {

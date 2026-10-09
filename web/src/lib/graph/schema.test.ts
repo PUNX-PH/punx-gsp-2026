@@ -135,7 +135,7 @@ describe("parseGraph refuses, in plain words", () => {
   });
 });
 
-describe("parseGraph and the tuning of a Game Template (Review Focus 3)", () => {
+describe("parseGraph and the tuning of an Assemble Game (Review Focus 3)", () => {
   const withTuning = (tuning: unknown) => changed((g) => (g.nodes[2].params = { tuning }));
 
   it.each([
@@ -147,7 +147,7 @@ describe("parseGraph and the tuning of a Game Template (Review Focus 3)", () => 
     ["an extra key", { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12, gravity: 9 }],
     ["no tuning object at all", null],
   ])("refuses %s", (_label, tuning) => {
-    expect(refused(withTuning(tuning))).toMatch(/Game Template/);
+    expect(refused(withTuning(tuning))).toMatch(/Assemble Game/);
   });
 
   it("accepts a tuning that is a valid number but not playable (that is decided at Play, with the slice 2 message)", () => {
@@ -156,7 +156,7 @@ describe("parseGraph and the tuning of a Game Template (Review Focus 3)", () => 
 
   it("reads 1e999 from real JSON as Infinity and refuses it", () => {
     const text = JSON.stringify(valid()).replace('"speed":6', '"speed":1e999');
-    expect(refused(JSON.parse(text))).toMatch(/Game Template/);
+    expect(refused(JSON.parse(text))).toMatch(/Assemble Game/);
   });
 });
 

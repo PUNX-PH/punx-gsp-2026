@@ -21,13 +21,13 @@ export const describeGame: Executor = async (inputs, params, ctx) => {
   }
 
   // Script (the default for new steps): Claude writes a Lua game, its five colors and the models it wants. There is no palette or feel port value: the
-  // colors travel with the game, and Game Template puts them in the settings.
+  // colors travel with the game, and Assemble Game puts them in the settings.
   if (mode === "script") {
     if (!ctx.scripts) throw new NodeError("Describe Game: making a whole game is not set up on this site yet.");
     const attempt = typeof params.attempt === "number" ? params.attempt : 0;
     const made = await ctx.scripts.create({ user: ctx.user, deadline: ctx.deadline }, { description: prompt, picture, models: [], attempt });
     // The models Claude asked for are not built here: each is a Build Model step of its own in the graph (the site makes them from this answer), wired
-    // to the Game Template's numbered model inputs in the order of `assets`, so each can be seen, changed and rebuilt.
+    // to the Assemble Game's numbered model inputs in the order of `assets`, so each can be seen, changed and rebuilt.
     const outputs: Record<string, WireValue> = {
       game: { type: "game", script: made.script, palette: made.palette, leftOut: made.leftOut, assets: made.assets, entityFiles: [] },
       palette: { type: "palette", colors: made.palette },
@@ -39,7 +39,7 @@ export const describeGame: Executor = async (inputs, params, ctx) => {
   }
 
   // Rules (and a saved true): Claude writes a whole game for the engine instead of a palette and a feel. The palette it chose is still offered, so a
-  // Game Template without the game wire keeps its colors.
+  // Assemble Game without the game wire keeps its colors.
   if (mode === "rules") {
     if (!ctx.games) throw new NodeError("Describe Game: making a whole game is not set up on this site yet.");
     const made = await ctx.games.create({ user: ctx.user, deadline: ctx.deadline }, { description: prompt, picture, models: [] });

@@ -138,7 +138,7 @@ describe("addNode", () => {
 
 describe("addNode and the size of a card (review fix)", () => {
   it("never puts a new step on top of any part of an existing card, which is 232 px wide and up to 260 px tall", () => {
-    // The + on the starter's 3D Model asks for a spot to its right, which used to land across the Game Template's lower half.
+    // The + on the starter's 3D Model asks for a spot to its right, which used to land across the Assemble Game's lower half.
     const added = addNode(starterGraph(), "game-template", { x: 560, y: 200 });
     expect(added.ok).toBe(true);
     if (!added.ok) return;

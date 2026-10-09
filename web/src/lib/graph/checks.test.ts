@@ -96,7 +96,7 @@ describe("checkGraph", () => {
   it("says what a Preview with no game needs", () => {
     const g = starter();
     g.edges = g.edges.filter((e) => e.to.node !== "n4");
-    expect(checkGraph(g, assets)).toEqual([{ node: "n4", message: "Preview needs a game. Connect a Game Template." }]);
+    expect(checkGraph(g, assets)).toEqual([{ node: "n4", message: "Preview needs a game. Connect the Assemble Game step." }]);
   });
 
   it("asks for a picture to be chosen", () => {

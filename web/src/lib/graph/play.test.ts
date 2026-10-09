@@ -89,7 +89,7 @@ describe("Play", () => {
     expect((await context.records.get(made.id))?.lastRunId).toBeNull();
   });
 
-  it("reports an unplayable tuning on the Game Template, skips the Preview, and keeps the earlier run", async () => {
+  it("reports an unplayable tuning on the Assemble Game, skips the Preview, and keeps the earlier run", async () => {
     const context = setup();
     const { id, graph } = await ready(context);
     await context.service.play(alice, id);
@@ -102,7 +102,7 @@ describe("Play", () => {
     if (played.kind !== "ran") return;
     expect(played.result.state).toBe("failed");
     expect(played.result.nodes.n3.state).toBe("failed");
-    expect(played.result.nodes.n3.error).toMatch(/^Game Template: /);
+    expect(played.result.nodes.n3.error).toMatch(/^Assemble Game: /);
     expect(played.result.nodes.n4.state).toBe("skipped");
     expect(played.runId).toBeUndefined();
     expect([...context.runRecords.runs.keys()]).toEqual(["run1"]);
@@ -186,7 +186,7 @@ describe("Play with a Describe Game step", () => {
     summary: "A fast neon night run.",
   };
 
-  /** Reference Image -> Describe Game -> Game Template -> Preview, with a picture chosen and a prompt typed. */
+  /** Reference Image -> Describe Game -> Assemble Game -> Preview, with a picture chosen and a prompt typed. */
   async function describedGame(ai?: DescribeGameService) {
     let graphs = 0;
     let runIds = 0;

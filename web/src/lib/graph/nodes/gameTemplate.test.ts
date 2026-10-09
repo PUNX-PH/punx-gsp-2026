@@ -13,7 +13,7 @@ const ctx = {} as ExecutorContext;
 const tuning: Tuning = { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 };
 const SHA = "c".repeat(64);
 
-describe("the Game Template node", () => {
+describe("the Assemble Game node", () => {
   it("makes valid settings from the defaults when nothing is connected", async () => {
     const { output, result } = await gameTemplate({}, { tuning }, ctx);
 
@@ -78,7 +78,7 @@ describe("the Game Template node", () => {
 
     const failure = await gameTemplate({}, { tuning: bad }, ctx).catch((e) => e);
     expect(failure).toBeInstanceOf(NodeError);
-    expect(failure.message).toBe(`Game Template: ${expected.ok ? "" : expected.error}`);
+    expect(failure.message).toBe(`Assemble Game: ${expected.ok ? "" : expected.error}`);
   });
 
   it("accepts the tuning at the top of the allowed ranges", async () => {
@@ -87,7 +87,7 @@ describe("the Game Template node", () => {
   });
 });
 
-describe("the Game Template node and the role a model was built for", () => {
+describe("the Assemble Game node and the role a model was built for", () => {
   const built = (role: "hero" | "obstacle" | "collectible", clips: ("Run" | "Jump" | "Loop")[] = ["Run", "Jump"]) => ({
     type: "model" as const,
     sha256: SHA,
@@ -102,13 +102,13 @@ describe("the Game Template node and the role a model was built for", () => {
   it("refuses a model built for another role, and says which role to set", async () => {
     const wrongHero = await failure(gameTemplate({ hero: built("obstacle") }, { tuning }, ctx));
     expect(wrongHero).toBeInstanceOf(NodeError);
-    expect((wrongHero as Error).message).toBe("Game Template: the hero model was built as an obstacle. Set its role to hero.");
+    expect((wrongHero as Error).message).toBe("Assemble Game: the hero model was built as an obstacle. Set its role to hero.");
 
     const wrongCollectible = await failure(gameTemplate({ collectible: built("hero") }, { tuning }, ctx));
-    expect((wrongCollectible as Error).message).toBe("Game Template: the collectible model was built as a hero. Set its role to collectible.");
+    expect((wrongCollectible as Error).message).toBe("Assemble Game: the collectible model was built as a hero. Set its role to collectible.");
 
     const wrongObstacle = await failure(gameTemplate({ obstacle: built("collectible") }, { tuning }, ctx));
-    expect((wrongObstacle as Error).message).toBe("Game Template: the obstacle model was built as a collectible. Set its role to obstacle.");
+    expect((wrongObstacle as Error).message).toBe("Assemble Game: the obstacle model was built as a collectible. Set its role to obstacle.");
   });
 
   it("takes a model built for the role it is plugged into", async () => {
@@ -128,7 +128,7 @@ describe("the Game Template node and the role a model was built for", () => {
   });
 });
 
-describe("the Game Template node and model files that are not GLBs", () => {
+describe("the Assemble Game node and model files that are not GLBs", () => {
   const raw = (format: "fbx" | "obj") => ({ type: "model" as const, sha256: SHA, name: `thing.${format}`, size: 100, format });
   const failure = (run: Promise<unknown>) => run.then(() => null, (e: unknown) => e);
 
@@ -139,7 +139,7 @@ describe("the Game Template node and model files that are not GLBs", () => {
   ] as const)("refuses a raw %s model that is a %s file, and says what to do", async (role, format, shown) => {
     const error = await failure(gameTemplate({ [role]: raw(format) }, { tuning }, ctx));
     expect(error).toBeInstanceOf(NodeError);
-    expect((error as Error).message).toBe(`Game Template: the ${role} model is an ${shown} file. Put a Prepare Model step after it.`);
+    expect((error as Error).message).toBe(`Assemble Game: the ${role} model is an ${shown} file. Put a Prepare Model step after it.`);
   });
 
   it("still takes a GLB in every role", async () => {
@@ -149,7 +149,7 @@ describe("the Game Template node and model files that are not GLBs", () => {
   });
 });
 
-describe("the Game Template node and the look and the world of High quality", () => {
+describe("the Assemble Game node and the look and the world of High quality", () => {
   const SHA_A = "a".repeat(64);
   const SHA_B = "b".repeat(64);
   const TERRAIN = "e".repeat(64);
@@ -237,7 +237,7 @@ describe("the Game Template node and the look and the world of High quality", ()
   });
 });
 
-describe("the Game Template node and an environment", () => {
+describe("the Assemble Game node and an environment", () => {
   const SHA_A = "a".repeat(64);
   const SHA_B = "b".repeat(64);
   const SHA_C = "c".repeat(64);
@@ -297,7 +297,7 @@ describe("the Game Template node and an environment", () => {
     const bad = { ...world([]), sky: 5 };
     const error = await failure(gameTemplate({ environment: bad }, { tuning }, ctx));
     expect(error).toBeInstanceOf(NodeError);
-    expect((error as Error).message).toBe("Game Template: settings.environment.sky: 5 is not a palette index (0 to 4)");
+    expect((error as Error).message).toBe("Assemble Game: settings.environment.sky: 5 is not a palette index (0 to 4)");
   });
 
   it("ignores a connected value that is not an environment", async () => {

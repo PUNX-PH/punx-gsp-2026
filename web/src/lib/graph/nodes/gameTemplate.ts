@@ -1,4 +1,4 @@
-// The Game Template node: turns the palette, the models and the tuning into a runner game's settings. It stores
+// The Assemble Game node: turns the palette, the models and the tuning into a runner game's settings. It stores
 // nothing (the Preview does); it only builds the settings and checks them exactly as the Unity template will.
 import { SAMPLE_PALETTE } from "@/lib/graph/palette";
 import { entityFile, entityFilesNeeded, usesFile } from "@/lib/engine/files";
@@ -24,7 +24,7 @@ function gameSettings(game: Extract<WireValue, { type: "game"; spec: GameSpec }>
   const spec = { ...game.spec, entities };
   const tuning: Tuning = { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 };
   const checked = validateSettings(JSON.stringify({ schemaVersion: 1, template: "runner", palette: padPalette(spec.look.palette), roles: ROLE_FILES, tuning, game: spec }));
-  if (!checked.ok) throw new NodeError(`Game Template: ${checked.error}`);
+  if (!checked.ok) throw new NodeError(`Assemble Game: ${checked.error}`);
   const needed = new Set(entityFilesNeeded(spec));
   const models = Object.fromEntries(ROLES.map((role): [Role, ModelSource] => [role, { kind: "builtin", role }])) as Record<Role, ModelSource>;
   return {
@@ -39,13 +39,13 @@ function gameSettings(game: Extract<WireValue, { type: "game"; spec: GameSpec }>
  */
 function scriptSettings(game: Extract<WireValue, { type: "game"; script: string }>, inputs: Partial<Record<string, WireValue>>) {
   const checkedScript = checkScript(game.script);
-  if (!checkedScript.ok) throw new NodeError(`Game Template: ${checkedScript.reason}`);
+  if (!checkedScript.ok) throw new NodeError(`Assemble Game: ${checkedScript.reason}`);
   // A model comes from a numbered input (the Nth model Describe Game listed) or, for a game that carried its own files, from the wire.
   const files = [...game.entityFiles];
   game.assets.slice(0, SCRIPT_MODEL_PORTS).forEach((asset, i) => {
     const given = inputs[`model${i + 1}`];
     if (given?.type !== "model") return;
-    if (given.format !== "glb") throw new NodeError(`Game Template: model ${i + 1} is an ${given.format.toUpperCase()} file. Put a Prepare Model step after it.`);
+    if (given.format !== "glb") throw new NodeError(`Assemble Game: model ${i + 1} is an ${given.format.toUpperCase()} file. Put a Prepare Model step after it.`);
     if (!files.some((f) => f.file === entityFile(asset.entity))) files.push({ file: entityFile(asset.entity), sha256: given.sha256, ...(given.mobile ? { mobile: given.mobile.sha256 } : {}) });
   });
   const have = new Set(files.map((f) => f.file));
@@ -53,12 +53,12 @@ function scriptSettings(game: Extract<WireValue, { type: "game"; script: string 
   const tuning: Tuning = { speed: 6, jumpHeight: 2.2, obstacleSpacing: 12 };
   // A connected environment gives the game its world: the sky, the ground's color and scenery along the field (the scenery files go in the run under fixed names).
   const world = inputs.environment?.type === "environment" ? inputs.environment : null;
-  const scenery = world ? world.scenery.slice(0, SCENERY_FILES.length).map((piece, index) => ({ file: SCENERY_FILES[index], sha256: piece.sha256 })) : [];
+  const scenery = world ? world.scenery.slice(0, SCENERY_FILES.length).map((piece, index) => ({ file: SCENERY_FILES[index], sha256: piece.sha256, ...(piece.mobile ? { mobile: piece.mobile } : {}) })) : [];
   const environment = world && scenery.length > 0 ? { sky: world.sky, field: world.field, stripe: world.stripe, density: world.density, scenery: scenery.map((s) => s.file) } : undefined;
   const checked = validateSettings(
     JSON.stringify({ schemaVersion: 1, template: "runner", palette: game.palette, roles: ROLE_FILES, tuning, script: { file: SCRIPT_FILE, models: names }, ...(environment ? { environment } : {}) }),
   );
-  if (!checked.ok) throw new NodeError(`Game Template: ${checked.error}`);
+  if (!checked.ok) throw new NodeError(`Assemble Game: ${checked.error}`);
   const needed = new Set(names.map(entityFile));
   const models = Object.fromEntries(ROLES.map((role): [Role, ModelSource] => [role, { kind: "builtin", role }])) as Record<Role, ModelSource>;
   return {
@@ -88,11 +88,11 @@ export const gameTemplate: Executor = async (inputs, params) => {
       const given = inputs[role];
       // Only a GLB can go into a game as it is: an FBX or an OBJ has to be prepared first.
       if (given?.type === "model" && given.format !== "glb") {
-        throw new NodeError(`Game Template: the ${role} model is an ${given.format.toUpperCase()} file. Put a Prepare Model step after it.`);
+        throw new NodeError(`Assemble Game: the ${role} model is an ${given.format.toUpperCase()} file. Put a Prepare Model step after it.`);
       }
       // A built model knows what it was built for (an obstacle has no Run clip to play): a mismatch is the person's to fix.
       if (given?.type === "model" && given.role !== undefined && given.role !== role) {
-        throw new NodeError(`Game Template: the ${role} model was built as ${article(given.role)} ${given.role}. Set its role to ${role}.`);
+        throw new NodeError(`Assemble Game: the ${role} model was built as ${article(given.role)} ${given.role}. Set its role to ${role}.`);
       }
       return [role, given?.type === "model" ? { kind: "asset", sha256: given.sha256 } : { kind: "builtin", role }];
     }),
@@ -114,7 +114,7 @@ export const gameTemplate: Executor = async (inputs, params) => {
   const checked = validateSettings(
     JSON.stringify({ schemaVersion: 1, template: "runner", palette, roles: ROLE_FILES, tuning, ...(environment ? { environment } : {}), ...(lit ? { look: "lit" } : {}) }),
   );
-  if (!checked.ok) throw new NodeError(`Game Template: ${checked.error}`);
+  if (!checked.ok) throw new NodeError(`Assemble Game: ${checked.error}`);
 
   return { output: { type: "settings", settingsText: checked.text, tuning, models, ...(scenery ? { scenery } : {}), ...(worldFiles ? { world: worldFiles } : {}) }, result: { tuning } };
 };
