@@ -76,7 +76,7 @@ namespace Runner.Tests
             Assert.Greater(DrawnObjects(), 0, name + " drew nothing");
         }
 
-        static string[] Examples() => new[] { "runner", "flier", "catcher", "crosser", "collector", "glider" };
+        static string[] Examples() => new[] { "runner", "flier", "catcher", "crosser", "collector", "glider", "firstperson" };
 
         [UnityTest]
         public IEnumerator A_game_ends_in_a_loss_when_driven_and_a_press_starts_a_new_round()
@@ -165,7 +165,7 @@ namespace Runner.Tests
         [UnityTest]
         public IEnumerator Every_camera_mode_boots_and_draws()
         {
-            foreach (var mode in new[] { "side", "top", "chase", "fixed", "side2d", "top2d" })
+            foreach (var mode in new[] { "side", "top", "chase", "fixed", "side2d", "top2d", "first" })
             {
                 if (host != null) Object.DestroyImmediate(host);
                 yield return Boot(MakeGame("function init() world.camera{ mode = '" + mode + "' } local o = world.spawn('box', { x = 1, y = 2, z = 0.5 }) world.spawn('quad', { x = -1 }) world.spawn('cone', { y = -2 }) world.spawn('plane') end"));

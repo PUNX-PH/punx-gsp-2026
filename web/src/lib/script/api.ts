@@ -2,7 +2,7 @@
 // server's script check and the docs are all built from it, so they cannot disagree. docs/superpowers/specs/2026-10-08-lua-games-design.md is the
 // description; Runtime/Script/Pure/ScriptHost.cs holds the same limits in C# (a test keeps the two equal).
 
-export const SCRIPT_VERSION = 7;
+export const SCRIPT_VERSION = 8;
 
 export const SCRIPT_FILE = "game.lua";
 
@@ -34,7 +34,7 @@ export const CALLBACKS = [
 
 export const REQUIRED_ONE_OF = ["init", "update", "on_tap", "on_drag"] as const;
 
-export const CAMERA_MODES = ["side", "top", "chase", "fixed", "side2d", "top2d"] as const;
+export const CAMERA_MODES = ["side", "top", "chase", "fixed", "side2d", "top2d", "first"] as const;
 
 export const PRIMITIVE_KINDS = ["box", "sphere", "capsule", "cylinder", "cone", "plane", "quad"] as const;
 
@@ -64,7 +64,7 @@ export const SCRIPT_API: readonly ApiEntry[] = [
   { name: "world.clear", signature: "world.clear()", doc: "Remove every object." },
   { name: "world.gravity", signature: "world.gravity(g)", doc: "Set the downward pull (units per second squared, 20 by default) for objects with gravity = true." },
   { name: "world.bounds", signature: "world.bounds(w, h)", doc: "Set the field's width and height in units (9 by 16 by default)." },
-  { name: "world.camera", signature: "world.camera{ mode, follow, x, y, z, zoom }", doc: "Choose the view and call it again with only the fields to change. side and fixed (3D) see the field head on: x right, y up, z depth away from you. top and chase (3D) see the field as the ground: x right, y running away from you, z height; chase follows the object given as follow from behind and above. (The player also has two flat cameras, side2d and top2d; do not use them: every game is 3D for now.) zoom above 1 moves in. follow = false stops following." },
+  { name: "world.camera", signature: "world.camera{ mode, follow, x, y, z, zoom }", doc: "Choose the view and call it again with only the fields to change. side and fixed (3D) see the field head on: x right, y up, z depth away from you. top and chase (3D) see the field as the ground: x right, y running away from you, z height; chase follows the object given as follow from behind and above. first is the first-person view: the camera sits at the eyes of the object given as follow (which is not drawn) and looks the way its angle points: a view toward angle a (degrees) looks along (-sin a, cos a) in x and y, angle 0 looks along +y, a positive angle turns left; to move or shoot forward set vx = -math.sin(math.rad(a)) * speed and vy = math.cos(math.rad(a)) * speed. In the first view input.x and input.y are a point ahead of you in the view, left or right of the middle by where the pointer is across the screen, so turn toward it with math.atan2(input.x - me.x, input.y - me.y) (negated, to get the angle) at a limited speed. (The player also has two flat cameras, side2d and top2d; do not use them: every game is 3D for now.) zoom above 1 moves in. follow = false stops following." },
   { name: "obj.destroy", signature: "obj:destroy()", doc: "Remove the object." },
   { name: "obj.set_color", signature: "obj:set_color(c)", doc: "Change its color." },
   { name: "obj.play", signature: "obj:play(animation)", doc: "Play one of its animations." },

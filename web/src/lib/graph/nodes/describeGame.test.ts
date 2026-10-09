@@ -90,3 +90,27 @@ describe("the Describe Game node and Play's deadline", () => {
     expect(seen).toEqual([{ prompt: "a run", picture: null, deadline: 123_456 }]);
   });
 });
+
+describe("the Describe Game node's Perspective setting", () => {
+  const made = { script: "function init() end", palette: ["#000000", "#111111", "#222222", "#333333", "#444444"], leftOut: "", assets: [], style: "stylized", world: null, asked: true };
+
+  function scriptContext() {
+    const inputs: Record<string, unknown>[] = [];
+    const scripts = {
+      async create(_job: unknown, input: Record<string, unknown>) {
+        inputs.push(input);
+        return made;
+      },
+    };
+    return { ctx: { user, scripts, deadline: 0, readAsset: async () => null } as unknown as ExecutorContext, inputs };
+  }
+
+  it("is passed to the script service as the person chose it, and is auto when nothing was chosen", async () => {
+    const chosen = scriptContext();
+    await describeGame({}, { prompt: "a shooter", makeGame: "script", perspective: "first" }, chosen.ctx);
+    expect(chosen.inputs[0]).toMatchObject({ perspective: "first" });
+    const none = scriptContext();
+    await describeGame({}, { prompt: "a shooter", makeGame: "script" }, none.ctx);
+    expect(none.inputs[0]).toMatchObject({ perspective: "auto" });
+  });
+});

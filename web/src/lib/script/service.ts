@@ -66,6 +66,8 @@ export interface ScriptInput {
    * the same number reuses that answer, so nothing has to be reset and a repeated Play costs nothing.
    */
   attempt: number;
+  /** The view the person chose (first, third, top or side); absent or auto leaves it to Claude. */
+  perspective?: string;
 }
 
 export interface ScriptService {
@@ -168,7 +170,7 @@ export function makeScriptService(deps: ScriptDeps): ScriptService {
       const description = Array.from(cleanPrompt(input.description)).slice(0, MAX_PROMPT_CHARACTERS).join("");
       if (description === "") throw problem("describe the game you want.");
 
-      const key = await scriptKey({ model: deps.modelId, uid: job.user.uid, description, pictureSha: input.picture?.sha256 ?? null, models: input.models, attempt: input.attempt });
+      const key = await scriptKey({ model: deps.modelId, uid: job.user.uid, description, pictureSha: input.picture?.sha256 ?? null, models: input.models, attempt: input.attempt, perspective: input.perspective });
       const found = await deps.cache.get(key);
       const cached = found ? readCached(found.value) : null;
       if (cached) {
@@ -177,7 +179,7 @@ export function makeScriptService(deps: ScriptDeps): ScriptService {
       }
 
       const author = (retryReason?: string) => (timeoutMs: number) =>
-        deps.author.author({ description, picture: input.picture?.bytes ?? null, models: input.models, retryReason, timeoutMs });
+        deps.author.author({ description, picture: input.picture?.bytes ?? null, models: input.models, retryReason, timeoutMs, perspective: input.perspective });
 
       let reply = await ask(job, author());
       let usage = reply.usage;

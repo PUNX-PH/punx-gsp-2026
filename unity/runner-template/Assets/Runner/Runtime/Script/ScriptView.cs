@@ -17,6 +17,8 @@ namespace Runner.Scripting
         static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
         static readonly int Mottle = Shader.PropertyToID("_Mottle");
         const float TopPitch = 58f;          // the top camera looks down at this angle (90 is straight down), so a field has depth and the scenery beside it shows
+        const float FirstPointerDistance = 10f; // in the first-person view the pointer is a point this far ahead, to the left or right of the middle
+        const float EyeHeight = 1.6f;        // the first-person camera's eye above the follow object's z
         const float SceneryMargin = 9f;      // the top camera frames this much more width when there is scenery to show
         static readonly Color DefaultColor = new Color(0.9f, 0.9f, 0.9f);
 
@@ -176,7 +178,7 @@ namespace Runner.Scripting
             get
             {
                 var mode = Runner.Api.Camera.Mode;
-                return mode == "top" || mode == "chase";
+                return mode == "top" || mode == "chase" || mode == "first";
             }
         }
 
@@ -244,6 +246,16 @@ namespace Runner.Scripting
                     t.rotation = Quaternion.Euler(TopPitch, 0f, 0f);
                     break;
                 }
+                case "first":
+                {
+                    // the view from the follow object's eyes, looking where its angle points (the object itself is not drawn); a little down so the ground shows
+                    camera.orthographic = false;
+                    camera.fieldOfView = 70f;
+                    var yaw = follow != null && follow.Alive ? (float)follow.Angle : 0f;
+                    t.position = new Vector3(cx, cz + EyeHeight, cy);
+                    t.rotation = Quaternion.Euler(4f, -yaw, 0f);
+                    break;
+                }
                 case "chase":
                 {
                     camera.orthographic = false;
@@ -279,6 +291,17 @@ namespace Runner.Scripting
         Vector2 ScreenToField(Vector2 screen, Vector2 fallback)
         {
             var ray = camera.ScreenPointToRay(new Vector3(screen.x, screen.y, 0f));
+            if (Runner.Api.Camera.Mode == "first")
+            {
+                var ahead = camera.transform.forward;
+                ahead.y = 0f;
+                if (ahead.sqrMagnitude < 1e-4f) return fallback;
+                ahead.Normalize();
+                var wall = new Plane(-ahead, camera.transform.position + ahead * FirstPointerDistance);
+                if (!wall.Raycast(ray, out var reach)) return fallback;
+                var seen = ray.GetPoint(reach);
+                return new Vector2(seen.x, seen.z);
+            }
             var ground = GroundMode;
             var plane = ground ? new Plane(Vector3.up, Vector3.zero) : new Plane(Vector3.back, Vector3.zero);
             if (!plane.Raycast(ray, out var enter)) return fallback;
@@ -371,6 +394,14 @@ namespace Runner.Scripting
             var y = (float)o.Y;
             var z = (float)o.Z;
             var t = d.Root.transform;
+            var inEyes = Runner.Api.Camera.Mode == "first" && ReferenceEquals(o, Runner.Api.Camera.Follow);
+            if (inEyes)
+            {
+                d.Root.SetActive(false);
+                if (d.Shadow != null) d.Shadow.gameObject.SetActive(false);
+                return;
+            }
+            if (!d.Root.activeSelf) d.Root.SetActive(true);
             if (d.Shadow != null)
             {
                 d.Shadow.gameObject.SetActive(ground);

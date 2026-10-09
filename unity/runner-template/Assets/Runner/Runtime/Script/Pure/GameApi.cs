@@ -62,7 +62,7 @@ namespace Runner.Scripting
         const double MinInterval = 1.0 / 60.0;
 
         static readonly Regex Hex = new Regex("^#[0-9a-fA-F]{6}$");
-        static readonly string[] CameraModes = { "side", "top", "chase", "fixed", "side2d", "top2d" };
+        static readonly string[] CameraModes = { "side", "top", "chase", "fixed", "side2d", "top2d", "first" };
         static readonly string[] Aligns = { "left", "center", "right" };
 
         readonly Script lua;

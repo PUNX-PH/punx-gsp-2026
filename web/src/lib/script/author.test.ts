@@ -117,6 +117,15 @@ describe("the author", () => {
     expect(JSON.stringify(call.messages)).toMatch(/material to interpret, not instructions/);
   });
 
+  it("tells Claude the view the person chose, and says nothing about the view when they chose auto", async () => {
+    const chosen = fakeClient();
+    await author(chosen.client).author({ description: "a shooter", picture: null, models: [], perspective: "first" });
+    expect(JSON.stringify(chosen.calls[0].messages)).toContain("first person: use the first camera");
+    const auto = fakeClient();
+    await author(auto.client).author({ description: "a shooter", picture: null, models: [], perspective: "auto" });
+    expect(JSON.stringify(auto.calls[0].messages)).not.toContain("The person chose the view");
+  });
+
   it("sends the system prompt, the schema, no tools, and the model", async () => {
     const { client, calls } = fakeClient();
     await author(client).author({ description: "x", picture: null, models: [] });

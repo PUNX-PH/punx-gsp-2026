@@ -67,6 +67,16 @@ export type MakeGameMode = "script" | "rules" | "off";
 const MAKE_GAME_MODES: readonly string[] = ["script", "rules", "off"];
 const MAX_ATTEMPTS = 1_000;
 
+/** The view the person chose for the game; auto lets Claude read it from their words. */
+export const PERSPECTIVES = ["auto", "first", "third", "top", "side"] as const;
+export type Perspective = (typeof PERSPECTIVES)[number];
+export const PERSPECTIVE_NAMES: Record<Perspective, string> = { auto: "Auto: from your words", first: "First person", third: "Third person", top: "Top-down", side: "Side view" };
+
+/** A saved `perspective` as one of the five (anything else, or nothing, is auto). */
+export function perspectiveOf(value: unknown): Perspective {
+  return typeof value === "string" && (PERSPECTIVES as readonly string[]).includes(value) ? (value as Perspective) : "auto";
+}
+
 /** A saved `makeGame` as a mode: the words as they are, a saved true (from before scripts) is rules, and false or nothing is off. */
 export function makeGameMode(value: unknown): MakeGameMode {
   if (value === true) return "rules";
@@ -79,7 +89,11 @@ function promptParam(params: Record<string, unknown>): string | null {
   const rest = { ...params };
   delete rest.makeGame;
   delete rest.attempt;
-  if (!hasExactly(rest, ["prompt"])) return "prompt, makeGame and attempt are the only settings a Describe Game step has.";
+  delete rest.perspective;
+  if (!hasExactly(rest, ["prompt"])) return "prompt, makeGame, attempt and perspective are the only settings a Describe Game step has.";
+  if (Object.hasOwn(params, "perspective") && !(typeof params.perspective === "string" && (PERSPECTIVES as readonly string[]).includes(params.perspective))) {
+    return "perspective must be auto, first, third, top or side.";
+  }
   if (Object.hasOwn(params, "makeGame") && typeof params.makeGame !== "boolean" && !(typeof params.makeGame === "string" && MAKE_GAME_MODES.includes(params.makeGame))) {
     return "make a game must be script, rules or off.";
   }

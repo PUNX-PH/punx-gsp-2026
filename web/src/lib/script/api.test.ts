@@ -25,7 +25,7 @@ describe("the script API table", () => {
   });
 
   it("has the camera modes and primitive kinds of the spec", () => {
-    expect([...CAMERA_MODES]).toEqual(["side", "top", "chase", "fixed", "side2d", "top2d"]);
+    expect([...CAMERA_MODES]).toEqual(["side", "top", "chase", "fixed", "side2d", "top2d", "first"]);
     expect([...PRIMITIVE_KINDS]).toEqual(["box", "sphere", "capsule", "cylinder", "cone", "plane", "quad"]);
     expect(SCRIPT_FILE).toBe("game.lua");
   });

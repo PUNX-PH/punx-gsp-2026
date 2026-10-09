@@ -13,7 +13,7 @@ import { SHAPES, SHAPE_NAMES, TRIANGLES } from "@/lib/blender/types";
 import { KIND_NAMES, MODEL_KINDS, QUALITIES, type Quality } from "@/lib/builder/kinds";
 import { TUNING_FIELDS, tuningProblem } from "@/lib/canvas/tuning";
 import { SAMPLE_PALETTE } from "@/lib/graph/palette";
-import { makeGameMode, MAX_DESCRIPTION_CHARACTERS, MAX_MOTION_CHARACTERS, MAX_PROMPT_CHARACTERS, MAX_THEME_CHARACTERS } from "@/lib/graph/registry";
+import { makeGameMode, MAX_DESCRIPTION_CHARACTERS, PERSPECTIVE_NAMES, PERSPECTIVES, perspectiveOf, MAX_MOTION_CHARACTERS, MAX_PROMPT_CHARACTERS, MAX_THEME_CHARACTERS } from "@/lib/graph/registry";
 import { type Assets, type GraphNode, ROLE_FILES, type Role, type Tuning } from "@/lib/graph/types";
 import { DENSITIES, type Density } from "@/lib/settings";
 
@@ -502,6 +502,14 @@ export function SettingsPanel({ node, data, uploading, error, onChooseFile, onTu
             current={makeGameMode(node.params.makeGame)}
             onPick={(value) => onSettings(node.id, { makeGame: value })}
           />
+          {makeGameMode(node.params.makeGame) === "script" && (
+            <ChoiceGroup
+              label="Perspective"
+              choices={PERSPECTIVES.map((value) => ({ value, name: PERSPECTIVE_NAMES[value] }))}
+              current={perspectiveOf(node.params.perspective)}
+              onPick={(value) => onSettings(node.id, { perspective: value })}
+            />
+          )}
           {makeGameMode(node.params.makeGame) === "script" && <TryAgain node={node} onSettings={onSettings} />}
           <PromptBox nodeId={node.id} prompt={typeof node.params.prompt === "string" ? node.params.prompt : ""} onPrompt={onPrompt} />
         </>

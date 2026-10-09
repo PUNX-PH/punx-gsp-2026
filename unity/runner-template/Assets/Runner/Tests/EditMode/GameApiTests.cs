@@ -214,6 +214,7 @@ namespace Runner.Tests
         [TestCase("top")]
         [TestCase("chase")]
         [TestCase("fixed")]
+        [TestCase("first")]
         [TestCase("side2d")]
         [TestCase("top2d")]
         public void EveryCameraModeIsAccepted(string mode)

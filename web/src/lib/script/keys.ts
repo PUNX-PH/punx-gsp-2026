@@ -7,5 +7,5 @@ import { SCRIPT_VERSION } from "./api";
  * A script: the cleaned description, the picture's hash (or null), the names of the models wired in (sorted) and how many times the person pressed Try
  * again. `SCRIPT_VERSION` is part of the key: change it when the prompt, the schema or the check change what the same words give.
  */
-export const scriptKey = (input: { model: string; uid: string; description: string; pictureSha: string | null; models: string[]; attempt: number }): Promise<string> =>
-  hashKey([SCRIPT_VERSION, "script", input.model, input.uid, input.description, input.pictureSha, [...input.models].sort(), input.attempt]);
+export const scriptKey = (input: { model: string; uid: string; description: string; pictureSha: string | null; models: string[]; attempt: number; perspective?: string }): Promise<string> =>
+  hashKey([SCRIPT_VERSION, "script", input.model, input.uid, input.description, input.pictureSha, [...input.models].sort(), input.attempt, ...(input.perspective && input.perspective !== "auto" ? [input.perspective] : [])]);

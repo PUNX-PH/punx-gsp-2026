@@ -3,7 +3,7 @@
 // rules (the cache, the limits, the model, checking the answer) are in the services it is given; this only passes things along.
 import { designEntityAssets } from "@/lib/engine/assets";
 import { paintingPalette } from "@/lib/graph/palette";
-import { makeGameMode } from "@/lib/graph/registry";
+import { makeGameMode, perspectiveOf } from "@/lib/graph/registry";
 import { type Executor, NodeError, type WireValue } from "@/lib/graph/types";
 
 /** A game's one to five colors as the five a palette wire carries: the last one repeated. */
@@ -25,7 +25,7 @@ export const describeGame: Executor = async (inputs, params, ctx) => {
   if (mode === "script") {
     if (!ctx.scripts) throw new NodeError("Describe Game: making a whole game is not set up on this site yet.");
     const attempt = typeof params.attempt === "number" ? params.attempt : 0;
-    const made = await ctx.scripts.create({ user: ctx.user, deadline: ctx.deadline }, { description: prompt, picture, models: [], attempt });
+    const made = await ctx.scripts.create({ user: ctx.user, deadline: ctx.deadline }, { description: prompt, picture, models: [], attempt, perspective: perspectiveOf(params.perspective) });
     // The models Claude asked for are not built here: each is a Build Model step of its own in the graph (the site makes them from this answer), wired
     // to the Assemble Game's numbered model inputs in the order of `assets`, so each can be seen, changed and rebuilt.
     const outputs: Record<string, WireValue> = {
