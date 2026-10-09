@@ -211,7 +211,7 @@ const SHA_MOBILE = "b".repeat(64);
 const JOB: BlenderJob = { user: { uid: "alice", email: "alice@punx.ai" }, graphId: "g1", derived: {} as DerivedFiles, deadline: 1_000_000 };
 const FOX = JSON.stringify({ summary: "A little fox.", materials: [{ color: 3, finish: "painted" }], parts: [{ shape: "ellipsoid", at: [0, 0.4, 0], size: [0.5, 0.5, 0.8] }] });
 
-function setup(options: { designer?: ScriptedDesigner; failMobile?: Error } = {}) {
+function setup(options: { designer?: ScriptedDesigner; failMobile?: Error; phone?: boolean } = {}) {
   const calls: FreeformBody[] = [];
   const seen = new Set<string>();
   const blender: BlenderService = {
@@ -239,11 +239,25 @@ function setup(options: { designer?: ScriptedDesigner; failMobile?: Error } = {}
     blender,
     now: () => 0,
     ai: { designer, designs, motions: new MemoryRecipeCache(), environments: new MemoryRecipeCache(), limits, modelId: "claude-sonnet-5-5", perPerson: 30, total: 300 },
+    ...(options.phone === false ? {} : { phone: true }), // most of these tests are about both variants; the default of the service (no phone) is tested once below
   });
   return { service, calls, designer, designs, limits };
 }
 
 const request = (extra: Partial<BuildModelInput> = {}): BuildModelInput => ({ role: "hero", kind: "freeform", description: "a little fox", motions: { run: "", jump: "", loop: "" }, picture: null, palette: SAMPLE_PALETTE, ...extra });
+
+describe("the phone variant is off by default", () => {
+  it("builds the PC model only: one worker call, no phone file", async () => {
+    const t = setup({ phone: false });
+    const built = await t.service.buildModel(JOB, request());
+    expect(t.calls.map((b) => b.target)).toEqual(["pc"]);
+    expect(built.mobile).toBeUndefined();
+    expect(built.sha256).toBe(SHA_PC);
+    const scenery = await t.service.buildScenery(JOB, { description: "a lamp post", palette: SAMPLE_PALETTE });
+    expect(t.calls.map((b) => b.target)).toEqual(["pc", "pc"]);
+    expect(scenery.mobile).toBeUndefined();
+  });
+});
 
 describe("Build World's scenery", () => {
   it("is designed as a piece of scenery (role scenery, no clips) and built for the PC and the phone, in the game's style", async () => {

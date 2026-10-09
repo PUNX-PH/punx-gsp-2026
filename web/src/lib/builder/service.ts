@@ -55,6 +55,8 @@ export interface BuilderDeps {
   ai?: BuilderAi;
   /** Where outcomes are logged: the step, the call, the outcome, counts and statuses, never the person's words or a recipe. */
   log?: (info: object) => void;
+  /** Also build the variant cut to a phone's budget for every freeform model (a second worker call each). Off: the owner is not working on phones for now. */
+  phone?: boolean;
 }
 
 const STEP = "build-model";
@@ -233,8 +235,8 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
   }
 
   /**
-   * A freeform model (or a piece of scenery, which is one too): designed from the words (there is no kit default to fall back on), then built twice, for the PC and for the phone (two cached
-   * worker calls; the worker fits each to its triangle budget). It has no motions of its own: the worker puts the stock clips of its role on it
+   * A freeform model (or a piece of scenery, which is one too): designed from the words (there is no kit default to fall back on), then built for the PC (and, when
+   * the service is set to, for the phone too: two cached worker calls; the worker fits each to its triangle budget). It has no motions of its own: the worker puts the stock clips of its role on it
    * (a hero runs and jumps, a collectible turns, an obstacle stands still).
    */
   async function buildFreeform(job: Parameters<BuilderService["buildModel"]>[0], input: FreeformInput, description: string): Promise<BuiltModel> {
@@ -250,11 +252,13 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
     // A phone variant that cannot be built (no time left, the day's builds used, a worker that did not answer) leaves the PC model: the Android export then
     // takes the PC file, which is what a run with no variant does.
     let mobile: Awaited<ReturnType<BlenderService["build"]>> | null = null;
-    try {
-      mobile = await deps.blender.build(job, { label, body: { recipe, palette, role, target: "mobile", clips } });
-    } catch (error) {
-      if (!(error instanceof NodeError)) throw error;
-      log({ step: STEP, call: "mobile", outcome: "skipped" });
+    if (deps.phone === true) {
+      try {
+        mobile = await deps.blender.build(job, { label, body: { recipe, palette, role, target: "mobile", clips } });
+      } catch (error) {
+        if (!(error instanceof NodeError)) throw error;
+        log({ step: STEP, call: "mobile", outcome: "skipped" });
+      }
     }
     return {
       sha256: pc.sha256,
