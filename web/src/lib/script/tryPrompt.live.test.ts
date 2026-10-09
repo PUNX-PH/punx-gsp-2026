@@ -1,4 +1,4 @@
-// A LIVE check of the prompt: five unlike game descriptions go to Claude through the real author, and each answer is checked with checkScript. It spends the
+// A LIVE check of the prompt (slice 10: the code, the models, the style and the world in one answer): six unlike game descriptions go to Claude through the real author, and each answer is checked with checkScript. It spends the
 // studio's API credit (a few cents), so it does nothing unless LIVE_PROMPT=1:
 //   LIVE_PROMPT=1 npx vitest run src/lib/script/tryPrompt.live.test.ts
 // The key is read from ANTHROPIC_API_KEY in the environment or from web/.env.local (git-ignored) and is never printed. The scripts are written to web/.live-scripts/
@@ -17,6 +17,7 @@ const GAMES = [
   { slug: "robot-islands", words: "A platformer where a little robot collects batteries across floating islands. Hold to walk, tap to jump." },
   { slug: "neon-breaker", words: "Brick breaker with neon colors, where some bricks drop power-ups that make the paddle wider." },
   { slug: "fishing", words: "A cozy fishing game: tap to cast, then tap again exactly when the bobber dips to hook the fish. Catch five fish to win." },
+  { slug: "flat-pixel", words: "A 2D pixel-art side-scroller where a knight jumps over spikes" },
 ];
 
 function apiKey(): string | undefined {
@@ -30,7 +31,7 @@ function apiKey(): string | undefined {
 }
 
 describe.skipIf(!process.env.LIVE_PROMPT)("the live prompt check", () => {
-  it("asks Claude for five unlike games and checks each script", { timeout: 600_000 }, async () => {
+  it("asks Claude for six unlike games and checks each script", { timeout: 600_000 }, async () => {
     const key = apiKey();
     if (!key) throw new Error("No ANTHROPIC_API_KEY in the environment or in web/.env.local");
     const client = new Anthropic({ apiKey: key, maxRetries: 1 }) as unknown as ClaudeClient;
@@ -44,14 +45,14 @@ describe.skipIf(!process.env.LIVE_PROMPT)("the live prompt check", () => {
       let line: string;
       try {
         const reply = await author.author({ description: game.words, picture: null, models: [] });
-        const raw = reply.raw as { script?: unknown; palette?: unknown; leftOut?: unknown; assets?: unknown };
+        const raw = reply.raw as { script?: unknown; palette?: unknown; leftOut?: unknown; assets?: unknown; style?: unknown; world?: unknown };
         const script = typeof raw.script === "string" ? raw.script : "";
         const checked = checkScript(script);
         const name = `${String(i + 1).padStart(2, "0")}-${game.slug}`;
         writeFileSync(join(out, `${name}.lua`), script);
-        writeFileSync(join(out, `${name}.json`), JSON.stringify({ palette: raw.palette, leftOut: raw.leftOut, assets: raw.assets }, null, 2));
+        writeFileSync(join(out, `${name}.json`), JSON.stringify({ palette: raw.palette, leftOut: raw.leftOut, assets: raw.assets, style: raw.style, world: raw.world }, null, 2));
         if (checked.ok) passed++;
-        line = `${game.slug}: ${checked.ok ? "PASS" : "FAIL " + checked.reason} | ${script.split("\n").length} lines | ${reply.usage.inputTokens} in, ${reply.usage.outputTokens} out | ${Math.round((Date.now() - started) / 1000)} s | left out: ${String(raw.leftOut ?? "").slice(0, 120)}`;
+        line = `${game.slug}: ${checked.ok ? "PASS" : "FAIL " + checked.reason} | ${script.split("\n").length} lines | ${reply.usage.inputTokens} in, ${reply.usage.outputTokens} out | ${Math.round((Date.now() - started) / 1000)} s | camera ${/modes*=s*"(w+)"/.exec(script)?.[1] ?? "?"} | style ${String(raw.style)} | ${Array.isArray(raw.assets) ? raw.assets.length : 0} models | world ${JSON.stringify(raw.world)} | left out: ${String(raw.leftOut ?? "").slice(0, 120)}`;
       } catch (error) {
         line = `${game.slug}: ERROR ${error instanceof Error ? error.name : typeof error}`; // never the message: it could quote a request
       }
