@@ -2,7 +2,7 @@
 // server's script check and the docs are all built from it, so they cannot disagree. docs/superpowers/specs/2026-10-08-lua-games-design.md is the
 // description; Runtime/Script/Pure/ScriptHost.cs holds the same limits in C# (a test keeps the two equal).
 
-export const SCRIPT_VERSION = 4;
+export const SCRIPT_VERSION = 5;
 
 export const SCRIPT_FILE = "game.lua";
 
@@ -64,7 +64,7 @@ export const SCRIPT_API: readonly ApiEntry[] = [
   { name: "world.clear", signature: "world.clear()", doc: "Remove every object." },
   { name: "world.gravity", signature: "world.gravity(g)", doc: "Set the downward pull (units per second squared, 20 by default) for objects with gravity = true." },
   { name: "world.bounds", signature: "world.bounds(w, h)", doc: "Set the field's width and height in units (9 by 16 by default)." },
-  { name: "world.camera", signature: "world.camera{ mode, follow, x, y, z, zoom }", doc: "Choose the view and call it again with only the fields to change. side and fixed (3D) see the field head on: x right, y up, z depth away from you. top and chase (3D) see the field as the ground: x right, y running away from you, z height; chase follows the object given as follow from behind and above. side2d and top2d are flat and orthographic (x right, y up). zoom above 1 moves in. follow = false stops following." },
+  { name: "world.camera", signature: "world.camera{ mode, follow, x, y, z, zoom }", doc: "Choose the view and call it again with only the fields to change. side and fixed (3D) see the field head on: x right, y up, z depth away from you. top and chase (3D) see the field as the ground: x right, y running away from you, z height; chase follows the object given as follow from behind and above. (The player also has two flat cameras, side2d and top2d; do not use them: every game is 3D for now.) zoom above 1 moves in. follow = false stops following." },
   { name: "obj.destroy", signature: "obj:destroy()", doc: "Remove the object." },
   { name: "obj.set_color", signature: "obj:set_color(c)", doc: "Change its color." },
   { name: "obj.play", signature: "obj:play(animation)", doc: "Play one of its animations." },
@@ -105,7 +105,7 @@ export function apiText(): string {
     "",
     FIELD_TEXT,
     "",
-    "Camera modes: " + CAMERA_MODES.join(", ") + ". Primitive kinds: " + PRIMITIVE_KINDS.join(", ") + ".",
+    "Camera modes: " + CAMERA_MODES.filter((mode) => !mode.endsWith("2d")).join(", ") + ". Primitive kinds: " + PRIMITIVE_KINDS.join(", ") + ".",
     "Libraries: " + ALLOWED_LIBRARIES.join(", ") + ".",
     "Not available (using any of these as a name is refused): " + REMOVED_NAMES.join(", ") + ".",
   ];
