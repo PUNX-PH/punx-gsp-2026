@@ -15,7 +15,7 @@ export const RECIPE_VERSION = 1;
 const withQuality = (parts: unknown[], quality: Quality | undefined): unknown[] => (quality === "high" ? [...parts, "high"] : parts);
 
 /** The look of a model: the cleaned description, the kind setting ("auto" or a kind), the role and the picture's hash (or null). */
-export const designKey = (input: { model: string; uid: string; description: string; kind: ModelKind | "auto"; role: Role; pictureSha: string | null; quality?: Quality }): Promise<string> =>
+export const designKey = (input: { model: string; uid: string; description: string; kind: ModelKind | "auto" | "freeform"; role: Role; pictureSha: string | null; quality?: Quality }): Promise<string> =>
   hashKey(withQuality([RECIPE_VERSION, "design", input.model, input.uid, input.description, input.kind, input.role, input.pictureSha], input.quality));
 
 /**

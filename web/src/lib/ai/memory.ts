@@ -7,7 +7,7 @@ import { AiUnavailableError, type DesignReply, type Designer } from "@/lib/ai/ty
 
 const yieldToOthers = () => Promise.resolve();
 
-type DesignMethod = "designModel" | "designMotion" | "designEnvironment";
+type DesignMethod = "designModel" | "designFreeform" | "designMotion" | "designEnvironment";
 
 /**
  * A designer that answers from a script and remembers every request it was sent, in order. A method with no script is "not
@@ -28,6 +28,10 @@ export class ScriptedDesigner implements Designer {
 
   designModel(request: Parameters<Designer["designModel"]>[0]) {
     return this.answer("designModel", request);
+  }
+
+  designFreeform(request: Parameters<Designer["designFreeform"]>[0]) {
+    return this.answer("designFreeform", request);
   }
 
   designMotion(request: Parameters<Designer["designMotion"]>[0]) {

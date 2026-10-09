@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { makeBlenderWorker } from "@/lib/blender/client";
 import { BlenderRefusedError, BlenderUnavailableError } from "@/lib/blender/types";
-import type { BuildBody } from "@/lib/builder/recipes";
+import type { AnyBuildBody, BuildBody } from "@/lib/builder/recipes";
 import { builtinModel } from "@/lib/graph/builtin";
 import { makeGlb } from "@/lib/testing/glb";
 
@@ -214,6 +214,29 @@ describe("build", () => {
     it("leaves a Standard body's answer as it was, even when the worker sends X-Vertices", async () => {
       const { worker } = setup(async () => built({ "X-Triangles": "180", "X-Parts": "15", "X-Clips": "Run,Jump", "X-Vertices": "99" }));
       expect(await worker.build({ body, timeoutMs: 5000 })).toEqual({ bytes: GLB, triangles: 180, parts: 15, clips: ["Run", "Jump"] });
+    });
+  });
+
+  describe("a freeform body", () => {
+    const freeform = { ...JSON.parse(readFileSync(new URL("../../../../blender-worker/fixtures/recipes/freeform/crate.json", import.meta.url), "utf8")), role: "prop", target: "mobile" } as AnyBuildBody;
+    const headers = { "X-Triangles": "1400", "X-Parts": "30", "X-Clips": "", "X-Vertices": "900" };
+
+    it("posts the body as it is, and reads the counts, no clips and the vertices", async () => {
+      const { worker, calls } = setup(async () => built(headers));
+      expect(await worker.build({ body: freeform, timeoutMs: 5000 })).toEqual({ bytes: GLB, triangles: 1400, parts: 30, clips: [], vertices: 900 });
+      expect(JSON.parse(calls[0].init.body as string)).toMatchObject({ role: "prop", target: "mobile" });
+    });
+
+    it("a 200 with no vertex count is unavailable, like a High build", async () => {
+      const { worker } = setup(async () => built({ "X-Triangles": "1400", "X-Parts": "30", "X-Clips": "" }));
+      expect(await failure(worker.build({ body: freeform, timeoutMs: 5000 }))).toBeInstanceOf(BlenderUnavailableError);
+    });
+
+    it("a body the worker would refuse is not sent", async () => {
+      const { worker, calls } = setup(async () => built(headers));
+      const error = await failure(worker.build({ body: { ...freeform, target: "console" } as unknown as AnyBuildBody, timeoutMs: 5000 }));
+      expect(error).toBeInstanceOf(BlenderRefusedError);
+      expect(calls).toHaveLength(0);
     });
   });
 

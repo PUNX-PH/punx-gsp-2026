@@ -33,6 +33,7 @@ function fakeBlender() {
       throw new Error("not used");
     },
     async build(job, input) {
+      if (!("motions" in input.body)) throw new Error("a freeform body in a kit test");
       asked.push({ label: input.label, recipeKind: input.body.recipe.kind, clips: Object.keys(input.body.motions.motions) });
       const scenery = input.body.recipe.kind === "scenery";
       const bytes = scenery ? TREE : BUILT;
@@ -221,6 +222,7 @@ describe("Build Model and Build Environment at High quality, played through the 
         throw new Error("not used");
       },
       async build(job, input) {
+        if (!("motions" in input.body)) throw new Error("a freeform body in a kit test");
         const { recipe } = input.body;
         const build = recipe.build as { piece?: string; style?: string };
         asked.push({ label: input.label, kind: recipe.kind, quality: recipe.quality, piece: build.piece, style: build.style });

@@ -1,5 +1,5 @@
 // What names a cached Blender job. Pure.
-import type { BuildBody } from "@/lib/builder/recipes";
+import type { AnyBuildBody } from "@/lib/builder/recipes";
 import type { Shape } from "@/lib/blender/types";
 import { sha256Hex } from "@/lib/runs/service";
 
@@ -47,5 +47,8 @@ export const shapeKey = (input: { graphId: string; shape: Shape; color: string }
  * The name of the result of building this recipe with these motions in this palette for this graph. The key order inside the recipe
  * and the motions does not matter, because only what they say is hashed.
  */
-export const buildKey = (input: { graphId: string; body: BuildBody }): Promise<string> =>
-  hashKey([JOB_VERSION, "build", input.graphId, input.body.recipe, input.body.motions, input.body.palette]);
+export const buildKey = (input: { graphId: string; body: AnyBuildBody }): Promise<string> =>
+  "motions" in input.body
+    ? hashKey([JOB_VERSION, "build", input.graphId, input.body.recipe, input.body.motions, input.body.palette])
+    : // a freeform model: the role and the target are part of the question (the same recipe is cut to another budget)
+      hashKey([JOB_VERSION, "build", input.graphId, input.body.recipe, input.body.palette, input.body.role, input.body.target]);

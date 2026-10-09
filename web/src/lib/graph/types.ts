@@ -113,7 +113,8 @@ export type WireValue =
   // `role` and `clips` come only from Build Model (the role it was built for, and the clips it carries); an upload, a prepared model and a
   // shape have neither.
   // `quality` is there only when Build Model made a High model (a missing one means Standard).
-  | { type: "model"; sha256: string; name: string; size: number; format: ModelFormat; role?: Role; clips?: ClipName[]; quality?: Quality }
+  // `mobile` is there only for a freeform model: the same model cut to the phone's triangle budget (its own file; `sha256` is the PC's).
+  | { type: "model"; sha256: string; name: string; size: number; format: ModelFormat; role?: Role; clips?: ClipName[]; quality?: Quality; mobile?: { sha256: string; size: number } }
   | { type: "palette"; colors: string[] }
   | { type: "feel"; tuning: Tuning }
   // A whole game from Describe Game: the checked spec, what Claude left out, the assets asked for, and the entity files made so far (entity-NAME.glb).

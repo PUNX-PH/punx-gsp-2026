@@ -25,6 +25,7 @@ import {
   worldRecipe,
 } from "@/lib/builder/recipes";
 import { makeBuilderService } from "@/lib/builder/service";
+import type { AnyBuildBody } from "@/lib/builder/recipes";
 import type { BuildEnvironmentInput, BuildModelInput } from "@/lib/builder/types";
 import { SAMPLE_PALETTE } from "@/lib/graph/palette";
 import { RAN_OUT_OF_TIME } from "@/lib/graph/playTime";
@@ -47,7 +48,7 @@ function setup(reply: () => Promise<BuiltResult> = async () => ({ sha256: SHA, s
       throw new Error("not used");
     },
     async build(j, input) {
-      builds.push({ job: j, label: input.label, body: input.body });
+      builds.push({ job: j, label: input.label, body: kitBody(input.body) });
       return reply();
     },
   };
@@ -253,20 +254,21 @@ function setupAi(
       throw new Error("not used");
     },
     async build(j, request) {
-      const key = await buildKey({ graphId: j.graphId, body: request.body });
+      const body = kitBody(request.body);
+      const key = await buildKey({ graphId: j.graphId, body });
       if (options.failBuild?.at === builds.length + 1) {
-        builds.push({ job: j, label: request.label, body: request.body, key });
+        builds.push({ job: j, label: request.label, body, key });
         throw options.failBuild.error;
       }
       const reused = seen.has(key);
       seen.add(key);
-      builds.push({ job: j, label: request.label, body: request.body, key });
+      builds.push({ job: j, label: request.label, body, key });
       // the hash of the body stands for the stored file; the counts are the kit's
-      if (request.body.recipe.quality === "high") {
-        const counts = estimate(request.body.recipe);
-        return { sha256: key, size: 24_824, triangles: counts.triangles, parts: counts.parts, vertices: counts.vertices, clips: clipsOf(request.body.motions), reused };
+      if (body.recipe.quality === "high") {
+        const counts = estimate(body.recipe);
+        return { sha256: key, size: 24_824, triangles: counts.triangles, parts: counts.parts, vertices: counts.vertices, clips: clipsOf(body.motions), reused };
       }
-      return { sha256: key, size: 24_824, triangles: triangleEstimate(request.body.recipe), parts: partCount(request.body.recipe), clips: clipsOf(request.body.motions), reused };
+      return { sha256: key, size: 24_824, triangles: triangleEstimate(body.recipe), parts: partCount(body.recipe), clips: clipsOf(body.motions), reused };
     },
   };
   const service = makeBuilderService({
@@ -279,6 +281,12 @@ function setupAi(
   const aiCount = () => limits.counts.get(`site_${dayOf(clock.ms)}`) ?? 0;
   return { service, designer, designs, environments, limits, logs, builds, clock, jobFor, aiCount };
 }
+
+/** The kit tests only build kit bodies: a freeform body here is a mistake in the test. */
+const kitBody = (body: AnyBuildBody): BuildBody => {
+  if (!("motions" in body)) throw new Error("a freeform body in a kit test");
+  return body;
+};
 
 const words = (description: string, extra: Partial<BuildModelInput> = {}): BuildModelInput => input({ kind: "auto", description, ...extra });
 

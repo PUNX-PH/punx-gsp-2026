@@ -40,12 +40,12 @@ describe("Build Model", () => {
     expect(spec.shapeProblem(params({ role }))).toBe("role must be hero, obstacle or collectible.");
   });
 
-  it.each([["auto"], ["biped"], ["vehicle"], ["blob"], ["prop"]])("accepts the kind %s", (kind) => {
+  it.each([["auto"], ["biped"], ["vehicle"], ["blob"], ["prop"], ["freeform"]])("accepts the kind %s", (kind) => {
     expect(spec.shapeProblem(params({ kind }))).toBeNull();
   });
 
   it.each([["dragon"], ["Auto"], ["scenery"], [""], [3], [null], [undefined]])("refuses the kind %s", (kind) => {
-    expect(spec.shapeProblem(params({ kind }))).toBe("kind must be auto, biped, vehicle, blob or prop.");
+    expect(spec.shapeProblem(params({ kind }))).toBe("kind must be auto, biped, vehicle, blob, prop or freeform.");
   });
 
   it("refuses a description that is not text, or is too long, counting characters (not bytes)", () => {

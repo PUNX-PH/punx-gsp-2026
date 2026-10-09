@@ -34,6 +34,7 @@ import {
   type WorldPiece,
   type WorldStyle,
 } from "@/lib/builder/kinds";
+import { checkFreeformBody, type FreeformBody } from "@/lib/builder/freeform";
 
 export interface Track {
   joint: string;
@@ -73,6 +74,8 @@ export interface BuildBody {
   motions: MotionRecipe;
   palette: string[];
 }
+/** Everything the worker's /build takes: a kit recipe with motions, or a freeform model with its role and target. */
+export type AnyBuildBody = BuildBody | FreeformBody;
 /**
  * The world around the track as Claude designs it: three palette indices (0 to 4) and up to three pieces of scenery from the kit. The
  * density is the person's setting, not Claude's, so it is not here.
@@ -298,6 +301,7 @@ function checkMotions(motions: unknown, recipe: ModelRecipe): string | null {
 /** null when the body is valid; otherwise a short problem that names the field. The worker's recipe.mjs has the same rules. */
 export function checkBuildBody(body: unknown): string | null {
   if (!isObject(body)) return "body: must be an object";
+  if (isObject(body.recipe) && body.recipe.kind === "model") return checkFreeformBody(body);
   const keys = keysProblem(body, ["recipe", "motions", "palette"], "body");
   if (keys) return keys;
   const palette = body.palette;

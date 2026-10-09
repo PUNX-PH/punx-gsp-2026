@@ -279,7 +279,7 @@ function BuildModelPanel({ node, onSettings }: { node: GraphNode; onSettings: Se
       <ChoiceGroup label="Role" choices={ROLES.map((value) => ({ value, name: ROLE_NAMES[value] }))} current={node.params.role} onPick={(role) => onSettings(node.id, { role })} />
       <ChoiceGroup
         label="Kind"
-        choices={[{ value: "auto", name: "Auto" }, ...MODEL_KINDS.map((value) => ({ value, name: KIND_NAMES[value] }))]}
+        choices={[{ value: "auto", name: "Auto" }, ...MODEL_KINDS.map((value) => ({ value, name: KIND_NAMES[value] })), { value: "freeform", name: "Custom" }]}
         current={node.params.kind}
         onPick={(kind) => onSettings(node.id, { kind })}
       />

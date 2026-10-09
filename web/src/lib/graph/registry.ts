@@ -136,8 +136,8 @@ function buildModelParams(params: Record<string, unknown>): string | null {
   }
   const { role, kind, description } = params;
   if (typeof role !== "string" || !Object.hasOwn(ROLE_FILES, role)) return "role must be hero, obstacle or collectible.";
-  if (typeof kind !== "string" || (kind !== "auto" && !(MODEL_KINDS as readonly string[]).includes(kind))) {
-    return "kind must be auto, biped, vehicle, blob or prop.";
+  if (typeof kind !== "string" || (kind !== "auto" && kind !== "freeform" && !(MODEL_KINDS as readonly string[]).includes(kind))) {
+    return "kind must be auto, biped, vehicle, blob, prop or freeform.";
   }
   if (typeof description !== "string") return "description must be text.";
   if (Array.from(description).length > MAX_DESCRIPTION_CHARACTERS) return `the description is longer than ${MAX_DESCRIPTION_CHARACTERS} characters.`;
@@ -236,7 +236,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     defaultParams: () => ({ role: "hero", kind: "auto", description: "", run: "", jump: "", loop: "", quality: "standard" }),
     shapeProblem: buildModelParams,
     incompleteProblem: (params) =>
-      params.kind === "auto" && typeof params.description === "string" && params.description.trim() === "" ? "describe it first, or pick a kind." : null,
+      (params.kind === "auto" || params.kind === "freeform") && typeof params.description === "string" && params.description.trim() === "" ? "describe it first, or pick a kind." : null,
   },
   "build-environment": {
     type: "build-environment",

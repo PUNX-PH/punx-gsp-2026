@@ -41,6 +41,8 @@ export interface DesignReply {
 export interface Designer {
   // `quality` is there only for High: a Standard request is what it always was.
   designModel(request: { description: string; role: Role; kind: ModelKind | null; picture: Uint8Array | null; quality?: Quality; timeoutMs?: number }): Promise<DesignReply>;
+  /** A freeform model: the answer is { recipe: "<JSON text>" }, repaired by lib/builder/freeform.ts. */
+  designFreeform(request: { description: string; role: Role; picture: Uint8Array | null; timeoutMs?: number }): Promise<DesignReply>;
   designMotion(request: { kind: ModelKind; joints: string[]; texts: Partial<Record<ClipKey, string>>; quality?: Quality; timeoutMs?: number }): Promise<DesignReply>;
   designEnvironment(request: { theme: string; quality?: Quality; timeoutMs?: number }): Promise<DesignReply>;
 }

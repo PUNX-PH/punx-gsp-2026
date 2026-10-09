@@ -167,10 +167,12 @@ function builtModel(result: unknown): ResultView | null {
   if (typeof soft === "object" && soft !== null && typeof soft.notBuilt === "string") {
     return { kind: "text", text: `Not built: ${soft.notBuilt} The game uses a plain shape for it. Press Play again to try building it.` };
   }
-  const r = result as { kind?: unknown; parts?: unknown; triangles?: unknown; size?: unknown; clips?: unknown; summary?: unknown; skipped?: unknown; reused?: unknown; quality?: unknown; vertices?: unknown } | null | undefined;
+  const r = result as { kind?: unknown; parts?: unknown; triangles?: unknown; size?: unknown; clips?: unknown; summary?: unknown; skipped?: unknown; reused?: unknown; quality?: unknown; vertices?: unknown; mobile?: unknown } | null | undefined;
   if (typeof r !== "object" || r === null) return null;
-  const { kind, parts, triangles, size, clips, summary, skipped, reused, quality, vertices } = r;
-  if (typeof kind !== "string" || !Object.hasOwn(KIND_NAMES, kind)) return null;
+  const { kind, parts, triangles, size, clips, summary, skipped, reused, quality, vertices, mobile } = r;
+  if (typeof kind !== "string" || !(Object.hasOwn(KIND_NAMES, kind) || kind === "freeform")) return null;
+  // a freeform model has a variant for the phone; the card says its triangles
+  const phone = kind === "freeform" && typeof mobile === "object" && mobile !== null && isNumber((mobile as { triangles?: unknown }).triangles) ? ((mobile as { triangles: number }).triangles) : null;
   if (!isNumber(parts) || !isNumber(triangles) || !isNumber(size) || typeof summary !== "string" || typeof reused !== "boolean") return null;
   if (!Array.isArray(clips) || !clips.every((c) => typeof c === "string" && CLIP_WORDS.includes(c))) return null;
   // a skipped entry is a clip and a joint, and the only reason it may give is the model's limit
@@ -187,7 +189,7 @@ function builtModel(result: unknown): ResultView | null {
   ].filter((sentence): sentence is string => sentence !== null);
   return {
     kind: "built",
-    line: `${KIND_NAMES[kind as ModelKind]}, ${plural(parts, "part")}, ${plural(triangles, "triangle")}, ${high ? `${count(vertices as number)} vertices, ` : ""}${formatSize(size)}`,
+    line: `${kind === "freeform" ? "Custom" : KIND_NAMES[kind as ModelKind]}, ${plural(parts, "part")}, ${plural(triangles, "triangle")}${phone === null ? "" : ` (${plural(phone, "triangle")} on a phone)`}, ${high ? `${count(vertices as number)} vertices, ` : ""}${formatSize(size)}`,
     clips: clips.length === 0 ? "Still" : `Moves: ${clips.join(", ")}`,
     summary,
     skipped: sentences.length === 0 ? null : sentences.join(". "),

@@ -183,6 +183,11 @@ export interface Kit {
     phase: [number, number];
     amplitude: Record<Channel, [number, number]>;
   };
+  /** The freeform kind (a list of parts): its caps, and the triangle budget of each role for each target. */
+  freeform: {
+    caps: { parts: number; points: number; profile: number; sections: number; materials: number; extent: number };
+    budgets: Record<"hero" | "prop" | "scenery", Record<"pc" | "mobile", number>>;
+  };
   kinds: Record<ModelKind, KindSpec>;
   extras: Record<Extra, ExtraSpec>;
   scenery: Record<SceneryKind, SceneryKit>;
@@ -198,6 +203,10 @@ export const KIT: Kit = {
     "cycles": [0.5, 4],
     "phase": [0, 1],
     "amplitude": { "rotate": [-90, 90], "move": [-0.5, 0.5], "scale": [-0.5, 0.5] }
+  },
+  "freeform": {
+    "caps": { "parts": 48, "points": 10, "profile": 14, "sections": 10, "materials": 6, "extent": 12 },
+    "budgets": { "hero": { "pc": 15000, "mobile": 5000 }, "prop": { "pc": 5000, "mobile": 1500 }, "scenery": { "pc": 8000, "mobile": 2500 } }
   },
   "kinds": {
     "biped": {

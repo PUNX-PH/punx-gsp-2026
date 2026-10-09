@@ -214,7 +214,8 @@ export function makeBlenderService(deps: BlenderDeps): BlenderService {
 
     async build(job, input) {
       const key = await buildKey({ graphId: job.graphId, body: input.body });
-      const high = input.body.recipe.quality === "high";
+      // a High build and a freeform model are not whole without their vertices
+      const high = input.body.recipe.kind === "model" || ("quality" in input.body.recipe && input.body.recipe.quality === "high");
       const done = await run(
         buildKind(input.label),
         key,

@@ -10,6 +10,7 @@ import { AiRefusedError, AiUnavailableError, type DesignReply, type Designer } f
 import type { BlenderService } from "@/lib/blender/types";
 import { CLIPS_FOR_ROLE, KIT, type ClipKey, type ModelKind, type Quality, WORLD_PIECES } from "@/lib/builder/kinds";
 import { designKey, environmentKey, motionKey } from "@/lib/builder/keys";
+import { freeformRoleOf, isFreeformRecipe, repairFreeform, type FreeformRecipe } from "@/lib/builder/freeform";
 import type { RecipeCache } from "@/lib/builder/ports";
 import {
   DEFAULT_ENVIRONMENT,
@@ -28,7 +29,7 @@ import {
   worldRecipe,
 } from "@/lib/builder/recipes";
 import { fitMotionsToMeshes, repairEnvironment, repairModelRecipe, repairMotions } from "@/lib/builder/repair";
-import type { BuildEnvironmentInput, BuildModelInput, BuilderService, BuiltEnvironment, BuiltPiece, BuiltWorld } from "@/lib/builder/types";
+import type { BuildEnvironmentInput, BuildModelInput, BuilderService, BuiltEnvironment, BuiltModel, BuiltPiece, BuiltWorld } from "@/lib/builder/types";
 import { pictureForModel } from "@/lib/graph/image";
 import { MIN_START_MS, RAN_OUT_OF_TIME, timeLeft } from "@/lib/graph/playTime";
 import { NodeError } from "@/lib/graph/types";
@@ -36,7 +37,8 @@ import { NodeError } from "@/lib/graph/types";
 /** What the AI half needs. Without it, any words in the step's boxes stop with the plain "did not answer" sentence. */
 export interface BuilderAi {
   designer: Designer;
-  designs: RecipeCache<ModelRecipe>;
+  /** The designs of kit models and of freeform ones; a freeform design has its own keys (the kind "freeform" is in them). */
+  designs: RecipeCache<ModelRecipe | FreeformRecipe>;
   motions: RecipeCache<{ motions: MotionRecipe; skipped: Skipped[] }>;
   environments: RecipeCache<EnvironmentDesign>;
   limits: UsageLimits;
@@ -131,7 +133,7 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
     input: BuildModelInput,
     description: string,
   ): Promise<{ recipe: ModelRecipe; asked: boolean }> {
-    const wanted = input.kind === "auto" ? null : input.kind;
+    const wanted = input.kind === "auto" || input.kind === "freeform" ? null : input.kind;
     const quality = qualityOf(input.quality);
     const key = await designKey({
       model: ai.modelId,
@@ -144,7 +146,7 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
     });
 
     const found = await ai.designs.get(key);
-    if (found) {
+    if (found && !isFreeformRecipe(found.value)) {
       log({ step: STEP, call: "design", outcome: "reused" });
       return { recipe: found.value, asked: false };
     }
@@ -176,6 +178,75 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
     }
     log({ step: STEP, call: "design", outcome: "answered", ...usage });
     return { recipe, asked: true };
+  }
+
+  /** The freeform model from Claude, or from the cache. `asked` is true when Claude was asked. */
+  async function designFreeformModel(
+    ai: BuilderAi,
+    job: Parameters<BuilderService["buildModel"]>[0],
+    input: BuildModelInput,
+    description: string,
+  ): Promise<{ recipe: FreeformRecipe; asked: boolean }> {
+    const key = await designKey({ model: ai.modelId, uid: job.user.uid, description, kind: "freeform", role: input.role, pictureSha: input.picture?.sha256 ?? null });
+    const found = await ai.designs.get(key);
+    if (found && isFreeformRecipe(found.value)) {
+      log({ step: STEP, call: "design", outcome: "reused" });
+      return { recipe: found.value, asked: false };
+    }
+
+    const { value: recipe, usage } = await askClaude(
+      ai,
+      job,
+      "design",
+      async (timeoutMs) => {
+        let picture: Uint8Array | null = null;
+        if (input.picture) {
+          const small = await pictureForModel(input.picture.bytes);
+          if (!small.ok) throw say(small.error);
+          picture = small.jpeg;
+        }
+        return ai.designer.designFreeform({ description, role: input.role, picture, timeoutMs });
+      },
+      (raw) => {
+        const repaired = repairFreeform(raw);
+        return repaired.ok ? repaired.recipe : null;
+      },
+    );
+
+    try {
+      await ai.designs.put(key, { value: recipe, model: ai.modelId, createdAt: deps.now(), inputTokens: usage.inputTokens, outputTokens: usage.outputTokens });
+    } catch {
+      log({ step: STEP, call: "design", outcome: "cache-write-failed" });
+    }
+    log({ step: STEP, call: "design", outcome: "answered", ...usage });
+    return { recipe, asked: true };
+  }
+
+  /**
+   * A freeform model: designed from the words (there is no kit default to fall back on), then built twice, for the PC and for the phone (two cached
+   * worker calls; the worker fits each to its triangle budget). It has no motions: a freeform model does not animate yet.
+   */
+  async function buildFreeform(job: Parameters<BuilderService["buildModel"]>[0], input: BuildModelInput, description: string): Promise<BuiltModel> {
+    if (description === "") throw say("describe it first.");
+    if (!deps.ai) throw say(NO_ANSWER);
+    const { recipe, asked } = await designFreeformModel(deps.ai, job, input, description);
+    const palette = [...input.palette];
+    const role = freeformRoleOf(input.role);
+    const pc = await deps.blender.build(job, { label: "Build Model", body: { recipe, palette, role, target: "pc" } });
+    const mobile = await deps.blender.build(job, { label: "Build Model", body: { recipe, palette, role, target: "mobile" } });
+    return {
+      sha256: pc.sha256,
+      size: pc.size,
+      kind: "freeform",
+      parts: pc.parts,
+      triangles: pc.triangles,
+      clips: [],
+      summary: recipe.summary !== "" ? recipe.summary : "A custom model.",
+      skipped: [],
+      reused: !asked && pc.reused && mobile.reused,
+      ...(pc.vertices === undefined ? {} : { vertices: pc.vertices }),
+      mobile: { sha256: mobile.sha256, size: mobile.size, triangles: mobile.triangles },
+    };
   }
 
   /**
@@ -277,7 +348,9 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
       const clips = CLIPS_FOR_ROLE[input.role];
       const motionWords = clips.some((clip) => cleanPrompt(input.motions[clip]) !== "");
 
-      if (input.kind === "auto" && description === "") throw say("describe it first, or pick a kind.");
+      if (input.kind === "freeform") return buildFreeform(job, input, description);
+      const setting = input.kind;
+      if (setting === "auto" && description === "") throw say("describe it first, or pick a kind.");
 
       // Auto with an empty description was refused above, so a kind is chosen when there is no description to design from.
       let recipe: ModelRecipe;
@@ -286,7 +359,7 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
         if (!deps.ai) throw say(NO_ANSWER);
         ({ recipe, asked: askedLook } = await design(deps.ai, job, input, description));
       } else {
-        const chosen = input.kind === "auto" ? "biped" : input.kind;
+        const chosen = setting === "auto" ? "biped" : setting;
         recipe = high ? defaultHighRecipe(chosen) : defaultRecipe(chosen);
       }
       // A High recipe goes through the budget fit before it is built (the repair did it for Claude's, this is for every way here).

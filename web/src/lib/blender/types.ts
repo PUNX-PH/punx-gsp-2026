@@ -2,7 +2,7 @@
 // steps call, and the two ways the worker can fail. The rules (cache, limits, time) live in the other files of lib/blender.
 import type { User } from "@/lib/auth/ports";
 import type { ClipName } from "@/lib/builder/kinds";
-import type { BuildBody } from "@/lib/builder/recipes";
+import type { AnyBuildBody } from "@/lib/builder/recipes";
 import type { DerivedFiles } from "@/lib/graph/types";
 
 /** The shapes Make Shape can build. A fixed list, so Describe Game can pick from it later. */
@@ -43,7 +43,7 @@ export interface BuiltGlb {
   triangles: number;
   parts: number;
   clips: ClipName[];
-  /** The shared vertices the GLB holds. Only a High build says (it is what the game decodes, so it is what its budget counts). */
+  /** The shared vertices the GLB holds. Only a High build or a freeform model says (it is what the game decodes, so it is what its budget counts). */
   vertices?: number;
 }
 
@@ -51,7 +51,7 @@ export interface BuiltGlb {
 export interface BlenderWorker {
   prepare(input: { bytes: Uint8Array; format: ModelFormat; triangles: number; color: string | null; timeoutMs: number }): Promise<MadeModel>;
   shape(input: { shape: Shape; color: string; timeoutMs: number }): Promise<MadeModel>;
-  build(input: { body: BuildBody; timeoutMs: number }): Promise<BuiltGlb>;
+  build(input: { body: AnyBuildBody; timeoutMs: number }): Promise<BuiltGlb>;
 }
 
 /** Blender ran and said no to this file. Carries a code and nothing else on purpose. */
@@ -111,7 +111,7 @@ export interface BuiltResult {
   triangles: number;
   parts: number;
   clips: ClipName[];
-  /** A High build's shared vertices; a Standard build has none. */
+  /** A High build's or a freeform model's shared vertices; a Standard build has none. */
   vertices?: number;
   reused: boolean;
 }
@@ -123,5 +123,5 @@ export interface BlenderService {
     input: { sha256: string; bytes: Uint8Array; format: ModelFormat; triangles: number; color: string | null },
   ): Promise<MadeResult>;
   shape(job: BlenderJob, input: { shape: Shape; color: string }): Promise<MadeResult>;
-  build(job: BlenderJob, input: { label: BuildLabel; body: BuildBody }): Promise<BuiltResult>;
+  build(job: BlenderJob, input: { label: BuildLabel; body: AnyBuildBody }): Promise<BuiltResult>;
 }

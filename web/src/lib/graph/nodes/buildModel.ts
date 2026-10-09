@@ -7,7 +7,7 @@ import { type Executor, NodeError, type Role } from "@/lib/graph/types";
 export const buildModel: Executor = async (inputs, params, ctx) => {
   // The settings' shape was checked when the graph was saved.
   const role = params.role as Role;
-  const kind = params.kind as ModelKind | "auto";
+  const kind = params.kind as ModelKind | "auto" | "freeform";
   // A graph saved before the Quality setting has none, and means Standard; only High is told to the builder.
   const high = params.quality === "high";
 
@@ -34,7 +34,7 @@ export const buildModel: Executor = async (inputs, params, ctx) => {
     },
   );
   return {
-    output: { type: "model", sha256: built.sha256, name: `${built.kind}.glb`, size: built.size, format: "glb", role, clips: built.clips, ...(built.quality === "high" ? { quality: "high" as const } : {}) },
+    output: { type: "model", sha256: built.sha256, name: `${built.kind}.glb`, size: built.size, format: "glb", role, clips: built.clips, ...(built.quality === "high" ? { quality: "high" as const } : {}), ...(built.mobile ? { mobile: { sha256: built.mobile.sha256, size: built.mobile.size } } : {}) },
     result: {
       role,
       kind: built.kind,
@@ -47,6 +47,7 @@ export const buildModel: Executor = async (inputs, params, ctx) => {
       skipped: built.skipped,
       reused: built.reused,
       ...(built.quality === "high" ? { quality: "high" as const, ...(built.vertices === undefined ? {} : { vertices: built.vertices }) } : {}),
+      ...(built.mobile ? { mobile: built.mobile } : {}),
     },
   };
 };

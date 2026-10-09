@@ -10,6 +10,7 @@ import { aiConfigFromEnv, logOutcome } from "@/lib/ai/server";
 import type { Designer } from "@/lib/ai/types";
 import type { BlenderService } from "@/lib/blender/types";
 import { FirestoreRecipeCache } from "@/lib/builder/firebase";
+import type { FreeformRecipe } from "@/lib/builder/freeform";
 import type { RecipeCache } from "@/lib/builder/ports";
 import type { EnvironmentDesign, ModelRecipe, MotionRecipe, Skipped } from "@/lib/builder/recipes";
 import { makeBuilderService } from "@/lib/builder/service";
@@ -19,7 +20,7 @@ import type { BuilderService } from "@/lib/builder/types";
 export function getBuilderService(
   blender: BlenderService,
   stores: {
-    designs?: RecipeCache<ModelRecipe>;
+    designs?: RecipeCache<ModelRecipe | FreeformRecipe>;
     motions?: RecipeCache<{ motions: MotionRecipe; skipped: Skipped[] }>;
     environments?: RecipeCache<EnvironmentDesign>;
     limits?: UsageLimits;
@@ -30,6 +31,7 @@ export function getBuilderService(
   // same "did not answer" as any other failure to reach Claude, and gives the person's AI count back.
   const designer: Designer = {
     designModel: (request) => makeClaudeDesigner({ client: getClaudeClient(), model: config.modelId }).designModel(request),
+    designFreeform: (request) => makeClaudeDesigner({ client: getClaudeClient(), model: config.modelId }).designFreeform(request),
     designMotion: (request) => makeClaudeDesigner({ client: getClaudeClient(), model: config.modelId }).designMotion(request),
     designEnvironment: (request) => makeClaudeDesigner({ client: getClaudeClient(), model: config.modelId }).designEnvironment(request),
   };
@@ -39,7 +41,7 @@ export function getBuilderService(
     log: logOutcome,
     ai: {
       designer,
-      designs: stores.designs ?? new FirestoreRecipeCache<ModelRecipe>("builderDesigns"),
+      designs: stores.designs ?? new FirestoreRecipeCache<ModelRecipe | FreeformRecipe>("builderDesigns"),
       motions: stores.motions ?? new FirestoreRecipeCache<{ motions: MotionRecipe; skipped: Skipped[] }>("builderMotions"),
       environments: stores.environments ?? new FirestoreRecipeCache<EnvironmentDesign>("builderEnvironments"),
       limits: stores.limits ?? new FirestoreUsageLimits(),

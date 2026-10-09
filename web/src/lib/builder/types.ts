@@ -8,8 +8,8 @@ import type { Density } from "@/lib/settings";
 /** What the step hands the builder: the settings as the person left them (the words not yet cleaned), the optional picture, and the palette. */
 export interface BuildModelInput {
   role: Role;
-  /** The kind the person chose, or "auto" to let the AI pick one from the description. */
-  kind: ModelKind | "auto";
+  /** The kind the person chose, "auto" to let the AI pick one from the description, or "freeform" for a model composed of parts (no kit kind, no animation yet). */
+  kind: ModelKind | "auto" | "freeform";
   description: string;
   /** What the person typed in the boxes. Only the boxes of the role's own clips count. */
   motions: Record<ClipKey, string>;
@@ -23,7 +23,7 @@ export interface BuildModelInput {
 export interface BuiltModel {
   sha256: string;
   size: number;
-  kind: ModelKind;
+  kind: ModelKind | "freeform";
   parts: number;
   triangles: number;
   clips: ClipName[];
@@ -35,6 +35,8 @@ export interface BuiltModel {
   /** Only a High model says so, and how many shared vertices its GLB holds. */
   quality?: Quality;
   vertices?: number;
+  /** A freeform model also has a variant cut to the phone's budget (`sha256` and `triangles` above are the PC's). */
+  mobile?: { sha256: string; size: number; triangles: number };
 }
 
 /** What Build Environment hands the builder: the person's theme (not yet cleaned), how much scenery, and the palette. */

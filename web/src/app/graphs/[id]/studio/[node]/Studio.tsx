@@ -50,7 +50,7 @@ export function Studio({ graphId, graphName, graph, nodeId }: { graphId: string;
 
   const set = (patch: Params) => setParams((current) => ({ ...current, ...patch }));
   const busy = phase === "saving" || phase === "building";
-  const nothingToBuild = isModel ? text(params.kind, "auto") === "auto" && text(params.description).trim() === "" : false;
+  const nothingToBuild = isModel ? (text(params.kind, "auto") === "auto" || text(params.kind) === "freeform") && text(params.description).trim() === "" : false;
 
   async function build() {
     setError("");
@@ -129,6 +129,7 @@ export function Studio({ graphId, graphName, graph, nodeId }: { graphId: string;
                         {KIND_NAMES[kind]}
                       </option>
                     ))}
+                    <option value="freeform">Custom (made of parts, no animation yet)</option>
                   </select>
                 </div>
                 <div className={shell.field}>
