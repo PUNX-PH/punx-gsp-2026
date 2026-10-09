@@ -68,3 +68,9 @@ Left as they are: the 8192-token cap on Claude's answer (a huge recipe shows as 
 - Slice 8 and its follow-ups (Make it, studio window, prompt refiner) are on `main` and pushed; read `slice8-handoff.md` for what is live and the studio's open steps (packager redeployed and players uploaded by the owner on 2026-10-09; the live acceptance of Make it was
   still to be reported).
 - The owner prefers building over testing: compile checks and one final run, not repeated suites (memory note `feedback-build-over-testing`).
+
+## Unity suites run (2026-10-09, Hub sign-in valid again)
+
+`Unity.exe -batchmode -projectPath unity/runner-template -runTests -testPlatform EditMode|PlayMode` on 6000.3.25f1, from the slice 9 branch: **EditMode 349 tests, 346 passed, 0 failed, 3 skipped** (the `[Ignore]`d LiveScriptsTests and two Explicit
+WinnabilityGoldenTests, by design; 328 s); **PlayMode 28 of 28 passed** (12 s). No tracked file changed and no `.meta` file was missing. Still not run in Unity: a rigged freeform GLB playing its Run clip in the runner (needs a PlayMode test that loads one), the
+rebuilt WebGL template and the Windows and Android players (`tools/build-players.ps1`), the phone budgets.
