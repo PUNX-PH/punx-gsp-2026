@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Runner.Engine;
+using Runner.View;
 using UnityEngine;
 
 namespace Runner.Scripting
@@ -28,6 +29,11 @@ namespace Runner.Scripting
         readonly Func<ScriptRunner> makeRunner;
         readonly Dictionary<string, GameObject> models; // fitted to one unit tall, hidden templates by kind
         readonly Material flat;
+        Renderer groundRenderer;
+        Color? skyColor;                 // the environment's sky, when the game has one
+        EnvironmentView scenery;         // the environment's scenery, drawn along the follow target in the ground cameras
+        bool sceneryShown = true;
+        const float SceneryBias = 1000f; // slots start at zero, so the follow target's y is lifted by this and the scenery's z lowered by it
         readonly Color[] palette;
         readonly Dictionary<int, Drawn> live = new Dictionary<int, Drawn>();
         readonly Dictionary<string, Stack<Drawn>> spare = new Dictionary<string, Stack<Drawn>>();
@@ -81,7 +87,7 @@ namespace Runner.Scripting
             ground = new GameObject("Ground");
             ground.transform.SetParent(root, false);
             ground.AddComponent<MeshFilter>().sharedMesh = PrimitiveMeshes.Get("plane");
-            var groundRenderer = ground.AddComponent<MeshRenderer>();
+            groundRenderer = ground.AddComponent<MeshRenderer>();
             groundRenderer.sharedMaterial = flat;
             block.SetColor(BaseColor, Color.Lerp(this.palette[0], Color.white, 0.22f)); // lit, so it needs to be a visible surface under the sun, not a near-black one
             groundRenderer.SetPropertyBlock(block);
@@ -90,6 +96,23 @@ namespace Runner.Scripting
             Runner.Start();
             FrameCamera();
             Sync();
+        }
+
+        /// <summary>
+        /// The world the environment gave the game: the sky, the color of the ground, and the scenery that stands along both sides of the field (a fixed pool recycled
+        /// by the follow target's distance, as in the runner), all of it only where the camera sees a ground (top and chase).
+        /// </summary>
+        public void SetWorld(Color sky, Color field, IReadOnlyList<GameObject> sceneryModels, float spacing)
+        {
+            skyColor = Color.Lerp(sky, new Color(0.62f, 0.76f, 0.92f), 0.35f); // the pick, lifted toward daylight so the lit scene is not dim
+            block.SetColor(BaseColor, field);
+            groundRenderer.SetPropertyBlock(block);
+            if (sceneryModels.Count == 0) return;
+            var half = Mathf.Max(0f, (float)Runner.World.Width / 2f - 4f); // the runner's scenery stands 7 to 9 m from the middle of a track 4 m from it
+            scenery = new EnvironmentView(root, sceneryModels, Color.white, Color.white, flat, spacing, false, half, -SceneryBias);
+            scenery.SetSceneryDetail(2);
+            sceneryShown = false;
+            FrameCamera();
         }
 
         /// <summary>The color a script named: a palette slot "1" to "5" or "#rrggbb"; the fallback for none.</summary>
@@ -161,7 +184,16 @@ namespace Runner.Scripting
 
             ground.SetActive(GroundMode);
             // Seen from above or behind there is a horizon: a daytime sky tinted by the game's darkest color, where the flat views keep their dark backdrop.
-            camera.backgroundColor = GroundMode ? Color.Lerp(palette[0], new Color(0.62f, 0.76f, 0.92f), 0.8f) : Background;
+            camera.backgroundColor = GroundMode ? (skyColor ?? Color.Lerp(palette[0], new Color(0.62f, 0.76f, 0.92f), 0.8f)) : Background;
+            if (scenery != null)
+            {
+                if (sceneryShown != GroundMode)
+                {
+                    scenery.SetSceneryDetail(GroundMode ? 0 : 2);
+                    sceneryShown = GroundMode;
+                }
+                if (GroundMode) scenery.Sync(cy + SceneryBias);
+            }
             if (GroundMode)
             {
                 ground.transform.localPosition = new Vector3(cx, -0.01f, cy);

@@ -94,7 +94,7 @@ namespace Runner.View
             if (scriptRead.Present)
             {
                 if (scriptRead.Error != null) throw new LoadException(scriptRead.Error);
-                await BootScript(scriptRead, settingsUrl);
+                await BootScript(scriptRead, settingsUrl, json);
                 Debug.Log("RUNNER ready in " + stopwatch.ElapsedMilliseconds + " ms");
                 return;
             }
@@ -234,7 +234,7 @@ namespace Runner.View
         /// Builds a script game: the Lua file next to the settings, and for each model name entity-NAME.glb next to the settings, fitted one unit tall (a
         /// missing or broken file is a box instead). The script runs only here, in the sandboxed interpreter, never on a server.
         /// </summary>
-        async Task BootScript(ScriptRead read, string settingsUrl)
+        async Task BootScript(ScriptRead read, string settingsUrl, string json)
         {
             var root = new GameObject("World").transform;
             root.SetParent(transform, false);
@@ -282,6 +282,21 @@ namespace Runner.View
                 var seed = ScriptSeed != 0 ? ScriptSeed : (uint)(Environment.TickCount | 1);
                 WorldLook.For("meadow", palette[0], palette.Count > 1 ? palette[1] : palette[0]).Apply(); // the lit shader reads its sun, sky and fog from globals
                 scriptView = new ScriptView(root, () => new ScriptRunner(source, seed++), models, flat, palette);
+
+                // A made game may carry an environment (its sky, ground color and scenery, from Build Environment); the settings are checked by the web app, and a
+                // scenery file that cannot be used stops nothing: the game goes on without that piece.
+                var withWorld = JsonUtility.FromJson<GameSettings>(json);
+                if (SettingsParser.HasEnvironment(withWorld) && palette.Count >= 5)
+                {
+                    var world = withWorld.environment;
+                    var sceneryModels = new List<GameObject>();
+                    foreach (var file in world.scenery ?? new string[0])
+                    {
+                        try { sceneryModels.Add(await LoadScenery(root, settingsUrl, file, generator)); }
+                        catch (LoadException e) { Debug.LogWarning("Runner: " + e.Message + ", leaving it out"); }
+                    }
+                    scriptView.SetWorld(palette[Mathf.Clamp(world.sky, 0, 4)], palette[Mathf.Clamp(world.field, 0, 4)], sceneryModels, SceneryLayout.Spacing(world.density));
+                }
                 scriptHud = gameObject.AddComponent<ScriptHud>();
                 scriptHud.View = scriptView;
                 hud.PanelColor = palette[2];

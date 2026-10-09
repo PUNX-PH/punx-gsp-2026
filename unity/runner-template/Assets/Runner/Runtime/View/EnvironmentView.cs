@@ -24,12 +24,16 @@ namespace Runner.View
         readonly int[] slots; // the slot each wrapper stands in now, so a wrapper is only moved when its slot changes
         readonly int poolSize;
         readonly float spacing;
+        readonly float sideExtra; // further out from the middle than the runner's track, for a wider field
+        readonly float zShift;    // added to every slot's z (a script game's follow target may be below zero, and slots start at zero)
 
         /// <param name="sceneryModels">The fitted, hidden prototypes: one wrapper clones <c>sceneryModels[ModelForSlot(...)]</c> and never any other.</param>
         /// <param name="drawGround">False in a High world, whose terrain and road are the ground: then only the scenery is made.</param>
-        public EnvironmentView(Transform root, IReadOnlyList<GameObject> sceneryModels, Color fieldColor, Color stripeColor, Material flat, float spacing, bool drawGround = true)
+        public EnvironmentView(Transform root, IReadOnlyList<GameObject> sceneryModels, Color fieldColor, Color stripeColor, Material flat, float spacing, bool drawGround = true, float sideExtra = 0f, float zShift = 0f)
         {
             this.spacing = spacing;
+            this.sideExtra = sideExtra;
+            this.zShift = zShift;
 
             if (drawGround)
             {
@@ -82,7 +86,8 @@ namespace Runner.View
                     var slot = SceneryLayout.SlotForItem(i, first, poolSize);
                     if (slots[index] == slot) continue;
                     slots[index] = slot;
-                    scenery[index].localPosition = new Vector3(SceneryLayout.SideX(slot, side), 0f, SceneryLayout.SlotZ(slot, spacing));
+                    var x = SceneryLayout.SideX(slot, side);
+                    scenery[index].localPosition = new Vector3(x + (x < 0f ? -sideExtra : sideExtra), 0f, SceneryLayout.SlotZ(slot, spacing) + zShift);
                 }
             }
         }
