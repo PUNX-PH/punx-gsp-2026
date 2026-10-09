@@ -62,7 +62,7 @@ namespace Runner.Tests
         {
             var root = GameObject.Find("Script game");
             if (root == null) return 0;
-            return root.GetComponentsInChildren<Renderer>().Count(r => r.gameObject.activeInHierarchy && r.gameObject.name != "Ground");
+            return root.GetComponentsInChildren<Renderer>().Count(r => r.gameObject.activeInHierarchy && r.gameObject.name != "Ground" && r.gameObject.name != "Shadow");
         }
 
         [UnityTest]

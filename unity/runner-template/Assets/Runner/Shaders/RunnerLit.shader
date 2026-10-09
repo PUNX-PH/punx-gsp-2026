@@ -12,6 +12,7 @@ Shader "Runner/Lit"
         _Metallic ("Metallic", Range(0, 1)) = 0
         _Smoothness ("Smoothness", Range(0, 1)) = 0.5
         [HDR] _EmissionColor ("Emission", Color) = (0, 0, 0, 1)
+        _Mottle ("Ground mottle", Range(0, 1)) = 0
     }
 
     SubShader
@@ -32,6 +33,7 @@ Shader "Runner/Lit"
             half _Metallic;
             half _Smoothness;
             half4 _EmissionColor;
+            half _Mottle;         // > 0 on the ground: patches of lighter and darker color by world position, so a field is not one flat color
 
             float4 _SunDir;       // direction TOWARD the light (lighting)
             half4 _SunColor;
@@ -70,6 +72,21 @@ Shader "Runner/Lit"
                 return o;
             }
 
+            float hash21(float2 p)
+            {
+                p = frac(p * float2(123.34, 456.21));
+                p += dot(p, p + 45.32);
+                return frac(p.x * p.y);
+            }
+
+            float valueNoise(float2 p)
+            {
+                float2 c = floor(p);
+                float2 f = frac(p);
+                f = f * f * (3.0 - 2.0 * f);
+                return lerp(lerp(hash21(c), hash21(c + float2(1, 0)), f.x), lerp(hash21(c + float2(0, 1)), hash21(c + float2(1, 1)), f.x), f.y);
+            }
+
             half3 aces(half3 x)
             {
                 const half a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
@@ -91,6 +108,8 @@ Shader "Runner/Lit"
                 half3 L = normalize(_SunDir.xyz);
 
                 half3 albedo = _BaseColor.rgb * i.col.rgb;
+                if (_Mottle > 0.0)
+                    albedo *= 1.0 + _Mottle * ((valueNoise(i.wpos.xz * 0.30) - 0.5) + 0.5 * (valueNoise(i.wpos.xz * 1.30) - 0.5));
                 half metallic = _Metallic;
                 half smooth = _Smoothness;
 

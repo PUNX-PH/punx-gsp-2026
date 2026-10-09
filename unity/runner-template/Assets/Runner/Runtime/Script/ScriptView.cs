@@ -15,6 +15,9 @@ namespace Runner.Scripting
     public sealed class ScriptView
     {
         static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
+        static readonly int Mottle = Shader.PropertyToID("_Mottle");
+        const float TopPitch = 58f;          // the top camera looks down at this angle (90 is straight down), so a field has depth and the scenery beside it shows
+        const float SceneryMargin = 9f;      // the top camera frames this much more width when there is scenery to show
         static readonly Color DefaultColor = new Color(0.9f, 0.9f, 0.9f);
 
         sealed class Drawn
@@ -23,6 +26,7 @@ namespace Runner.Scripting
             public Renderer Renderer; // null for a model, which keeps the colors it came with
             public string Color;
             public bool IsModel;
+            public Transform Shadow; // the soft contact shadow on the ground (ground cameras only), or null
         }
 
         readonly Transform root;
@@ -30,6 +34,8 @@ namespace Runner.Scripting
         readonly Dictionary<string, GameObject> models; // fitted to one unit tall, hidden templates by kind
         readonly Material flat;
         Renderer groundRenderer;
+        Material shadowMaterial;         // null when the shadow shader is not in the build: no shadows then
+        readonly MaterialPropertyBlock groundBlock = new MaterialPropertyBlock();
         Color? skyColor;                 // the environment's sky, when the game has one
         EnvironmentView scenery;         // the environment's scenery, drawn along the follow target in the ground cameras
         bool sceneryShown = true;
@@ -89,8 +95,15 @@ namespace Runner.Scripting
             ground.AddComponent<MeshFilter>().sharedMesh = PrimitiveMeshes.Get("plane");
             groundRenderer = ground.AddComponent<MeshRenderer>();
             groundRenderer.sharedMaterial = flat;
-            block.SetColor(BaseColor, Color.Lerp(this.palette[0], Color.white, 0.22f)); // lit, so it needs to be a visible surface under the sun, not a near-black one
-            groundRenderer.SetPropertyBlock(block);
+            groundBlock.SetColor(BaseColor, Color.Lerp(this.palette[0], Color.white, 0.22f)); // lit, so it needs to be a visible surface under the sun, not a near-black one
+            groundBlock.SetFloat(Mottle, 0.45f);
+            groundRenderer.SetPropertyBlock(groundBlock);
+            var shadowShader = Shader.Find("Runner/BlobShadow");
+            if (shadowShader != null)
+            {
+                shadowMaterial = new Material(shadowShader);
+                shadowMaterial.SetColor("_Color", new Color(0.02f, 0.02f, 0.04f, 0.42f));
+            }
 
             Runner = makeRunner();
             Runner.Start();
@@ -105,8 +118,8 @@ namespace Runner.Scripting
         public void SetWorld(Color sky, Color field, IReadOnlyList<GameObject> sceneryModels, float spacing)
         {
             skyColor = Color.Lerp(sky, new Color(0.62f, 0.76f, 0.92f), 0.35f); // the pick, lifted toward daylight so the lit scene is not dim
-            block.SetColor(BaseColor, field);
-            groundRenderer.SetPropertyBlock(block);
+            groundBlock.SetColor(BaseColor, field);
+            groundRenderer.SetPropertyBlock(groundBlock);
             if (sceneryModels.Count == 0) return;
             var half = Mathf.Max(0f, (float)Runner.World.Width / 2f - 5.5f); // the runner's scenery stands 7 or 9 m from the middle: moved out so it stands 1.5 or 3.5 m beyond this field's edge
             scenery = new EnvironmentView(root, sceneryModels, Color.white, Color.white, flat, spacing, false, half, -SceneryBias);
@@ -197,7 +210,7 @@ namespace Runner.Scripting
             if (GroundMode)
             {
                 ground.transform.localPosition = new Vector3(cx, -0.01f, cy);
-                ground.transform.localScale = new Vector3(Mathf.Max(w * 4f, 40f), 1f, Mathf.Max(h * 6f, 60f));
+                ground.transform.localScale = new Vector3(Mathf.Max(w * 6f, 120f), 1f, Mathf.Max(h * 8f, 160f));
             }
 
             switch (cam.Mode)
@@ -213,9 +226,11 @@ namespace Runner.Scripting
                 {
                     camera.orthographic = false;
                     camera.fieldOfView = 40f;
-                    var distance = FitDistance(w, h, aspect, camera.fieldOfView) / zoom;
-                    t.position = new Vector3(cx, distance, cy);
-                    t.rotation = Quaternion.Euler(90f, 0f, 0f);
+                    var wide = w + (scenery != null ? SceneryMargin : 0f);
+                    var distance = FitDistance(wide, h * 0.9f, aspect, camera.fieldOfView) / zoom;
+                    var pitch = TopPitch * Mathf.Deg2Rad;
+                    t.position = new Vector3(cx, Mathf.Sin(pitch) * distance, cy - Mathf.Cos(pitch) * distance);
+                    t.rotation = Quaternion.Euler(TopPitch, 0f, 0f);
                     break;
                 }
                 case "chase":
@@ -267,14 +282,39 @@ namespace Runner.Scripting
                 holder.transform.SetParent(root, false);
                 var clone = UnityEngine.Object.Instantiate(template, holder.transform);
                 clone.SetActive(true);
-                return new Drawn { Root = holder, IsModel = true };
+                return new Drawn { Root = holder, IsModel = true, Shadow = MakeShadow() };
             }
             var go = new GameObject(kind);
             go.transform.SetParent(root, false);
             go.AddComponent<MeshFilter>().sharedMesh = PrimitiveMeshes.Get(kind);
             var renderer = go.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = flat;
-            return new Drawn { Root = go, Renderer = renderer };
+            return new Drawn { Root = go, Renderer = renderer, Shadow = MakeShadow() };
+        }
+
+        Transform MakeShadow()
+        {
+            if (shadowMaterial == null) return null;
+            var go = new GameObject("Shadow");
+            go.transform.SetParent(root, false);
+            go.AddComponent<MeshFilter>().sharedMesh = ShadowMesh();
+            go.AddComponent<MeshRenderer>().sharedMaterial = shadowMaterial;
+            go.SetActive(false);
+            return go.transform;
+        }
+
+        static Mesh shadowMesh;
+
+        // a unit square flat on the ground with uvs (the blob shader draws a soft disc from them), facing up
+        static Mesh ShadowMesh()
+        {
+            if (shadowMesh != null) return shadowMesh;
+            shadowMesh = new Mesh { name = "ShadowQuad" };
+            shadowMesh.vertices = new[] { new Vector3(-0.5f, 0f, -0.5f), new Vector3(0.5f, 0f, -0.5f), new Vector3(0.5f, 0f, 0.5f), new Vector3(-0.5f, 0f, 0.5f) };
+            shadowMesh.uv = new[] { new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(0f, 1f) };
+            shadowMesh.normals = new[] { Vector3.up, Vector3.up, Vector3.up, Vector3.up };
+            shadowMesh.triangles = new[] { 0, 2, 1, 0, 3, 2 };
+            return shadowMesh;
         }
 
         void Place(Drawn d, ScriptObject o)
@@ -287,6 +327,16 @@ namespace Runner.Scripting
             var y = (float)o.Y;
             var z = (float)o.Z;
             var t = d.Root.transform;
+            if (d.Shadow != null)
+            {
+                d.Shadow.gameObject.SetActive(ground);
+                if (ground)
+                {
+                    d.Shadow.localPosition = new Vector3(x, 0.02f, y);
+                    d.Shadow.localRotation = Quaternion.Euler(0f, -(float)o.Angle, 0f);
+                    d.Shadow.localScale = new Vector3(Mathf.Max(w, 0.4f) * 1.2f, 1f, Mathf.Max(h, 0.4f) * 1.2f);
+                }
+            }
             t.localRotation = ground ? Quaternion.Euler(0f, -(float)o.Angle, 0f) : Quaternion.Euler(0f, 0f, (float)o.Angle);
             if (d.IsModel)
             {
@@ -354,10 +404,15 @@ namespace Runner.Scripting
         void Recycle(Drawn d, int id)
         {
             d.Root.SetActive(false);
+            if (d.Shadow != null) d.Shadow.gameObject.SetActive(false);
             var kind = d.Root.name;
             if (!spare.TryGetValue(kind, out var pool)) spare[kind] = pool = new Stack<Drawn>();
             if (pool.Count < 64) pool.Push(d);
-            else UnityEngine.Object.Destroy(d.Root);
+            else
+            {
+                if (d.Shadow != null) UnityEngine.Object.Destroy(d.Shadow.gameObject);
+                UnityEngine.Object.Destroy(d.Root);
+            }
         }
     }
 }

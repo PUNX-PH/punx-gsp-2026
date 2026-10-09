@@ -62,9 +62,14 @@ end
         public IEnumerator A_made_game_draws_its_primitives_and_its_ground_with_the_lit_shader()
         {
             yield return Boot();
-            var renderers = Drawn();
+            var all = Drawn();
+            var renderers = all.Where(r => r.gameObject.name != "Shadow").ToArray();
             Assert.GreaterOrEqual(renderers.Length, 3, "the ground, a box and a sphere");
             foreach (var r in renderers) Assert.AreEqual("Runner/Lit", r.sharedMaterial.shader.name, r.gameObject.name);
+            // a ground camera gives each thing a soft contact shadow on the ground
+            var shadows = all.Where(r => r.gameObject.name == "Shadow").ToArray();
+            Assert.GreaterOrEqual(shadows.Length, 2, "a shadow under the box and under the sphere");
+            foreach (var s in shadows) Assert.AreEqual("Runner/BlobShadow", s.sharedMaterial.shader.name);
         }
 
         [UnityTest]
