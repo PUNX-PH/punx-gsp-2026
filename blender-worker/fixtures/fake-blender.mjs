@@ -36,7 +36,11 @@ if (text.includes("SLEEP")) {
 } else {
   if (!text.includes("NOOUT")) {
     fs.writeFileSync(option(after, "--out"), Buffer.concat([Buffer.from("glTF"), Buffer.alloc(8)]));
-    const stats = recipe
+    // a freeform model body (kind "model") has its clips in the body, and always a vertex count (the marker NOVERTICES leaves it out)
+    const model = recipe && text.includes('"kind":"model"') ? JSON.parse(text) : null;
+    const stats = model
+      ? { triangles: 900, parts: 8, clips: model.clips, ...(text.includes("NOVERTICES") ? {} : { vertices: 600 }), meshes: 1 }
+      : recipe
       ? {
           triangles: 180,
           parts: 15,
