@@ -34,12 +34,23 @@ describe("the graph made from one description", () => {
     expect(graph.nodes[1].params).toMatchObject({ kind: "freeform", description: "a coin (collectible)" });
   });
 
-  it("builds the world around the game too, from the person's own words, soft and wired into the template", () => {
-    const graph = generatedGraph({ words: "a fox in a snowy forest", assets: [asset("fox")] });
-    const world = graph.nodes.find((n) => n.id === "world");
-    expect(world).toMatchObject({ type: "build-environment", params: { theme: "a fox in a snowy forest", density: "lots", quality: "standard", soft: true } });
+  it("builds the world the plan describes: a Build World step with its sky, ground and scenery, soft, in the game's style, wired into the template", () => {
+    const world = { sky: 1, ground: 4, scenery: [{ description: "a snowy pine" }, { description: "a neon sign" }] };
+    const graph = generatedGraph({ words: "a fox in a snowy forest", assets: [asset("fox")], world, style: "cartoon" });
+    expect(graph.nodes.find((n) => n.id === "world")).toMatchObject({
+      type: "build-world",
+      params: { sky: 1, ground: 4, scenery: ["a snowy pine", "a neon sign"], style: "cartoon", soft: true },
+    });
+    expect(graph.nodes[1].params).toMatchObject({ style: "cartoon", kind: "freeform", soft: true }); // every model shares the game's style
     expect(graph.edges).toContainEqual({ from: { node: "world", port: "environment" }, to: { node: "template", port: "environment" } });
     expect(graph.edges).toContainEqual({ from: { node: "n1", port: "palette" }, to: { node: "world", port: "palette" } });
+    expect(parseGraph(graph).ok).toBe(true);
+  });
+
+  it("has no world step when the plan has none, and no style on the models when there is none", () => {
+    const graph = generatedGraph({ words: "x", assets: [asset("fox")], world: null });
+    expect(graph.nodes.some((n) => n.type === "build-world" || n.type === "build-environment")).toBe(false);
+    expect(graph.nodes[1].params).not.toHaveProperty("style");
     expect(parseGraph(graph).ok).toBe(true);
   });
 
@@ -56,8 +67,8 @@ describe("a soft model step", () => {
     "build-model": async () => {
       throw new NodeError("Build Model: The Blender service did not answer. Try again.");
     },
-    "build-environment": async () => {
-      throw new NodeError("Build Environment: The Blender service did not answer. Try again.");
+    "build-world": async () => {
+      throw new NodeError("Build World: The Blender service did not answer. Try again.");
     },
     "game-template": async (inputs) => ({ result: { sawModel: inputs.model1 !== undefined, sawWorld: inputs.environment !== undefined } }),
     preview: async () => ({ result: { played: true } }),
@@ -72,8 +83,8 @@ describe("a soft model step", () => {
     expect(run.nodes.preview.state).toBe("done");
   });
 
-  it("is the same for the world around the game: a soft Build Environment that fails leaves the plain world and the game plays", async () => {
-    const graph = generatedGraph({ words: "x", assets: [asset("fox")] });
+  it("is the same for the world around the game: a soft Build World that fails leaves the plain world and the game plays", async () => {
+    const graph = generatedGraph({ words: "x", assets: [asset("fox")], world: { sky: 0, ground: 3, scenery: [{ description: "a snowy pine" }] } });
     const run = await runGraph(graph, { executors, ctx: {} as ExecutorContext, log: () => {} });
     expect(run.nodes.world).toEqual({ state: "done", result: { notBuilt: "The Blender service did not answer. Try again." } });
     expect(run.state).toBe("done");

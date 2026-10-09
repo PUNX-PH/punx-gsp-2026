@@ -203,7 +203,7 @@ export function makeGraphService(deps: GraphServiceDeps): GraphService {
         if (!deps.scripts) throw new GraphError(503, "Making a whole game is not set up on this site yet.");
         try {
           const result = await deps.scripts.create({ user, deadline: now() + PLAY_BUDGET_MS }, { description: input.describe, picture: null, models: [], attempt: 0 });
-          made = generatedGraph({ words: input.describe, assets: result.assets });
+          made = generatedGraph({ words: input.describe, assets: result.assets, world: result.world, style: result.style });
         } catch (error) {
           if (!(error instanceof NodeError)) throw error;
           const plain = error.message.replace(/^[^:]+: /, "");
