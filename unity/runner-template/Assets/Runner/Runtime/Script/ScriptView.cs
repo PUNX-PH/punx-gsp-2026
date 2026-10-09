@@ -83,7 +83,7 @@ namespace Runner.Scripting
             ground.AddComponent<MeshFilter>().sharedMesh = PrimitiveMeshes.Get("plane");
             var groundRenderer = ground.AddComponent<MeshRenderer>();
             groundRenderer.sharedMaterial = flat;
-            block.SetColor(BaseColor, Color.Lerp(this.palette[0], Color.black, 0.45f));
+            block.SetColor(BaseColor, Color.Lerp(this.palette[0], Color.white, 0.22f)); // lit, so it needs to be a visible surface under the sun, not a near-black one
             groundRenderer.SetPropertyBlock(block);
 
             Runner = makeRunner();
@@ -160,6 +160,8 @@ namespace Runner.Scripting
             }
 
             ground.SetActive(GroundMode);
+            // Seen from above or behind there is a horizon: a daytime sky tinted by the game's darkest color, where the flat views keep their dark backdrop.
+            camera.backgroundColor = GroundMode ? Color.Lerp(palette[0], new Color(0.62f, 0.76f, 0.92f), 0.8f) : Background;
             if (GroundMode)
             {
                 ground.transform.localPosition = new Vector3(cx, -0.01f, cy);
@@ -260,7 +262,7 @@ namespace Runner.Scripting
                 if (ground)
                 {
                     t.localScale = Vector3.one * depth;
-                    t.localPosition = new Vector3(x, z - depth / 2f, y);
+                    t.localPosition = new Vector3(x, Mathf.Max(0f, z - depth / 2f), y); // never below the ground: a script that left z at 0 still has its model standing on it
                 }
                 else
                 {
@@ -271,7 +273,7 @@ namespace Runner.Scripting
             }
             if (ground)
             {
-                t.localPosition = new Vector3(x, z, y);
+                t.localPosition = new Vector3(x, Mathf.Max(z, depth / 2f), y); // never sunk into the ground: a script that left z at 0 still has its object resting on it
                 t.localScale = new Vector3(w, depth, h);
             }
             else

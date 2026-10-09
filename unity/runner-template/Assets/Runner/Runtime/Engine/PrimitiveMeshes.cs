@@ -21,7 +21,7 @@ namespace Runner.Engine
                 case "cylinder": mesh = Cylinder(16); break;
                 case "cone": mesh = Cone(16); break;
                 case "quad": mesh = Face(Vector3.back, Vector3.up, Vector3.left); break; // one flat rectangle in x and y, facing the viewer on -z
-                case "plane": mesh = Face(Vector3.up, Vector3.forward, Vector3.left); break; // one flat rectangle on the ground (x and z), facing up
+                case "plane": mesh = Face(Vector3.up, Vector3.forward, Vector3.right); break; // one flat rectangle on the ground (x and z), facing up (its triangles wind so it is seen from above, which a lit shader culls otherwise)
                 default: mesh = Box(); break;
             }
             mesh.name = "Engine " + name;

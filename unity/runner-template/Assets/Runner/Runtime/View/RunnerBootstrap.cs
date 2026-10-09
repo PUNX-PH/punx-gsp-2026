@@ -194,10 +194,12 @@ namespace Runner.View
             root.SetParent(transform, false);
             try
             {
-                var flatShader = Shader.Find("Runner/Flat");
-                if (flatShader == null) throw new LoadException("the Runner/Flat shader is missing from this build");
-                var flat = new Material(flatShader);
-                IMaterialGenerator generator = new FlatMaterialGenerator(flat);
+                // A made game is always lit (the platform adds the quality; the person only wrote the idea): its models and its primitives are drawn with
+                // the lit shader, under the meadow's sun, sky and fog.
+                var litShader = Shader.Find("Runner/Lit");
+                if (litShader == null) throw new LoadException("the Runner/Lit shader is missing from this build");
+                var flat = new Material(litShader) { enableInstancing = true };
+                IMaterialGenerator generator = new LitMaterialGenerator(new Material(litShader));
                 var models = new Dictionary<string, GameObject>();
                 foreach (var e in spec.Entities)
                 {
@@ -214,6 +216,7 @@ namespace Runner.View
                     }
                 }
                 game = new EngineGame(root, spec, models, flat);
+                WorldLook.For("meadow", game.Slot(0), game.Slot(1)).Apply(); // the lit shader reads its sun, sky and fog from globals
                 hud.PanelColor = game.Slot(2);
                 hud.PanelTextColor = game.Slot(0);
                 hud.ScoreColor = game.Slot(Mathf.Min(4, spec.Palette.Count - 1));
@@ -248,10 +251,12 @@ namespace Runner.View
                 }
                 if (System.Text.Encoding.UTF8.GetByteCount(source) > 65536) throw new LoadException(read.File + ": the script is over 64 KiB");
 
-                var flatShader = Shader.Find("Runner/Flat");
-                if (flatShader == null) throw new LoadException("the Runner/Flat shader is missing from this build");
-                var flat = new Material(flatShader);
-                IMaterialGenerator generator = new FlatMaterialGenerator(flat);
+                // A made game is always lit (the platform adds the quality; the person only wrote the idea): its models and its primitives are drawn with
+                // the lit shader, under the meadow's sun, sky and fog.
+                var litShader = Shader.Find("Runner/Lit");
+                if (litShader == null) throw new LoadException("the Runner/Lit shader is missing from this build");
+                var flat = new Material(litShader) { enableInstancing = true };
+                IMaterialGenerator generator = new LitMaterialGenerator(new Material(litShader));
                 var models = new Dictionary<string, GameObject>();
                 foreach (var name in read.Models)
                 {
@@ -275,6 +280,7 @@ namespace Runner.View
                 }
                 lastPointer = new Vector2(Screen.width / 2f, Screen.height / 2f);
                 var seed = ScriptSeed != 0 ? ScriptSeed : (uint)(Environment.TickCount | 1);
+                WorldLook.For("meadow", palette[0], palette.Count > 1 ? palette[1] : palette[0]).Apply(); // the lit shader reads its sun, sky and fog from globals
                 scriptView = new ScriptView(root, () => new ScriptRunner(source, seed++), models, flat, palette);
                 scriptHud = gameObject.AddComponent<ScriptHud>();
                 scriptHud.View = scriptView;
