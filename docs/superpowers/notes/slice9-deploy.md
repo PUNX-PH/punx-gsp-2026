@@ -1,5 +1,7 @@
 # Slice 9: what to deploy, and in what order (prepared 2026-10-09, for the studio to run)
 
+**Done 2026-10-09:** the worker was deployed from `main` (`837aef5`), revision `blender-worker-00006-2np`, and the live `smoke.mjs` ended `all checks passed` (the freeform builds took 6.2 to 6.5 s each on Cloud Run, against 2.6 s locally; the website deployed on Vercel at the merge). What is left is step 3, the first look by eye, and the Make it timing: a game with 6 models makes 12 builds one after another, so check it finishes inside Play's time.
+
 Nothing here has been run. Project `punx-gsp`, region `us-east1`, worker `blender-worker`. The slice 9 code is on `origin/slice-9-art-pipeline` (13 commits ahead of `main`, a fast-forward).
 
 ## What needs deploying, and what does not
