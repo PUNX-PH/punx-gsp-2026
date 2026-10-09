@@ -6,6 +6,7 @@ import type { User } from "@/lib/auth/ports";
 import { checkGlb } from "@/lib/glb";
 import { SCRIPT_FILE } from "@/lib/script/api";
 import { checkScript } from "@/lib/script/check";
+import { pcFileOf } from "@/lib/engine/files";
 import { filesNeeded, validateSettings } from "@/lib/settings";
 import { FileExistsError, type FileStore, type Run, RunError, type RunRecords, type RunService } from "@/lib/runs/types";
 
@@ -77,7 +78,9 @@ export function makeRunService(deps: RunServiceDeps): RunService {
 
     async putFile(user, id, name, bytes) {
       const run = await ownedRun(user, id);
-      if (!run.needed.includes(name)) throw new RunError(400, `${name} is not one of this run's files`);
+      // a phone variant (entity-NAME.mobile.glb) is an extra of a file the run needs
+      const base = pcFileOf(name);
+      if (!run.needed.includes(name) && !(base !== null && run.needed.includes(base))) throw new RunError(400, `${name} is not one of this run's files`);
       if (Object.hasOwn(run.files, name)) throw new RunError(409, `${name} was already uploaded`);
 
       const checked = name === SCRIPT_FILE ? checkScriptFile(bytes) : checkGlb(name, bytes);

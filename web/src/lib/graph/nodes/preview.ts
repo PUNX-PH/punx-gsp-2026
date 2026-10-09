@@ -1,6 +1,7 @@
 // The Preview node: the one node with a side effect. It stores the game as an ordinary run (through the slice 2 run
 // service), so the existing Preview page plays it, and it replaces the graph's earlier run, so a graph never holds
 // more than one. Everything that can fail without side effects (reading the models) happens first.
+import { mobileFile } from "@/lib/engine/files";
 import { builtinModel } from "@/lib/graph/builtin";
 import { SCRIPT_FILE } from "@/lib/script/api";
 import { type Executor, NodeError, ROLE_FILES, type Role } from "@/lib/graph/types";
@@ -29,6 +30,14 @@ export const preview: Executor = async (inputs, _params, ctx) => {
     const bytes = await ctx.readAsset(piece.sha256);
     if (!bytes) throw new NodeError("Preview: a model file is missing. Choose it again.");
     models.push([piece.file, bytes]);
+  }
+
+  // The phone variants of the entities' models come last (a run is ready once its own files are there; these are extras the Android export prefers).
+  for (const piece of game.entityFiles ?? []) {
+    if (piece.mobile === undefined) continue;
+    const bytes = await ctx.readAsset(piece.mobile);
+    if (!bytes) throw new NodeError("Preview: a model file is missing. Choose it again.");
+    models.push([mobileFile(piece.file), bytes]);
   }
 
   // The earlier run goes first, which also frees its place under the 20-run cap. Someone may have deleted it already.

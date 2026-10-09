@@ -3,6 +3,7 @@
 // the person's daily exports is taken before the call and given back when no file came out. Packager and stores are ports, so every rule here is tested
 // with fakes.
 import { dayOf } from "@/lib/ai/key";
+import { mobileFile } from "@/lib/engine/files";
 import type { UsageLimits } from "@/lib/ai/ports";
 import { ExportError, type ExportService, type Packager, PackagerNotSetUpError, PackagerRefusedError, PackagerUnavailableError, PLATFORM_NAMES } from "@/lib/export/types";
 import { RunError, type RunService } from "@/lib/runs/types";
@@ -31,13 +32,25 @@ export function makeExportService(deps: ExportDeps): ExportService {
           throw error;
         }
       };
+      const readOptional = async (name: string) => {
+        try {
+          return (await deps.runs.readFile(user, runId, name)).bytes;
+        } catch (error) {
+          if (error instanceof RunError) return null;
+          throw error;
+        }
+      };
       const settingsBytes = await read("settings.json");
       const checked = validateSettings(new TextDecoder().decode(settingsBytes));
       if (!checked.ok || !(checked.settings.game || checked.settings.script)) {
         throw new ExportError(409, "Only a game made with Describe Game can be built for a computer or a phone. Turn on Make a game, then press Play.");
       }
       const files = [{ name: "settings.json", bytes: settingsBytes }];
-      for (const name of filesNeeded(checked.settings)) files.push({ name, bytes: await read(name) });
+      for (const name of filesNeeded(checked.settings)) {
+        // The phone build takes the variant cut to the phone's budget when the run has one (a run made before there were variants has none), and the
+        // computer build never sees it. Either way the player reads the file by its normal name.
+        files.push({ name, bytes: (platform === "android" && name.endsWith(".glb") ? await readOptional(mobileFile(name)) : null) ?? (await read(name)) });
+      }
 
       const day = dayOf(deps.now());
       const taken = await deps.limits.take(user.uid, day, { perPerson: deps.perPerson, total: deps.total });

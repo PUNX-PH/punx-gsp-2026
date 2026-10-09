@@ -106,6 +106,13 @@ export class NodeError extends Error {
 
 // ---- what travels along a wire ----
 
+/** One entity's GLB in a game's run; `mobile` is the hash of its variant cut to the phone's budget (the run holds it as entity-NAME.mobile.glb). */
+export interface EntityFile {
+  file: string;
+  sha256: string;
+  mobile?: string;
+}
+
 export type ModelSource = { kind: "asset"; sha256: string } | { kind: "builtin"; role: Role };
 
 export type WireValue =
@@ -118,10 +125,10 @@ export type WireValue =
   | { type: "palette"; colors: string[] }
   | { type: "feel"; tuning: Tuning }
   // A whole game from Describe Game: the checked spec, what Claude left out, the assets asked for, and the entity files made so far (entity-NAME.glb).
-  | { type: "game"; spec: GameSpec; leftOut: string; assets: AssetRequest[]; entityFiles: { file: string; sha256: string }[] }
+  | { type: "game"; spec: GameSpec; leftOut: string; assets: AssetRequest[]; entityFiles: EntityFile[] }
   // A Lua script game from Describe Game, on the same game wire: the checked script, its five colors, what Claude left out, the models asked for and
   // the entity files made so far. It has `script` where a game of rules has `spec`.
-  | { type: "game"; script: string; palette: string[]; leftOut: string; assets: AssetRequest[]; entityFiles: { file: string; sha256: string }[] }
+  | { type: "game"; script: string; palette: string[]; leftOut: string; assets: AssetRequest[]; entityFiles: EntityFile[] }
   // `sky`, `field` and `stripe` are palette indices 0 to 4; each piece of scenery is a GLB stored in the graph's folder.
   // A High environment also says so and carries the three files of its world (`style` is the look of the land, the road and the far hills).
   | {
@@ -144,7 +151,7 @@ export type WireValue =
       scenery?: { file: string; sha256: string }[];
       world?: { file: string; sha256: string }[];
       // Present (even empty) only for an engine game or a script game: the entity files, which are then the only files of the run besides the script.
-      entityFiles?: { file: string; sha256: string }[];
+      entityFiles?: EntityFile[];
       // Present only for a script game: the Lua text, stored in the run as game.lua.
       script?: string;
     };

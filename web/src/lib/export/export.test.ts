@@ -81,6 +81,29 @@ describe("the export service", () => {
     expect(JSON.stringify(logs)).toContain("packed");
   });
 
+  it("an Android build takes the phone variant of a file under the file's normal name, and a computer build never sees it", async () => {
+    const pc = makeGlb({ asset: { version: "2.0", generator: "pc" } });
+    const phone = makeGlb({ asset: { version: "2.0" } });
+    expect(phone.length).not.toBe(pc.length);
+    const { runs, id } = await storedRun(gameSettings("heroArt"), { "entity-hero.glb": pc, "entity-hero.mobile.glb": phone });
+    const { packager, calls } = fakePackager();
+    const { s } = service(runs, packager);
+    await s.exportGame(alice, id, "android");
+    await s.exportGame(alice, id, "windows");
+    expect(calls[0].files.map((f) => [f.name, f.size])).toEqual([["settings.json", expect.any(Number)], ["entity-hero.glb", phone.length]]);
+    expect(calls[1].files.map((f) => [f.name, f.size])).toEqual([["settings.json", expect.any(Number)], ["entity-hero.glb", pc.length]]);
+  });
+
+  it("an Android build of a run with no phone variant (an older run) takes the file it has", async () => {
+    const pc = makeGlb({ asset: { version: "2.0" } });
+    const { runs, id } = await storedRun(gameSettings("heroArt"), { "entity-hero.glb": pc });
+    const { packager, calls } = fakePackager();
+    const { s } = service(runs, packager);
+    await s.exportGame(alice, id, "android");
+    expect(calls[0].files.map((f) => f.name)).toEqual(["settings.json", "entity-hero.glb"]);
+    expect(calls[0].files[1].size).toBe(pc.length);
+  });
+
   it("refuses a runner game (no game spec), calling nothing and counting nothing", async () => {
     const { runs, id } = await storedRun(runnerSettings, { "hero.glb": makeGlb({ asset: { version: "2.0" } }), "obstacle.glb": makeGlb({ asset: { version: "2.0" } }), "collectible.glb": makeGlb({ asset: { version: "2.0" } }) });
     const { packager, calls } = fakePackager();

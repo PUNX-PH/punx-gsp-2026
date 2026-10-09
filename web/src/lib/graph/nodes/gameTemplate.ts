@@ -46,7 +46,7 @@ function scriptSettings(game: Extract<WireValue, { type: "game"; script: string 
     const given = inputs[`model${i + 1}`];
     if (given?.type !== "model") return;
     if (given.format !== "glb") throw new NodeError(`Game Template: model ${i + 1} is an ${given.format.toUpperCase()} file. Put a Prepare Model step after it.`);
-    if (!files.some((f) => f.file === entityFile(asset.entity))) files.push({ file: entityFile(asset.entity), sha256: given.sha256 });
+    if (!files.some((f) => f.file === entityFile(asset.entity))) files.push({ file: entityFile(asset.entity), sha256: given.sha256, ...(given.mobile ? { mobile: given.mobile.sha256 } : {}) });
   });
   const have = new Set(files.map((f) => f.file));
   const names = game.assets.map((a) => a.entity).filter((name) => have.has(entityFile(name)));

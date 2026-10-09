@@ -207,6 +207,39 @@ describe("Preview with a script", () => {
     expect(new TextDecoder().decode(stored.bytes)).toBe(SCRIPT);
   });
 
+  it("a model built with a phone variant carries it: the template keeps its hash and Preview stores it beside the file, after the rest", async () => {
+    const MOBILE = "b".repeat(64);
+    let n = 0;
+    const runs = makeRunService({ records: new MemoryRunRecords(), files: new MemoryFileStore(), now: Date.now, newId: () => `run${++n}` });
+    let last: string | null = null;
+    const pc = makeGlb({ asset: { version: "2.0" } });
+    const phone = makeGlb({ asset: { version: "2.0" }, extras: { phone: true } });
+    const ctx = {
+      user,
+      runs,
+      lastRun: { get: () => last, set: (id: string | null) => void (last = id) },
+      readAsset: async (sha: string) => (sha === SHA ? pc : sha === MOBILE ? phone : null),
+    } as unknown as ExecutorContext;
+
+    const made = await gameTemplate({ game: scriptWire([{ file: entityFile("hero"), sha256: SHA, mobile: MOBILE } as never]) }, {}, ctx);
+    if (made.output?.type !== "settings") throw new Error("expected settings");
+    expect(made.output.entityFiles).toEqual([{ file: entityFile("hero"), sha256: SHA, mobile: MOBILE }]);
+    const done = await preview({ settings: made.output }, {}, ctx);
+    const runId = (done.result as { runId: string }).runId;
+    const run = (await runs.listRuns(user)).find((r) => r.id === runId)!;
+    expect(run.needed).toEqual(["game.lua", entityFile("hero")]); // the phone file is an extra, never a need
+    expect(Object.keys(run.files).sort()).toEqual(["entity-hero.glb", "entity-hero.mobile.glb", "game.lua", "settings.json"]);
+    expect((await runs.readFile(user, runId, "entity-hero.mobile.glb")).bytes).toEqual(phone);
+  });
+
+  it("takes the phone variant from a numbered model input too", async () => {
+    const MOBILE = "b".repeat(64);
+    const model = { type: "model" as const, sha256: SHA, name: "freeform.glb", size: 1, format: "glb" as const, mobile: { sha256: MOBILE, size: 1 } };
+    const done = await gameTemplate({ game: scriptWire([], { assets: [{ entity: "hero", role: "hero", kind: "biped", description: "x" }] }), model1: model }, {}, {} as ExecutorContext);
+    if (done.output?.type !== "settings") throw new Error("expected settings");
+    expect(done.output.entityFiles).toEqual([{ file: entityFile("hero"), sha256: SHA, mobile: MOBILE }]);
+  });
+
   it("replaces the earlier run, and a script game with no models has just two files", async () => {
     let n = 0;
     const runs = makeRunService({ records: new MemoryRunRecords(), files: new MemoryFileStore(), now: Date.now, newId: () => `run${++n}` });

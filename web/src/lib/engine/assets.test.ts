@@ -21,7 +21,7 @@ describe("designEntityAssets", () => {
       { file: "entity-rock.glb", sha256: "0".repeat(63) + "2" },
     ]);
     expect(done.fallbacks).toEqual([]);
-    expect(calls[0]).toMatchObject({ role: "hero", kind: "biped", description: "a hero", palette, picture: null, motions: { run: "", jump: "", loop: "" } });
+    expect(calls[0]).toMatchObject({ role: "hero", kind: "freeform", description: "a hero", palette, picture: null, motions: { run: "", jump: "", loop: "" } });
     expect(await designEntityAssets(builder, job, [], palette, () => NOW)).toEqual({ files: [], fallbacks: [] });
   });
 

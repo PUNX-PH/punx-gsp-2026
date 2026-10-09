@@ -117,6 +117,22 @@ describe("a run with an environment", () => {
   });
 });
 
+describe("a phone variant of a file", () => {
+  it("is accepted beside a file the run needs, does not change when the run is ready, and is refused for a file it does not", async () => {
+    const { id, needed } = await service.createRun(alice, environmentSettingsFor());
+    for (const name of needed) await service.putFile(alice, id, name, glb());
+    expect((await service.listRuns(alice))[0].status).toBe("ready");
+    await service.putFile(alice, id, "hero.mobile.glb", glb(1));
+    expect((await service.readFile(alice, id, "hero.mobile.glb")).contentType).toBe("model/gltf-binary");
+    expect(await failure(service.putFile(alice, id, "dragon.mobile.glb", glb()))).toMatchObject({ status: 400, message: "dragon.mobile.glb is not one of this run's files" });
+    expect(await failure(service.putFile(alice, id, "hero.mobile.glb", glb()))).toMatchObject({ status: 409 });
+  });
+});
+
+function environmentSettingsFor(): string {
+  return validSettings;
+}
+
 describe("listRuns", () => {
   it("returns only the caller's runs, newest first, and removes stale pending ones", async () => {
     const a1 = await readyRun();

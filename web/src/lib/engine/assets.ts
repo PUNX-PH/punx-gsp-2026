@@ -4,14 +4,14 @@
 import type { BuilderService } from "@/lib/builder/types";
 import type { BlenderJob } from "@/lib/blender/types";
 import { MIN_START_MS, timeLeft } from "@/lib/graph/playTime";
-import { NodeError } from "@/lib/graph/types";
+import { type EntityFile, NodeError } from "@/lib/graph/types";
 import { entityFile } from "./files";
 import type { AssetRequest } from "./service";
 import { ENGINE_CAPS } from "./spec";
 
 export interface EntityAssets {
   /** One stored GLB per entity that got its model, named as the run holds it. */
-  files: { file: string; sha256: string }[];
+  files: EntityFile[];
   /** The entities that will be drawn as plain shapes, and a plain sentence for each. */
   fallbacks: { entity: string; message: string }[];
 }
@@ -38,13 +38,13 @@ export async function designEntityAssets(
     try {
       const built = await builder.buildModel(job, {
         role: request.role,
-        kind: request.kind,
+        kind: "freeform", // composed from parts, with a PC and a phone variant; the AI's kit kind is not used
         description: request.description,
         motions: { run: "", jump: "", loop: "" },
         picture: null,
         palette,
       });
-      out.files.push({ file: entityFile(request.entity), sha256: built.sha256 });
+      out.files.push({ file: entityFile(request.entity), sha256: built.sha256, ...(built.mobile ? { mobile: built.mobile.sha256 } : {}) });
     } catch (error) {
       // A step's own sentence (limits, the clock, the worker) is the person's to read; anything else is only "not built".
       const message = error instanceof NodeError ? error.message.replace(/^[^:]+: /, "") : "it could not be built.";

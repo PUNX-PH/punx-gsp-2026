@@ -15,6 +15,15 @@ Plan: `plans/2026-10-09-slice9-art-pipeline.md` (21 tasks). Spec: `specs/2026-10
   render: `render-preview.py` (Cycles, CPU). Recipes and generator: `blender-worker/fixtures/recipes/freeform/`, `tools/make-freeform-recipes.mjs`.
 - **Result (pictures in `art-gate/v2/`):** fox 10,950 triangles, robot 6,430, crate 3,504, pine 4,160, spaceship 3,672: all read as what they are. All inside PC budgets; the fox is over the mobile hero budget (5,000).
 
+## Phone variant in the run, and Make it uses freeform (2026-10-09)
+
+- A model's phone variant travels with it: `EntityFile = {file, sha256, mobile?}` on the game wire and the settings wire, the Game Template's numbered model inputs and `designEntityAssets` carry `mobile`; **Preview stores it as
+  `entity-NAME.mobile.glb` after every other file**; `runs.putFile` accepts `X.mobile.glb` when the run needs `X.glb` (an extra, never a "need", so readiness is unchanged). **The Android export swaps it in under the normal name**
+  (`entity-NAME.glb` gets the phone bytes; a run with no variant sends what it has); the Windows export never sees it. So the packager and the Unity player needed no change.
+- **Make it's generated graph and the rules path (`designEntityAssets`) now build every model as "freeform"** (the AI's kit kind in the asset request is ignored). Revert by using `asset.kind` / `request.kind` again in `graph/generated.ts` and `engine/assets.ts`.
+  This means a hero is one body with stock clips, not a rigged kit biped; judge by eye once the live key is there.
+- The WebGL Preview plays the PC files. Still open: the Target setting, style/detail/view on asset requests, Unity picking by platform without the swap (not needed now), sprites for 2D.
+
 ## Not done (in order of what to do next)
 
 1. ~~Wire `model` into the worker~~ **Done (2026-10-09).** A model body is `{ recipe, palette, role: hero|prop|scenery, target: pc|mobile }` (no motions yet); `recipe.mjs` checks it (`checkModelBody`), `build.py`'s `run_model` calls

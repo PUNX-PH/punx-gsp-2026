@@ -26,7 +26,7 @@ describe("the graph made from one description", () => {
   it("carries the words and Claude's description of each model, and makes every model step soft", () => {
     const graph = generatedGraph({ words: "a fox that jumps", assets: [asset("fox")] });
     expect(graph.nodes[0].params).toEqual({ prompt: "a fox that jumps", makeGame: "script" });
-    expect(graph.nodes[1].params).toMatchObject({ role: "hero", kind: "biped", description: "a fox", soft: true });
+    expect(graph.nodes[1].params).toMatchObject({ role: "hero", kind: "freeform", description: "a fox", soft: true });
   });
 
   it("keeps at most the six models the template has inputs for, and cuts overlong words and descriptions", () => {

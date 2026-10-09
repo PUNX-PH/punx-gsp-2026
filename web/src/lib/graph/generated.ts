@@ -24,7 +24,7 @@ export function generatedGraph(input: { words: string; assets: AssetRequest[] })
       type: "build-model",
       params: {
         role: asset.role,
-        kind: asset.kind,
+        kind: "freeform", // composed from parts (a model of its own, a PC and a phone variant); the AI's kit kind is not used
         description: Array.from(asset.description).slice(0, MAX_DESCRIPTION_CHARACTERS).join(""),
         run: "",
         jump: "",
