@@ -25,7 +25,8 @@ export function generatedGraph(input: { words: string; assets: AssetRequest[] })
       params: {
         role: asset.role,
         kind: "freeform", // composed from parts (a model of its own, a PC and a phone variant); the AI's kit kind is not used
-        description: Array.from(asset.description).slice(0, MAX_DESCRIPTION_CHARACTERS).join(""),
+        // a custom model needs words: an asset Claude left no words for is described by its name and role
+        description: Array.from(asset.description.trim() !== "" ? asset.description : `a ${asset.entity} (${asset.role})`).slice(0, MAX_DESCRIPTION_CHARACTERS).join(""),
         run: "",
         jump: "",
         loop: "",

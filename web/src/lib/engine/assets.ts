@@ -39,7 +39,7 @@ export async function designEntityAssets(
       const built = await builder.buildModel(job, {
         role: request.role,
         kind: "freeform", // composed from parts, with a PC and a phone variant; the AI's kit kind is not used
-        description: request.description,
+        description: request.description.trim() !== "" ? request.description : `a ${request.entity} (${request.role})`, // a custom model needs words
         motions: { run: "", jump: "", loop: "" },
         picture: null,
         palette,

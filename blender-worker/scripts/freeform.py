@@ -313,7 +313,7 @@ def _add_part(bm, part, which="both"):
     mirror image: the part is drawn and then reflected in place), so the two sides of a jointed part can go to two meshes."""
     # a tube's points are in the model's own units; every other shape is drawn in its unit space and scaled by `size`
     sx, sy, sz = (1.0, 1.0, 1.0) if part["shape"] == "tube" else part["size"]
-    before = len(bm.faces)
+    before = set(bm.faces)  # the new faces are found by identity: a bevel frees and reuses slots, so they are not the last ones in the list
     verts = _make(bm, part)
     turn = Euler([math.radians(a) for a in part["rot"]], "XYZ").to_matrix()
     offset = Vector(part["at"])
@@ -321,7 +321,7 @@ def _add_part(bm, part, which="both"):
         if not v.is_valid:
             continue
         v.co = turn @ Vector((v.co.x * sx, v.co.y * sy, v.co.z * sz)) + offset
-    new_faces = list(bm.faces)[before:]
+    new_faces = [f for f in bm.faces if f not in before]
     for f in new_faces:
         f.material_index = part["material"]
     if which == "mirror":
@@ -373,6 +373,7 @@ def build_model(path, recipe, palette, finishes, budget=None, animate=None):
         parts, _, dropped = fit_parts(parts, budget)
     while True:
         counts = _build(path, clean_materials, parts, palette, finishes, animate)
+        _need(counts["triangles"] > 0)  # a recipe of degenerate parts (a lathe with no width) builds nothing
         if budget is None or counts["triangles"] <= budget:
             break
         _need(len(parts) > 1)

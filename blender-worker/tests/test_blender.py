@@ -1303,6 +1303,38 @@ class BuildFreeform(unittest.TestCase):
         self.assertEqual(self.stats()["clips"], [])
         self.assertNotIn("animations", read_glb(self.out))
 
+    def test_a_part_after_a_beveled_box_keeps_every_face_and_its_material(self):
+        sys.path.insert(0, SCRIPTS)
+        import bmesh
+        import freeform
+
+        finishes = {"matte": {}, "metal": {}, "painted": {}, "rubber": {}, "glow": {}}
+        recipe = {
+            "version": 2, "kind": "model", "summary": "",
+            "materials": [{"color": 0, "finish": "matte"}, {"color": 1, "finish": "matte"}],
+            "parts": [
+                {"shape": "box", "size": [1, 1, 1], "bevel": 0.1, "material": 0},
+                {"shape": "ellipsoid", "at": [2, 0, 0], "size": [1, 1, 1], "material": 1, "mirror": True},
+                {"shape": "box", "at": [0, 3, 0], "size": [1, 1, 1], "bevel": 0.2, "material": 0},
+                {"shape": "capsule", "at": [3, 3, 0], "size": [0.5, 1, 0.5], "material": 1, "mirror": True},
+            ],
+        }
+        _, parts, _ = freeform.check_model(recipe, finishes)
+        bm = bmesh.new()
+        for part in parts:
+            freeform._add_part(bm, part)
+        by_material = {0: 0, 1: 0}
+        for face in bm.faces:
+            by_material[face.material_index] += len(face.verts) - 2
+        expected = {0: sum(freeform.part_triangles(p) for p in (parts[0], parts[2])), 1: sum(freeform.part_triangles(p) for p in (parts[1], parts[3]))}
+        bm.free()
+        self.assertEqual(by_material, expected)
+
+    def test_a_model_that_builds_nothing_exits_5(self):
+        body = self.fixture("crate", "prop", "pc")
+        body["recipe"]["parts"] = [{"shape": "revolve", "profile": [[0, 0], [0, 1]], "material": 0}]
+        self.assertEqual(self.build(body).returncode, EXIT_BAD_RECIPE)
+
     def test_a_model_that_cannot_fit_is_refused(self):
         sys.path.insert(0, SCRIPTS)
         import freeform

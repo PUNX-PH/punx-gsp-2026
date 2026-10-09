@@ -192,6 +192,8 @@ export function checkFreeformBody(body: unknown): string | null {
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 const MAX_ANSWER_CHARS = 60_000;
+/** The worker takes a body of 64 KiB; a repaired recipe (defaults filled in) must leave room for the palette and the rest. */
+const MAX_RECIPE_CHARS = 56_000;
 
 function number(v: unknown, low: number, high: number, fallback: number): number {
   return isNumber(v) ? clamp(v, low, high) : fallback;
@@ -296,5 +298,5 @@ export function repairFreeform(raw: unknown): { ok: true; recipe: FreeformRecipe
   const summary = typeof design.summary === "string" ? Array.from(design.summary.replace(/[\u0000-\u001f\u007f]/g, " ").trim()).slice(0, KIT.caps.summary).join("") : "";
 
   const recipe: FreeformRecipe = { version: 2, kind: "model", summary, ...(rig ? { rig } : {}), materials, parts };
-  return checkFreeformRecipe(recipe) === null ? { ok: true, recipe } : { ok: false };
+  return checkFreeformRecipe(recipe) === null && JSON.stringify(recipe).length <= MAX_RECIPE_CHARS ? { ok: true, recipe } : { ok: false };
 }

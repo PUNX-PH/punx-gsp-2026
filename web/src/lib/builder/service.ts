@@ -235,7 +235,15 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
     const role = freeformRoleOf(input.role);
     const clips = freeformClipsOf(input.role);
     const pc = await deps.blender.build(job, { label: "Build Model", body: { recipe, palette, role, target: "pc", clips } });
-    const mobile = await deps.blender.build(job, { label: "Build Model", body: { recipe, palette, role, target: "mobile", clips } });
+    // A phone variant that cannot be built (no time left, the day's builds used, a worker that did not answer) leaves the PC model: the Android export then
+    // takes the PC file, which is what a run with no variant does.
+    let mobile: Awaited<ReturnType<BlenderService["build"]>> | null = null;
+    try {
+      mobile = await deps.blender.build(job, { label: "Build Model", body: { recipe, palette, role, target: "mobile", clips } });
+    } catch (error) {
+      if (!(error instanceof NodeError)) throw error;
+      log({ step: STEP, call: "mobile", outcome: "skipped" });
+    }
     return {
       sha256: pc.sha256,
       size: pc.size,
@@ -245,9 +253,9 @@ export function makeBuilderService(deps: BuilderDeps): BuilderService {
       clips: pc.clips,
       summary: recipe.summary !== "" ? recipe.summary : "A custom model.",
       skipped: [],
-      reused: !asked && pc.reused && mobile.reused,
+      reused: !asked && pc.reused && (mobile?.reused ?? true),
       ...(pc.vertices === undefined ? {} : { vertices: pc.vertices }),
-      mobile: { sha256: mobile.sha256, size: mobile.size, triangles: mobile.triangles },
+      ...(mobile ? { mobile: { sha256: mobile.sha256, size: mobile.size, triangles: mobile.triangles } } : {}),
     };
   }
 

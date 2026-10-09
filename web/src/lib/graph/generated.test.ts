@@ -29,6 +29,11 @@ describe("the graph made from one description", () => {
     expect(graph.nodes[1].params).toMatchObject({ role: "hero", kind: "freeform", description: "a fox", soft: true });
   });
 
+  it("describes a model Claude gave no words for by its name and role, so the custom model step is complete and Play is not refused", () => {
+    const graph = generatedGraph({ words: "x", assets: [{ ...asset("coin", "collectible"), description: "   " }] });
+    expect(graph.nodes[1].params).toMatchObject({ kind: "freeform", description: "a coin (collectible)" });
+  });
+
   it("keeps at most the six models the template has inputs for, and cuts overlong words and descriptions", () => {
     const graph = generatedGraph({ words: "w".repeat(900), assets: Array.from({ length: 9 }, (_, i) => ({ ...asset(`m${i}`), description: "d".repeat(900) })) });
     expect(graph.nodes.filter((node) => node.type === "build-model")).toHaveLength(6);

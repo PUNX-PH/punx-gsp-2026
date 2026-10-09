@@ -24,6 +24,13 @@ Plan: `plans/2026-10-09-slice9-art-pipeline.md` (21 tasks). Spec: `specs/2026-10
   This means a hero is one body with stock clips, not a rigged kit biped; judge by eye once the live key is there.
 - The WebGL Preview plays the PC files. Still open: the Target setting, style/detail/view on asset requests, Unity picking by platform without the swap (not needed now), sprites for 2D.
 
+## Whole-branch review (2026-10-09, a fresh agent; no Critical findings)
+
+Fixed: **(Important) new faces of a part were found by list position; a bevel frees and reuses face slots, so after a beveled box the next part lost a face and two faces got the wrong material** (now by identity; the test fails without the fix: 204/1544 vs 216/1520
+triangles by material); **(Important) Make it could be refused when Claude left an asset with no words** (a custom model needs a description: it now falls back to "a NAME (role)", in the generated graph and the rules path); a failed **phone build now keeps the good PC
+model** (export falls back to the PC file); a recipe that builds nothing is refused (exit 5, not a 500); a repaired recipe over 56,000 characters is refused on the web (the worker takes 64 KiB); the worker checks the triangles against the budget again before sending.
+Left as they are: the 8192-token cap on Claude's answer (a huge recipe shows as "did not answer"); the Quality High setting and the Run/Jump/Loop boxes are ignored for the Custom kind; two worker calls run one after the other.
+
 ## Not done (in order of what to do next)
 
 1. ~~Wire `model` into the worker~~ **Done (2026-10-09).** A model body is `{ recipe, palette, role: hero|prop|scenery, target: pc|mobile }` (no motions yet); `recipe.mjs` checks it (`checkModelBody`), `build.py`'s `run_model` calls

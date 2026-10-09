@@ -21,7 +21,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkBuildBody } from "./recipe.mjs";
+import { checkBuildBody, KIT } from "./recipe.mjs";
 
 const SHAPES = ["cube", "sphere", "cone", "cylinder", "pyramid", "coin", "ring"];
 const FORMATS = ["glb", "fbx", "obj"];
@@ -218,6 +218,8 @@ export function createWorker(options) {
         // A High build, and a freeform model, also report how many shared vertices the GLB holds (it is what the game decodes); without it the answer is not usable.
         if (job.recipe.recipe?.quality === "high" || job.recipe.recipe?.kind === "model") {
           if (!Number.isInteger(vertices) || vertices < 1) throw new Refusal(500, "failed");
+          // a freeform model is never sent over the budget of its role and target (build.py fits it; this is the second line)
+          if (job.recipe.recipe.kind === "model" && triangles > KIT.freeform.budgets[job.recipe.role][job.recipe.target]) throw new Refusal(500, "failed");
           return { glb, triangles, parts, clips, vertices };
         }
         return { glb, triangles, parts, clips };
