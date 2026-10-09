@@ -1,0 +1,60 @@
+{
+  "recipe": {
+    "version": 1,
+    "kind": "prop",
+    "summary": "A wooden crate with iron corners.",
+    "build": {
+      "shape": "crate",
+      "size": 1.2
+    },
+    "colors": {
+      "body": 1,
+      "extra": 3
+    },
+    "extras": [],
+    "quality": "high",
+    "finishes": {
+      "body": "matte",
+      "extra": "metal"
+    },
+    "details": [
+      "seams",
+      "bolts"
+    ]
+  },
+  "motions": {
+    "version": 1,
+    "motions": {
+      "loop": {
+        "seconds": 1,
+        "tracks": [
+          {
+            "joint": "root",
+            "channel": "rotate",
+            "axis": "y",
+            "wave": "spin",
+            "amplitude": 1,
+            "cycles": 1,
+            "phase": 0
+          },
+          {
+            "joint": "root",
+            "channel": "move",
+            "axis": "y",
+            "wave": "swing",
+            "amplitude": 0.1,
+            "cycles": 1,
+            "phase": 0
+          }
+        ]
+      }
+    }
+  },
+  "palette": [
+    "#2a1b10",
+    "#a8743f",
+    "#c99a5b",
+    "#53606b",
+    "#e8d5b0"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "spaceship": {
+    "triangles": 1960,
+    "vertices": 1602,
+    "parts": 28,
+    "meshes": 1,
+    "clips": [],
+    "bytes": 68432,
+    "render": "spaceship.png"
+  }
+}

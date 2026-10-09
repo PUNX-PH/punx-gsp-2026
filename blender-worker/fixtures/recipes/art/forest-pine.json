@@ -1,0 +1,47 @@
+{
+  "recipe": {
+    "version": 1,
+    "kind": "scenery",
+    "summary": "A tall pine with a brown trunk.",
+    "build": {
+      "scenery": "pine"
+    },
+    "colors": {
+      "main": 2,
+      "detail": 1
+    },
+    "extras": [],
+    "quality": "high",
+    "finishes": {
+      "main": "matte",
+      "detail": "matte"
+    },
+    "details": []
+  },
+  "motions": {
+    "version": 1,
+    "motions": {
+      "loop": {
+        "seconds": 2.8,
+        "tracks": [
+          {
+            "joint": "canopy",
+            "channel": "rotate",
+            "axis": "x",
+            "wave": "swing",
+            "amplitude": 3,
+            "cycles": 1,
+            "phase": 0
+          }
+        ]
+      }
+    }
+  },
+  "palette": [
+    "#10201a",
+    "#5c3d24",
+    "#2f7d4f",
+    "#3f9d5f",
+    "#cfe8d0"
+  ]
+}
